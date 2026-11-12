@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { Button, Space, Tooltip } from "antd";
 import { DownOutlined, MessageOutlined, QuestionCircleOutlined } from "@ant-design/icons";
-import AskAiPanel from "@/components/ai/AskAiPanel";
+import AbacusMark from "@/components/abacus/AbacusMark";
 import ReportDialog from "@/components/feedback/ReportDialog";
 import {
   isLauncherCollapsed,
@@ -38,9 +39,23 @@ import {
 /** Space between the bottom of a page's content and the top of the cluster, once scrolled to the end. */
 const CLEARANCE_GAP = 12;
 
+/**
+ * Abacus is fetched when it is first wanted, not with every page (3.0.20): it
+ * carries the guide's answers, the bundled manual and its own views, and the
+ * floating buttons sit on every screen. Pointing at the button starts the
+ * download, so it is usually there by the time it is pressed. Once opened it
+ * stays mounted, so closing and opening again keeps the conversation.
+ */
+const AbacusPanel = dynamic(() => import("@/components/abacus/AbacusPanel"), { ssr: false });
+
+function preloadAbacus() {
+  void import("@/components/abacus/AbacusPanel");
+}
+
 export default function AssistantLauncher() {
   const box = useRef<HTMLDivElement>(null);
   const [askOpen, setAskOpen] = useState(false);
+  const [askWanted, setAskWanted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   // The stored choice is a browser-only value: the server renders expanded and
   // React swaps in the real state on hydration, without a mismatch.
@@ -72,7 +87,7 @@ export default function AssistantLauncher() {
 
   return (
     <>
-      {/* Out of sight while Ask AI is open (2.51): the cluster sat on the
+      {/* Out of sight while Abacus is open (2.51): the cluster sat on the
           panel's last lines, its tooltip over the text. Hidden, not removed, so
           the room it reserves at the foot of the page does not jump. */}
       <div
@@ -81,7 +96,7 @@ export default function AssistantLauncher() {
         data-feedback-chrome="true"
       >
         {collapsed ? (
-          <Tooltip title="Show Report and Ask AI" placement="left">
+          <Tooltip title="Show Report and Ask Abacus" placement="left">
             <Button
               type="primary"
               shape="circle"
@@ -104,15 +119,20 @@ export default function AssistantLauncher() {
                 Report
               </Button>
             </Tooltip>
-            <Tooltip title="Ask about a feature or an accounting workflow" placement="top">
+            <Tooltip title="Ask how something in OneBook works" placement="top">
               <Button
                 type="primary"
                 shape="round"
-                icon={<QuestionCircleOutlined />}
-                onClick={() => setAskOpen(true)}
-                aria-label="Ask AI"
+                icon={<AbacusMark size={22} />}
+                onClick={() => {
+                  setAskWanted(true);
+                  setAskOpen(true);
+                }}
+                onMouseEnter={preloadAbacus}
+                onFocus={preloadAbacus}
+                aria-label="Ask Abacus"
               >
-                Ask AI
+                Ask Abacus
               </Button>
             </Tooltip>
             <Tooltip title="Hide these buttons; one ? button stays to bring them back" placement="topRight">
@@ -128,16 +148,18 @@ export default function AssistantLauncher() {
         )}
       </div>
 
-      <AskAiPanel
-        open={askOpen}
-        onClose={() => setAskOpen(false)}
-        onReportProblem={() => {
-          // The panel's own "Report a problem" link, as in the reference design:
-          // close the assistant so the screenshot captures the page, not the drawer.
-          setAskOpen(false);
-          setReportOpen(true);
-        }}
-      />
+      {askWanted ? (
+        <AbacusPanel
+          open={askOpen}
+          onClose={() => setAskOpen(false)}
+          onReportProblem={() => {
+            // The panel's own "Report a problem" link, as in the reference design:
+            // close the assistant so the screenshot captures the page, not the drawer.
+            setAskOpen(false);
+            setReportOpen(true);
+          }}
+        />
+      ) : null}
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
     </>
   );

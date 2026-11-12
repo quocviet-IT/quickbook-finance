@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knownScreenName, screenName } from "@/lib/domain/screen-names";
+import { knownScreenName, screenName, screenPath } from "@/lib/domain/screen-names";
 import { guideKnownRoutes } from "@/lib/domain/screen-context";
 
 /**
@@ -41,5 +41,31 @@ describe("the name a person knows a screen by (3.0.17)", () => {
   it("never shows a path, even for a screen it does not know yet", () => {
     expect(knownScreenName("/some-new/screen-here")).toBeNull();
     expect(screenName("/some-new/screen-here")).toBe("Screen here");
+  });
+});
+
+describe("the menu path to a screen (Abacus)", () => {
+  it("puts a sidebar group before its page", () => {
+    expect(screenPath("/banking")).toBe("Banking › Bank Transactions");
+    expect(screenPath("/invoices")).toBe("Sales › Invoices");
+    expect(screenPath("/banking/overview")).toBe("Banking › Overview");
+  });
+
+  it("gives a top-level page its label alone", () => {
+    expect(screenPath("/dashboard")).toBe("Dashboard");
+  });
+
+  it("puts settings and reports under their own headings", () => {
+    expect(screenPath("/settings/periods")).toBe("Settings › Accounting periods");
+    expect(screenPath("/reports/cash-flow-forecast")).toBe("Reports › 13 Week Cash Forecast");
+  });
+
+  it("gives a screen no menu holds its name", () => {
+    expect(screenPath("/guide")).toBe("Guide");
+    expect(screenPath("/some-new/screen-here")).toBe("Screen here");
+  });
+
+  it("follows a record's page to its list", () => {
+    expect(screenPath("/invoices/8f3c2a1b-1111-4222-8333-944455556666")).toBe("Sales › Invoices");
   });
 });

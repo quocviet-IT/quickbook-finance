@@ -48,6 +48,33 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.20",
+    date: "2026-11-11",
+    headline: "Ask AI is now Abacus, and every conversation is kept under your account to open again.",
+    changes: [
+      {
+        kind: "added",
+        title: "Past conversations: open one again, read it whole and carry on asking; search them or delete them",
+        detail:
+          "History, at the top of the Abacus panel, lists your last 20 conversations in the company that is open, grouped by day, with the screen each was asked on. Open one to read every question and answer, and ask on from where it ended; Abacus remembers what was said. Search by the first or the last question asked, or by the screen; delete one, or clear them all. They are kept under your account, not in the browser, so they follow you to another computer, and nobody else sees them.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Answers show their steps in order, link the screen to open and name the guide they come from",
+        detail:
+          "Steps are numbered and joined down the side, and the name of a button reads as a key. A screen an answer mentions opens in one click. Under each answer, Ref. names the guide it came from and opens it. When the guides do not cover a question, the answer says so. Copy, and Helpful or Not right on the newest answer, sit beside it.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Common questions by topic, and the screen you are asking about is shown in the box you type in",
+        detail:
+          "An empty panel asks what you need to do on the screen you are on, says what Abacus can answer and what it cannot see, and offers common questions for this screen and for each area of the guide, each tagged with the guide that answers it. The box you type in reads About and the screen's name, so you know which screen the answer is about.",
+      },
+    ],
+  },
+  {
     version: "3.0.18",
     date: "2026-11-11",
     headline: "The guide says each step in a line, and Banking has six short guides instead of one long one.",

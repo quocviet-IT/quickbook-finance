@@ -177,9 +177,9 @@ describe("the buttons the guide names are the ones on screen (3.0.18)", () => {
     }
   });
 
-  it("says Report and Ask AI are on every screen, not on the screen the guide starts on", () => {
+  it("says Report and Ask Abacus are on every screen, not on the screen the guide starts on", () => {
     const flow = GUIDE_FLOWS.find((candidate) => candidate.id === "feedback");
-    expect(flow?.steps.filter((step) => step.everyScreen).map((step) => step.control)).toEqual(["Report", "Ask AI"]);
+    expect(flow?.steps.filter((step) => step.everyScreen).map((step) => step.control)).toEqual(["Report", "Ask Abacus"]);
     const view = read("app", "(app)", "guide", "[id]", "GuideFlowView.tsx");
     expect(view).toMatch(/step\.everyScreen \? "every screen"/);
   });

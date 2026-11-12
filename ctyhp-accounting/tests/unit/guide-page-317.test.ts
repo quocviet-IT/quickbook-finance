@@ -48,10 +48,10 @@ describe("where the guide is reached from (3.0.17)", () => {
     expect(shell).toMatch(/>\s*New\s*</);
   });
 
-  it("is gone from the floating help buttons, which keep Report and Ask AI", () => {
+  it("is gone from the floating help buttons, which keep Report and Ask Abacus (Ask AI until 3.0.20)", () => {
     expect(launcher).not.toMatch(/System guide|SystemGuideDrawer|openGuide/);
     expect(launcher).toMatch(/Report/);
-    expect(launcher).toMatch(/Ask AI/);
+    expect(launcher).toMatch(/Ask Abacus/);
   });
 });
 

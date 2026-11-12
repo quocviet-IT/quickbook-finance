@@ -48,6 +48,30 @@ const NAMES: ReadonlyMap<string, string> = (() => {
   return names;
 })();
 
+/**
+ * Where a person finds a screen, as the menus lay it out (Abacus): "Banking ›
+ * Bank Transactions", "Settings › Accounting periods", "Reports › Balance
+ * Sheet". Read from the same three catalogues as the names, so it cannot drift.
+ */
+const PATHS: ReadonlyMap<string, string> = (() => {
+  const paths = new Map<string, string>();
+  const add = (href: string, path: string) => {
+    const route = screenRoute(href);
+    if (!paths.has(route)) paths.set(route, path);
+  };
+  for (const item of NAV) {
+    if (!isNavGroup(item)) {
+      add(item.key, item.label);
+      continue;
+    }
+    for (const child of item.children) add(child.key, `${item.label} › ${child.label}`);
+  }
+  for (const group of SETTINGS_HUB) for (const entry of group.items) add(entry.href, `Settings › ${entry.title}`);
+  for (const report of REPORT_CATALOG) add(report.href, `Reports › ${report.title}`);
+  for (const [route, name] of Object.entries(OTHER_SCREENS)) add(route, name);
+  return paths;
+})();
+
 /** The screen's name from the menus, or null when no menu names it. */
 export function knownScreenName(route: string): string | null {
   return NAMES.get(screenRoute(route)) ?? null;
@@ -63,4 +87,9 @@ export function screenName(route: string): string {
   const last = screenRoute(route).split("/").filter(Boolean).pop() ?? "";
   const words = last.replace(/[-_]+/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "OneBook";
+}
+
+/** The menu path to a screen ("Sales › Invoices"), or its name when no menu holds it. */
+export function screenPath(route: string): string {
+  return PATHS.get(screenRoute(route)) ?? screenName(route);
 }
