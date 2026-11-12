@@ -45,6 +45,11 @@ describe("manual grounding context", () => {
 describe("buildAskAiSystemPrompt", () => {
   const prompt = buildAskAiSystemPrompt();
 
+  it("asks for a route in place of a screen's name, never both", () => {
+    expect(prompt).toContain("write the route instead of the name,");
+    expect(prompt).toContain("Do not copy the notation of the briefing below.");
+  });
+
   it("grounds the answer in the manual rather than the model's own knowledge", () => {
     expect(prompt).toContain("Answer only from the chapters below");
     expect(prompt).toContain(MANUAL_CONTEXT);

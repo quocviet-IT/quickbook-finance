@@ -557,7 +557,9 @@ export default function AbacusPanel({
       aria-labelledby={titleId}
       classNames={{ wrapper: "abacus-drawer" }}
       styles={{
-        wrapper: { maxWidth: "100vw" },
+        // 100%, not 100vw: with a scrollbar, 100vw is 15px wider than the
+        // page, and a full-width panel slid that far off the left edge.
+        wrapper: { maxWidth: "100%" },
         body: { padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" },
       }}
       afterOpenChange={(visible) => {

@@ -118,7 +118,17 @@ describe("describeContextForAssistant", () => {
 
   it("names the controls on that screen, so the answer can point at one", () => {
     const briefing = describeContextForAssistant(base);
-    expect(briefing).toContain('control "');
+    expect(briefing).toContain('use "');
+    // The old notation was copied into answers word for word (3.0.20).
+    expect(briefing).not.toContain("— control");
+  });
+
+  it("names a control that is the screen it opens once, as the route", () => {
+    const flow = GUIDE_FLOWS.find((f) => f.steps.some((s) => s.route === "/reports/ar-aging"));
+    expect(flow).toBeDefined();
+    const briefing = describeContextForAssistant({ ...base, route: flow!.route });
+    expect(briefing).toContain("open /reports/ar-aging");
+    expect(briefing).not.toMatch(/use "[^"]*" on \/reports\/ar-aging/);
   });
 
   it("names the guide beside each workflow, so the answer can cite it", () => {

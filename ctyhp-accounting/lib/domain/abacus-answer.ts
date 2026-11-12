@@ -139,7 +139,57 @@ function inlines(text: string, known: readonly string[]): AbacusInline[] {
     }
   }
   pushText(text.slice(last));
-  return out;
+  return mergeNamedRoutes(out);
+}
+
+/** Words that may sit between a screen's name and its route: "`Open Invoices` report [/reports/open-invoices]". */
+const KEPT_BETWEEN = /^\s*(report|screen|page|tab)\s*$/i;
+const DROPPED_BETWEEN = /^\s*(on|in|at|from|under)?\s*$/i;
+
+/**
+ * A screen named twice, once as a control and once as its link, reads as one
+ * link (3.0.20). Models write "View the `Accounts Receivable Aging` report
+ * [/reports/ar-aging]", and the route renders as that same name, so the reader
+ * saw "Accounts Receivable Aging report Accounts Receivable Aging". The control
+ * becomes the link and the second mention goes, with an "on" or "in" that only
+ * joined the two.
+ */
+function mergeNamedRoutes(items: AbacusInline[]): AbacusInline[] {
+  const out = [...items];
+  for (let i = 0; i < out.length; i++) {
+    const route = out[i];
+    if (route.kind !== "route") continue;
+    const namedAt = out[i - 1]?.kind === "text" ? i - 2 : i - 1;
+    const named = out[namedAt];
+    if (!named || (named.kind !== "control" && named.kind !== "strong")) continue;
+    if (named.text.trim().toLowerCase() !== route.name.toLowerCase()) continue;
+    const between = namedAt === i - 2 ? out[i - 1] : null;
+    if (between && between.kind !== "text") continue;
+    const gap = between?.text ?? "";
+    if (!KEPT_BETWEEN.test(gap) && !DROPPED_BETWEEN.test(gap)) continue;
+    out[namedAt] = route;
+    const next = out[i + 1];
+    const beforePunctuation = next?.kind === "text" && /^[.,;:!?)]/.test(next.text);
+    if (between) {
+      if (KEPT_BETWEEN.test(gap)) {
+        between.text = beforePunctuation ? gap.trimEnd() : gap;
+        out.splice(i, 1);
+      } else {
+        out.splice(i - 1, 2);
+        if (!beforePunctuation && next?.kind === "text" && !/^\s/.test(next.text)) next.text = ` ${next.text}`;
+      }
+    } else {
+      out.splice(i, 1);
+    }
+    i = namedAt;
+  }
+  // Two text runs left side by side by a removal read as one.
+  return out.reduce<AbacusInline[]>((merged, item) => {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.kind === "text" && item.kind === "text") prev.text += item.text;
+    else merged.push(item.kind === "text" ? { ...item } : item);
+    return merged;
+  }, []);
 }
 
 const STEP_LINE = /^\s*\d+\s*[.)]\s+(.*\S)\s*$/;

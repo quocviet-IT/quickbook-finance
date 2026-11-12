@@ -129,6 +129,13 @@ export function groupByDay<T extends { updatedAt: string }>(
 }
 
 /** A conversation's title short enough for a dialog's question: `How do I record a payment…`. */
+/** A server's message read as a sentence, so the line after it does not run on: "fetch failed" → "fetch failed." */
+export function asSentence(message: string): string {
+  const text = message.trim();
+  if (!text) return text;
+  return /[.!?…]$/.test(text) ? text : `${text}.`;
+}
+
 export function shortTitle(title: string, limit = 60): string {
   const flat = title.replace(/\s+/g, " ").trim();
   return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`;

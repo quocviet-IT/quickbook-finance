@@ -16,7 +16,7 @@ import {
 import { formatDayHeading, formatTime, plural } from "@/lib/format";
 import AbacusMark from "./AbacusMark";
 import { AnswerBlocks, RouteCard } from "./AbacusAnswer";
-import type { AbacusTurn } from "./abacus-view";
+import { asSentence, type AbacusTurn } from "./abacus-view";
 import styles from "./abacus.module.css";
 
 /**
@@ -203,7 +203,7 @@ function Reply({
         <AbacusSays at={null} timeZone={timeZone} />
         <div className={`${styles.note} ${styles.noteError}`} role="alert">
           <b>No answer came back.</b>
-          <p>{turn.error ?? "The connection dropped before the answer arrived."} Your question is kept.</p>
+          <p>{asSentence(turn.error ?? "The connection dropped before the answer arrived.")} Your question is kept.</p>
           <div className={styles.noteRow}>
             <button
               type="button"

@@ -131,6 +131,42 @@ describe("abacusBlocks", () => {
   it("defaults to the routes the guide names", () => {
     expect(abacusBlocks("[/invoices]")[0].kind).toBe("route");
   });
+
+  it("reads a screen named twice, as a key cap and as its link, as one link", () => {
+    const name = abacusBlocks("[/reports/ar-aging]", known)[0] as { name: string };
+    const read = (text: string) => abacusBlocks(text, known)[0];
+    expect(read(`View the \`${name.name}\` report [/reports/ar-aging].`)).toEqual({
+      kind: "paragraph",
+      inlines: [
+        { kind: "text", text: "View the " },
+        { kind: "route", route: "/reports/ar-aging", name: name.name },
+        { kind: "text", text: " report." },
+      ],
+    });
+    expect(read(`Check it — control \`${name.name}\` on [/reports/ar-aging].`)).toEqual({
+      kind: "paragraph",
+      inlines: [
+        { kind: "text", text: "Check it — control " },
+        { kind: "route", route: "/reports/ar-aging", name: name.name },
+        { kind: "text", text: "." },
+      ],
+    });
+    expect(read(`Open **${name.name}** [/reports/ar-aging] to see it.`)).toMatchObject({
+      inlines: [{ kind: "text", text: "Open " }, { kind: "route" }, { kind: "text", text: " to see it." }],
+    });
+  });
+
+  it("keeps a key cap that is not the linked screen's name", () => {
+    expect(abacusBlocks("Click `Receive payment` on [/invoices].", known)[0]).toMatchObject({
+      inlines: [
+        { kind: "text", text: "Click " },
+        { kind: "control", text: "Receive payment" },
+        { kind: "text", text: " on " },
+        { kind: "route", route: "/invoices" },
+        { kind: "text", text: "." },
+      ],
+    });
+  });
 });
 
 describe("abacusTopics", () => {

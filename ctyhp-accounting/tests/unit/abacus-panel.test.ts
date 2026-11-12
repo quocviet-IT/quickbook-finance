@@ -4,6 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   ABACUS_KEPT,
+  asSentence,
   filterConversations,
   groupByDay,
   guideForScreen,
@@ -128,7 +129,7 @@ describe("the drawer", () => {
     expect(panel).toContain("title={null}");
     expect(panel).toContain("closable={false}");
     expect(panel).toContain("size={468}");
-    expect(panel).toContain('wrapper: { maxWidth: "100vw" }');
+    expect(panel).toContain('wrapper: { maxWidth: "100%" }');
     expect(panel).toContain('body: { padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }');
     expect(panel).toContain('classNames={{ wrapper: "abacus-drawer" }}');
   });
@@ -258,7 +259,11 @@ describe("buttons that are only an icon", () => {
   it("include the header's New and History, whose words hide on a phone", () => {
     expect(panel).toContain('aria-label="New conversation"');
     expect(panel).toContain('aria-label="History"');
-    expect(css).toMatch(/@media \(max-width: 520px\) \{\s*\.headerLabel,\s*\.enterHint \{\s*display: none;/);
+    expect(css).toMatch(/@media \(max-width: 520px\) \{\s*\.headerLabel,\s*\.enterHint,\s*\.guideTag \{\s*display: none;/);
+  });
+
+  it("leave a phone's common questions their full width, without the guide tag", () => {
+    expect(css).toMatch(/@media \(max-width: 520px\) \{[^}]*\.guideTag \{\s*display: none;/);
   });
 });
 
@@ -405,5 +410,14 @@ describe("a reply's source", () => {
     expect(knownSource({ kind: "guide", id: "no-such-guide", title: "x", href: "/guide/no-such-guide" })).toBeNull();
     expect(knownSource(null)).toBeNull();
     expect(knownSource(undefined)).toBeNull();
+  });
+});
+
+describe("a server's message in the error note", () => {
+  it("ends as a sentence, so the next line does not run on", () => {
+    expect(asSentence("Could not reach the model: fetch failed")).toBe("Could not reach the model: fetch failed.");
+    expect(asSentence("Try again in a minute.")).toBe("Try again in a minute.");
+    expect(asSentence("Is it down?")).toBe("Is it down?");
+    expect(asSentence("  ")).toBe("");
   });
 });
