@@ -15,7 +15,7 @@ import LoanSplitModal from "./LoanSplitModal";
 import {
   categoriseBankTransactionAction,
   postLoanPaymentAction,
-  recodeUncategorizedAction,
+  recodeBankTransactionAction,
   uncategoriseBankTransactionAction,
   undoRecodeAction,
 } from "./actions";
@@ -110,16 +110,15 @@ export default function CategoriseCell({
       })),
     [accounts, query],
   );
-  // A recode moves money out of Uncategorized, so it never goes back into one,
-  // and a bank account is not a category (acc_recode_uncategorized refuses both).
+  // Never Uncategorized, a bank account, or the account it is on (acc_recode_bank_transaction refuses all three).
   const recodeOptions = useMemo(() => {
     const holdingIds = new Set(accounts.filter((a) => isHoldingDetail(a.detail_type)).map((a) => a.id));
-    return options.filter((option) => !holdingIds.has(option.value) && option.type !== "bank");
-  }, [accounts, options]);
+    return options.filter((option) => !holdingIds.has(option.value) && option.type !== "bank" && option.value !== posting?.account_id);
+  }, [accounts, options, posting?.account_id]);
 
   async function recodeTo(accountId: string) {
     setBusy(true);
-    const res = await recodeUncategorizedAction(transactionId, accountId);
+    const res = await recodeBankTransactionAction(transactionId, accountId);
     setBusy(false);
     if (!res.ok || !res.data) {
       message.error(res.error ?? "Could not recode this line");
@@ -140,7 +139,7 @@ export default function CategoriseCell({
       message.error(res.error ?? "Could not take the recode back");
       return;
     }
-    message.success("Recode taken back. The line is in Uncategorized again.");
+    message.success(`Recode taken back. The line is on ${posting ? `${posting.account_code} — ${posting.account_name}` : "its own account"} again.`);
     onChanged();
   }
 
@@ -291,6 +290,7 @@ export default function CategoriseCell({
     return (
       <RecodedCategory
         recode={recode}
+        from={`${posting.account_code} — ${posting.account_name}`}
         entryNumber={posting.entry_number}
         onUndo={canWrite && posting.own_entry ? () => void takeRecodeBack() : null}
         undoing={busy}
@@ -304,6 +304,8 @@ export default function CategoriseCell({
     const others = posting.others ?? [];
     const everyAccount = [main, ...others].join("; ");
     const mayChange = canWrite && posting.own_entry;
+    // Any line coded here to one account, reconciled or not (3.0.25); a split line is corrected with a journal entry.
+    const mayRecode = mayChange && others.length === 0;
     return (
       <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
         {/* Cut to the column, with the whole account name on hover: an account
@@ -326,7 +328,7 @@ export default function CategoriseCell({
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {posting.entry_number ?? "posted"}
           </Typography.Text>
-          {mayChange && holding ? (
+          {mayRecode ? (
             <Button type="link" size="small" style={linkStyle} disabled={busy} onClick={() => setRecoding((open) => !open)}>
               Recode
             </Button>
@@ -354,7 +356,7 @@ export default function CategoriseCell({
           ) : null}
         </Space>
         {recoding ? (
-          <Tooltip title="Choosing an account posts a second entry that moves this line out of Uncategorized">
+          <Tooltip title="Choosing an account posts a second entry, the same day, that moves this line's money there. The bank side, and any reconciliation it is on, stay as they are.">
             {accountSelect(recodeOptions, "Recode to…", (accountId) => void recodeTo(accountId))}
           </Tooltip>
         ) : null}

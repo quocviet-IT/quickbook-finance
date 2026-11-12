@@ -763,16 +763,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "instead of asking again, and Change voids the entry and hands the line back.",
       },
       {
-        action: "Recode a line from Uncategorized",
+        action: "Move a coded line to another account",
         summary: "Posts a second entry that moves the amount to the account you choose.",
         control: "Recode",
         route: "/banking",
         note:
-          "In Bank Transactions, Needs coding in the posted-to filter lists the lines still in Uncategorized. Recode posts a " +
-          "second entry, the same day, that moves the amount to the account you choose; the line's own entry, and " +
-          "any reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a signed-off month " +
-          "cannot be taken back with Change — recode it instead. A recoded line offers Undo recode, not Change: to code it " +
-          "again, Undo recode first.",
+          "Any line coded in Bank Transactions to one account offers Recode, in a reconciled month too; Needs coding in " +
+          "the posted-to filter lists the lines still in Uncategorized. Recode posts a second entry, the same day, that " +
+          "moves the amount to the account you choose; the line's own entry, its date, amount and bank account, and any " +
+          "reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a " +
+          "signed-off month cannot be taken back with Change: recode it instead. A recoded line offers Undo recode, not " +
+          "Change. A line split across accounts is corrected with a journal entry.",
       },
       {
         action: "Check for a charge taken twice",

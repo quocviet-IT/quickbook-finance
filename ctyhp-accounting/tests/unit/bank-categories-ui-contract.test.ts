@@ -24,7 +24,8 @@ describe("the banking category column", () => {
     expect(end).toBeGreaterThan(start);
     expect(cell.slice(start, end)).toContain("<RecodedCategory");
     const recoded = read("RecodedCategory.tsx");
-    expect(recoded).toContain("Recoded from Uncategorized");
+    // From whatever account the line's own entry names (3.0.25), not only Uncategorized.
+    expect(recoded).toContain("Recoded from {from}");
     expect(recoded).toContain("` → ${recode.entry_number}`");
     expect(recoded).toContain("Undo recode");
     expect(recoded).toContain("Create rule");

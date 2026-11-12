@@ -643,7 +643,28 @@ export async function recodeUncategorized(
   return (Array.isArray(data) ? data[0] : data) as { entry_number: string | null; account_code: string; account_name: string };
 }
 
-/** Take a recode back: its entry is voided, and the line is in Uncategorized again. */
+/**
+ * Move a line coded in Bank Transactions to another account (3.0.25, 0194):
+ * any line Banking coded to one account, reconciled or not. The line's own
+ * entry and its bank side stay as they are; a second entry, the same day,
+ * moves the amount, so a reconciled month still agrees. A line recoded before
+ * is recoded from its own entry again, and recoding it to its own entry's
+ * account takes the recode back.
+ */
+export async function recodeBankTransaction(
+  sb: SupabaseClient,
+  transactionId: string,
+  accountId: string,
+): Promise<{ entry_number: string | null; account_code: string; account_name: string }> {
+  const { data, error } = await sb.rpc("acc_recode_bank_transaction", {
+    p_bank_transaction_id: transactionId,
+    p_account_id: accountId,
+  });
+  if (error) throw new BankingError(error.message);
+  return (Array.isArray(data) ? data[0] : data) as { entry_number: string | null; account_code: string; account_name: string };
+}
+
+/** Take a recode back: its entry is voided, and the line is on its own entry's account again. */
 export async function undoRecode(sb: SupabaseClient, transactionId: string): Promise<{ entry_number: string | null }> {
   const { data, error } = await sb.rpc("acc_undo_recode", { p_bank_transaction_id: transactionId });
   if (error) throw new BankingError(error.message);
