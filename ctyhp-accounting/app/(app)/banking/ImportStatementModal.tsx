@@ -63,7 +63,7 @@ import {
 import { formatMoney } from "@/lib/format";
 import { rememberColumns, rememberedColumns, type CsvColumnChoice } from "@/lib/client/statement-columns";
 import { statementLineKeyTable } from "@/lib/client/statement-line-keys";
-import { bankLinesOnAction, priorClosingAction } from "./actions";
+import { bankLinesElsewhereAction, bankLinesOnAction, priorClosingAction } from "./actions";
 import PdfStatementPreview, { OcrNotice, ReadingPdf, ScannedPdf, UnreadableFile, WrongAccountAlert } from "./PdfStatementPreview";
 import { ocrAvailableAction } from "./ocr-actions";
 import type { ScannedReading } from "@/lib/domain/ocr-statement";
@@ -457,17 +457,21 @@ export default function ImportStatementModal({
   }, [open, bankAccount.id]);
   const prior = priorOf?.accountId === bankAccount.id ? priorOf.prior : null;
 
-  // Which lines are already in Bank Transactions, from this statement or from
-  // another source. The server is asked once per statement read, never on a
-  // tick: for the account's bank lines over the file's days, with their keys.
-  // The lines' own keys are worked out here, once, for every occurrence a line
-  // can be sent as. Nothing is imported until both are in. Both belong to the
-  // account: its id is part of every key.
+  // Which lines are already in Bank Transactions: from this statement, from
+  // another source, or (3.0.22) under another bank account of the company. The
+  // server is asked once per statement read, never on a tick: for the
+  // account's bank lines over the file's days, with their keys, and for the
+  // other accounts' lines over the same days. The lines' own keys are worked
+  // out here, once, for every occurrence a line can be sent as. Nothing is
+  // imported until all three are in. The keys belong to the account: its id is
+  // part of every one.
   const factsKey = purpose === "import" && lines.length ? `${bankAccount.id}|${linesKey}` : "";
   const [factsOf, setFactsOf] = useState<{
     key: string;
     lines: readonly StatementLine[];
     facts: StatementLineFacts | null;
+    /** Every bank account of the company by id, as the screens name it: for the lines another one holds. */
+    labels: Readonly<Record<string, string>>;
     error: string | null;
   } | null>(null);
   useEffect(() => {
@@ -475,17 +479,27 @@ export default function ImportStatementModal({
     if (!factsKey || !days) return;
     let live = true;
     const key = factsKey;
-    Promise.all([bankLinesOnAction(bankAccount.id, days.from, days.to), statementLineKeyTable(bankAccount.id, lines)])
-      .then(([res, keys]) => {
+    Promise.all([
+      bankLinesOnAction(bankAccount.id, days.from, days.to),
+      bankLinesElsewhereAction(bankAccount.id, days.from, days.to),
+      statementLineKeyTable(bankAccount.id, lines),
+    ])
+      .then(([res, other, keys]) => {
         if (!live) return;
         setFactsOf(
-          res.ok
-            ? { key, lines, facts: { keys, bankLines: res.data ?? [] }, error: null }
-            : { key, lines, facts: null, error: res.error ?? serverFailure(null) },
+          res.ok && other.ok
+            ? {
+                key,
+                lines,
+                facts: { keys, bankLines: res.data ?? [], elsewhere: other.data?.lines ?? [] },
+                labels: other.data?.labels ?? {},
+                error: null,
+              }
+            : { key, lines, facts: null, labels: {}, error: (res.ok ? other.error : res.error) ?? serverFailure(null) },
         );
       })
       .catch((error: unknown) => {
-        if (live) setFactsOf({ key, lines, facts: null, error: serverFailure(error) });
+        if (live) setFactsOf({ key, lines, facts: null, labels: {}, error: serverFailure(error) });
       });
     return () => {
       live = false;
@@ -493,6 +507,7 @@ export default function ImportStatementModal({
   }, [factsKey, bankAccount.id, lines]);
   const factsHere = factsOf?.key === factsKey && factsOf.lines === lines ? factsOf : null;
   const facts = factsHere?.facts ?? null;
+  const accountLabels = factsHere?.labels;
   const checkError = factsHere?.error ?? null;
   // Worked out again here on every Not a transaction tick, with no round trip:
   // the keys are counted over the lines sent, as the import counts them.
@@ -511,14 +526,24 @@ export default function ImportStatementModal({
   // Worked out again only when something it rests on changes: a statement can
   // hold thousands of lines, and a render for anything else — the import
   // starting, the dialog's own busy state — should not walk them again.
-  const { currencyCode, decimals } = bankAccount;
+  const { currencyCode, decimals, label: hereLabel } = bankAccount;
   const view = useMemo(
     () =>
       statementDialogView(
-        { purpose, kind, lines: shownLines, figures: shownFigures, prior: shownPrior, marks, check, canOverride },
+        {
+          purpose,
+          kind,
+          lines: shownLines,
+          figures: shownFigures,
+          prior: shownPrior,
+          marks,
+          check,
+          accounts: { here: hereLabel, labels: accountLabels ?? {} },
+          canOverride,
+        },
         (minor) => formatMoney(minor, currencyCode, decimals),
       ),
-    [purpose, kind, shownLines, shownFigures, shownPrior, marks, check, canOverride, currencyCode, decimals],
+    [purpose, kind, shownLines, shownFigures, shownPrior, marks, check, hereLabel, accountLabels, canOverride, currencyCode, decimals],
   );
   const aside = useMemo(() => new Set(marks.aside), [marks.aside]);
 

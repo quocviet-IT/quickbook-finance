@@ -13,6 +13,15 @@ import { statementLineHashes } from "@/lib/domain/banking-import";
 import type { StatementProofPayload } from "@/lib/domain/statement-proof";
 import { BANK_LINE_SOURCES, otherSourceLines, type BankLineOn, type BankLineSource } from "@/lib/domain/statement-repeats";
 import { statementDays } from "@/lib/domain/statement-line-keys";
+import {
+  NO_OTHER_ACCOUNTS,
+  otherAccountLines,
+  sameAccountNumber,
+  sameNumberRefusal,
+  wholeStatementElsewhere,
+  type ElsewhereBankLine,
+  type OtherAccountsCheck,
+} from "@/lib/domain/statement-other-accounts";
 import { BANK_DETAIL_TYPES } from "@/lib/domain/bank-account-detail";
 import { isCardAccountType } from "@/lib/domain/card-account";
 import { validFeedStart, type FeedSkips } from "@/lib/domain/bank-feed-start";
@@ -59,6 +68,24 @@ export async function listBankAccounts(sb: SupabaseClient): Promise<BankAccountW
   }));
 }
 
+/** How a bank account is named wherever one is chosen: its own name, then its ledger account's code. */
+export function bankAccountLabel(account: Pick<BankAccountWithGl, "bank_name" | "account_name" | "account_code">): string {
+  return `${account.bank_name || account.account_name} · ${account.account_code}`;
+}
+
+/**
+ * Refuses an account number another bank account of the company already has
+ * (3.0.22). Two bank accounts for one real account is how one statement came
+ * to be imported, and coded, twice. `exceptId` is the account being edited.
+ */
+async function refuseNumberInUse(sb: SupabaseClient, number: string | null | undefined, exceptId: string | null): Promise<void> {
+  if (!number) return;
+  const holder = (await listBankAccounts(sb)).find(
+    (account) => account.id !== exceptId && sameAccountNumber(account.account_number_masked, number),
+  );
+  if (holder) throw new BankingError(sameNumberRefusal(bankAccountLabel(holder), number));
+}
+
 /** Whether a bank account is a credit card (2.45): its ledger account is Credit Card-type. */
 export async function isCardBankAccount(sb: SupabaseClient, bankAccountId: string): Promise<boolean> {
   const { data, error } = await sb
@@ -91,6 +118,7 @@ export async function createBankAccount(
     detail_type?: string | null;
   },
 ): Promise<BankAccountRow> {
+  await refuseNumberInUse(sb, input.account_number_masked, null);
   const { data, error } = await sb.rpc("acc_save_bank_account", {
     p_values: {
       account_id: input.account_id,
@@ -112,6 +140,25 @@ export async function createBankAccount(
     if (classifyError) console.warn("classifying the ledger account failed:", classifyError.message);
   }
 
+  return data as unknown as BankAccountRow;
+}
+
+/**
+ * Correct a bank account's name or number (3.0.22, migration 0191). Its ledger
+ * account and currency are not changed here: lines are already posted to them.
+ * The audit trigger on the table keeps the old and the new values.
+ */
+export async function updateBankAccount(
+  sb: SupabaseClient,
+  id: string,
+  input: { bank_name: string; account_number_masked?: string | null },
+): Promise<BankAccountRow> {
+  await refuseNumberInUse(sb, input.account_number_masked, id);
+  const { data, error } = await sb.rpc("acc_update_bank_account", {
+    p_id: id,
+    p_values: { bank_name: input.bank_name, account_number_masked: input.account_number_masked || null },
+  });
+  if (error) throw new BankingError(error.message);
   return data as unknown as BankAccountRow;
 }
 
@@ -195,7 +242,8 @@ export async function importStatement(
  * which has no dialog to show them in. A line Bank Transactions holds on the
  * same day for the same amount, that no line of this file accounts for, is
  * that line: importing it again would put it there twice, to be coded twice.
- * The skip each line was sent with is replaced by this rule's.
+ * A line another bank account already holds (3.0.22) is skipped the same way.
+ * The skip each line was sent with is replaced by what these two rules find.
  */
 export async function markLinesAlreadyHere(
   sb: SupabaseClient,
@@ -204,9 +252,94 @@ export async function markLinesAlreadyHere(
 ): Promise<ImportRow[]> {
   const days = statementDays(rows);
   if (!days) return [];
-  const existing = await listBankLinesOn(sb, bankAccountId, days.from, days.to);
+  const [existing, elsewhere] = await Promise.all([
+    listBankLinesOn(sb, bankAccountId, days.from, days.to),
+    listBankLinesElsewhere(sb, bankAccountId, days.from, days.to),
+  ]);
   const other = new Set(otherSourceLines(rows, statementLineHashes(bankAccountId, rows), existing).map((line) => line.index));
+  for (const line of otherAccountLines(rows, [], elsewhere).lines) other.add(line.index);
   return rows.map((row, i) => ({ ...row, skip: other.has(i) }));
+}
+
+/**
+ * The company's OTHER bank accounts' lines dated `from` to `to` (3.0.22): what
+ * a statement's lines are compared with, so a statement already imported into
+ * one bank account is not imported into another. A line a bank feed took back
+ * is left out. Paged past PostgREST's cap, ordered by date then id.
+ */
+export async function listBankLinesElsewhere(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  from: string,
+  to: string,
+): Promise<ElsewhereBankLine[]> {
+  const rows = await readAllPages<Record<string, unknown>>(
+    (start, end) =>
+      sb
+        .from("acc_bank_transaction")
+        .select("id,bank_account_id,txn_date,amount_minor,description")
+        .neq("bank_account_id", bankAccountId)
+        .is("provider_removed_at", null)
+        .neq("status", "ignored")
+        .gte("txn_date", from)
+        .lte("txn_date", to)
+        .order("txn_date")
+        .order("id")
+        .range(start, end),
+    (message) => new BankingError(message),
+  );
+  return rows.map((r) => ({
+    id: r.id as string,
+    bankAccountId: r.bank_account_id as string,
+    txnDate: r.txn_date as string,
+    amountMinor: Number(r.amount_minor),
+    description: (r.description as string | null) ?? null,
+  }));
+}
+
+/** What the import dialog needs to say which lines another bank account holds. */
+export interface BankLinesElsewhere {
+  lines: ElsewhereBankLine[];
+  /** Every bank account of the company by id, named as the screens name it. */
+  labels: Record<string, string>;
+}
+
+/** The other accounts' lines over a statement's days, and every bank account's name. */
+export async function getBankLinesElsewhere(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  from: string,
+  to: string,
+): Promise<BankLinesElsewhere> {
+  const [lines, accounts] = await Promise.all([listBankLinesElsewhere(sb, bankAccountId, from, to), listBankAccounts(sb)]);
+  return { lines, labels: Object.fromEntries(accounts.map((account) => [account.id, bankAccountLabel(account)])) };
+}
+
+/** Which of a statement's rows another bank account already holds: the dialog's rule, on what was sent. */
+export async function statementHeldElsewhere(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  rows: readonly ImportRow[],
+): Promise<OtherAccountsCheck & { labels: Record<string, string> }> {
+  const days = statementDays(rows);
+  if (!days) return { ...NO_OTHER_ACCOUNTS, labels: {} };
+  const { lines, labels } = await getBankLinesElsewhere(sb, bankAccountId, days.from, days.to);
+  return { ...otherAccountLines(rows, [], lines), labels };
+}
+
+/**
+ * Refuses a statement another bank account already holds every line of
+ * (3.0.22), before anything is kept or imported: the dialog refuses it first,
+ * and a page left open, or a run with no dialog, is refused here. Every row
+ * sent counts, those marked skip included: they are on the statement.
+ */
+export async function refuseAnotherAccountsStatement(
+  sb: SupabaseClient,
+  bankAccountId: string,
+  rows: readonly ImportRow[],
+): Promise<void> {
+  const held = await statementHeldElsewhere(sb, bankAccountId, rows);
+  if (held.whole) throw new BankingError(wholeStatementElsewhere(held.labels[held.whole], held.labels[bankAccountId]));
 }
 
 /**

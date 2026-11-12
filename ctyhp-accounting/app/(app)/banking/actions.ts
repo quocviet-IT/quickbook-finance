@@ -5,6 +5,10 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite, getSessionUser, isAdmin } from "@/lib/auth";
 import {
   createBankAccount,
+  updateBankAccount,
+  getBankLinesElsewhere,
+  refuseAnotherAccountsStatement,
+  type BankLinesElsewhere,
   importStatement,
   listBankLinesOn,
   type StatementImportCounts,
@@ -101,6 +105,31 @@ export async function createBankAccountAction(input: {
   }
 }
 
+/**
+ * Correct a bank account's name or number (3.0.22). The ledger account and the
+ * currency stay as they are: lines are already posted to them. A number
+ * another bank account has is refused, as adding one is.
+ */
+export async function updateBankAccountAction(
+  id: string,
+  input: { bank_name: string; account_number_masked?: string | null },
+): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const account = accountIdSchema.safeParse(id);
+  if (!account.success) return { ok: false, error: account.error.issues[0]?.message ?? "Invalid data" };
+  const parsed = bankAccountEditSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    await updateBankAccount(sb, account.data, parsed.data);
+    revalidatePath("/banking");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
 export interface StatementImportResult extends StatementImportCounts {
   /** Said when the kept file could not be tied to the import; null when it was, or none was kept. */
   fileWarning: string | null;
@@ -116,7 +145,9 @@ export interface StatementImportResult extends StatementImportCounts {
  * again from what was sent — the same rule the dialog runs — and a statement
  * that does not add up, with no override or with one from anyone but an
  * administrator, is refused before the database is asked; the database asks
- * again whether the person may override.
+ * again whether the person may override. A statement another bank account
+ * already holds every line of (3.0.22) is refused here too, as the dialog
+ * refuses it: it is that account's statement.
  */
 export async function importStatementAction(
   bankAccountId: string,
@@ -140,6 +171,7 @@ export async function importStatementAction(
   }
   try {
     const sb = await createSupabaseServerClient();
+    await refuseAnotherAccountsStatement(sb, bankAccountId, lines.data);
     const res = await importStatement(sb, bankAccountId, filename, lines.data, payload.data);
     // The file the lines were read from, kept already (1.83). Linking it costs
     // nothing the import did if it fails: the file stays in Reports › Saved,
@@ -162,6 +194,11 @@ export async function importStatementAction(
 
 const accountIdSchema = z.uuid("Select a bank account");
 const daySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a YYYY-MM-DD date");
+/** What Edit bank account saves: the name the screens show, and the number as the person writes it. */
+const bankAccountEditSchema = z.object({
+  bank_name: z.string().trim().min(1, "Enter the bank account's name").max(120, "Keep the name under 120 characters"),
+  account_number_masked: z.string().trim().max(40, "Keep the account number under 40 characters").nullish(),
+});
 
 /**
  * The prior statement's closing for Import statement's proof (2.04): the
@@ -196,6 +233,29 @@ export async function bankLinesOnAction(
   try {
     const sb = await createSupabaseServerClient();
     return { ok: true, data: await listBankLinesOn(sb, account.data, from, to) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * The company's OTHER bank accounts' lines from `from` to `to`, and every bank
+ * account's name (3.0.22). Import statement asks once per statement read, with
+ * bankLinesOnAction, and works out in the browser which of its lines another
+ * bank account already holds. Reads only.
+ */
+export async function bankLinesElsewhereAction(
+  bankAccountId: string,
+  from: string,
+  to: string,
+): Promise<ActionResult<BankLinesElsewhere>> {
+  const account = accountIdSchema.safeParse(bankAccountId);
+  const days = z.tuple([daySchema, daySchema]).safeParse([from, to]);
+  if (!account.success) return { ok: false, error: account.error.issues[0]?.message ?? "Invalid data" };
+  if (!days.success) return { ok: false, error: days.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getBankLinesElsewhere(sb, account.data, from, to) };
   } catch (err) {
     return { ok: false, error: msg(err) };
   }

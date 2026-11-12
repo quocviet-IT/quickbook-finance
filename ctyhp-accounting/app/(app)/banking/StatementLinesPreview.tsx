@@ -12,6 +12,7 @@ import {
   type StatementDialogView,
 } from "@/lib/domain/statement-import-dialog";
 import { OTHER_SOURCE_WARNING } from "@/lib/domain/statement-repeats";
+import { OTHER_ACCOUNT_NOTE } from "@/lib/domain/statement-other-accounts";
 import { IMPORT_PREVIEW_WIDTH as PW } from "./import-preview-columns";
 import styles from "./import-statement.module.css";
 
@@ -22,6 +23,9 @@ import styles from "./import-statement.module.css";
  *   Transactions and how many will be imported;
  * - the lines already in Bank Transactions from another source — the books, a
  *   bank feed or another file — skipped unless ticked back;
+ * - the lines another bank account already holds (3.0.22), by that account,
+ *   skipped unless ticked back; when that account holds the whole statement,
+ *   the dialog says so in an error and none of them can be ticked back;
  * - every line, each with its own Not a transaction tick: a ticked line is
  *   struck through, left out of the count and not sent.
  *
@@ -34,8 +38,8 @@ interface Props {
   /** Indexes ticked Not a transaction. */
   aside: ReadonlySet<number>;
   onAside: (index: number, aside: boolean) => void;
-  view: Pick<StatementDialogView, "repeats" | "otherSource" | "skip">;
-  /** Ticks a line already here from another source back, to import it as well, or skips it again. */
+  view: Pick<StatementDialogView, "repeats" | "otherSource" | "otherAccounts" | "elsewhere" | "skip">;
+  /** Ticks a line already here — from another source, or under another bank account — back, to import it as well, or skips it again. */
   onBack: (index: number, back: boolean) => void;
   money: (minor: number) => string;
 }
@@ -91,6 +95,33 @@ export default function StatementLinesPreview({ lines, aside, onAside, view, onB
           }
         />
       ) : null}
+      {view.elsewhere ? (
+        // The whole statement is another account's: one sentence, and no line to tick back.
+        <Alert type="error" showIcon title={view.elsewhere} />
+      ) : (
+        view.otherAccounts.map((group) => (
+          <Alert
+            key={group.bankAccountId}
+            type="warning"
+            showIcon
+            title={group.title}
+            description={
+              <div>
+                <Typography.Text type="secondary">{OTHER_ACCOUNT_NOTE}</Typography.Text>
+                <ul className={styles.list} style={{ listStyle: "none", paddingLeft: 0 }}>
+                  {group.indexes.map((index) => (
+                    <li key={index}>
+                      <Checkbox checked={!skipped.has(index)} onChange={(e) => onBack(index, e.target.checked)}>
+                        {previewLineLabel(lines[index], money)}
+                      </Checkbox>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            }
+          />
+        ))
+      )}
       <div className={styles.preview}>
         <DataTable<PreviewRow>
           rowKey={(row) => String(row.index)}

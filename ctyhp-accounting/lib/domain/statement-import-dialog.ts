@@ -5,9 +5,12 @@
  * Pure, so the dialog only draws it and a test proves every state of it: the
  * proof panel's tone and its blocked sentence, who is offered "Import
  * anyway…", when the two balance fields show, the lines ticked Not a
- * transaction left out of what is sent, and the lines already in Bank
- * Transactions from another source skipped unless ticked back. The rule itself
- * is statement-proof's and statement-repeats'; this only puts them together.
+ * transaction left out of what is sent, the lines already in Bank
+ * Transactions from another source skipped unless ticked back, and (3.0.22)
+ * the lines another bank account already holds skipped the same way — or the
+ * whole statement refused, when that account holds every line of it. The rules
+ * themselves are statement-proof's, statement-repeats' and
+ * statement-other-accounts'; this only puts them together.
  *
  * Banking › Import statement, importing into a reconciliation and Attach the
  * statement open the one dialog. Attaching imports nothing, so it never asks
@@ -34,6 +37,7 @@ import {
   type StatementProofPayload,
 } from "./statement-proof";
 import { describeRepeats, type OtherSourceLine, type RepeatGroup, type StatementLinesCheck } from "./statement-repeats";
+import { otherAccountGroups, wholeStatementElsewhere, type OtherAccountGroup } from "./statement-other-accounts";
 
 /** Why the dialog was opened: to import the statement, or to attach it to a reconciliation (nothing imported). */
 export type StatementDialogPurpose = "import" | "attach";
@@ -42,7 +46,10 @@ export type StatementDialogPurpose = "import" | "attach";
 export interface DialogMarks {
   /** Indexes into the lines read of those ticked Not a transaction. */
   aside: readonly number[];
-  /** Indexes of lines already in Bank Transactions from another source that were ticked back, to be imported after all. */
+  /**
+   * Indexes of lines already in Bank Transactions — from another source, or
+   * under another bank account — that were ticked back, to be imported after all.
+   */
   back: readonly number[];
   /** "Use $X (the closing of the reconciliation to …)" was pressed. */
   usePrior: boolean;
@@ -80,6 +87,11 @@ export interface StatementDialogInput {
    */
   check: StatementLinesCheck | null;
   /**
+   * How the bank accounts are named (3.0.22): the one imported into, and the
+   * company's others by id, for the lines one of them already holds.
+   */
+  accounts?: { here: string; labels: Readonly<Record<string, string>> };
+  /**
    * The person is an administrator, and so is offered "Import anyway…". Read
    * the way every screen reads the role; the database decides again.
    */
@@ -115,8 +127,23 @@ export interface StatementDialogView {
   priorOffer: { label: string; taken: boolean } | null;
   /** The lines already in Bank Transactions from another source, those ticked Not a transaction left out. */
   otherSource: OtherSourceLine[];
-  /** Their indexes, less those ticked back: skipped, counted in the proof and not imported. */
+  /**
+   * The lines another bank account already holds (3.0.22), by that account,
+   * those ticked Not a transaction left out.
+   */
+  otherAccounts: OtherAccountGroup[];
+  /**
+   * Why nothing of this statement can be imported here: another bank account
+   * holds every line of it. Null otherwise. No line of it can be ticked back.
+   */
+  elsewhere: string | null;
+  /**
+   * The indexes of both kinds of line already here, less those ticked back:
+   * skipped, counted in the proof and not imported.
+   */
   skip: number[];
+  /** Of the skipped lines, how many another bank account holds: said after the import. */
+  otherAccountSkipped: number;
   /** The file's sets of identical lines, and what becomes of each; none when attaching. */
   repeats: RepeatGroup[];
   /** Importing, while the server has not yet said which lines are already here: nothing can be sent. */
@@ -158,7 +185,15 @@ export function statementDialogView(
   const aside = new Set(marks.aside);
   const back = new Set(marks.back);
   const otherSource = (check?.otherSource ?? []).filter((line) => !aside.has(line.index));
-  const skip = otherSource.filter((line) => !back.has(line.index)).map((line) => line.index);
+  const held = check?.otherAccount ?? null;
+  const labels = input.accounts?.labels ?? {};
+  const otherAccounts = held ? otherAccountGroups(held, labels, proof.lineCount) : [];
+  const elsewhere = held?.whole ? wholeStatementElsewhere(labels[held.whole], input.accounts?.here) : null;
+  // A statement another account holds whole is not imported line by line either: a tick back counts for nothing.
+  const heldSkipped = (held?.lines ?? []).filter((line) => elsewhere !== null || !back.has(line.index)).map((line) => line.index);
+  const skip = [
+    ...new Set([...otherSource.filter((line) => !back.has(line.index)).map((line) => line.index), ...heldSkipped]),
+  ].sort((a, b) => a - b);
   const repeats = check ? describeRepeats(input.lines, marks.aside, check.present, skip, money) : [];
   const checking = importing && input.lines.length > 0 && input.check === null;
 
@@ -176,11 +211,14 @@ export function statementDialogView(
         ? { label: proof.sentences.usePrior, taken: proof.prior.status === "taken" }
         : null,
     otherSource,
+    otherAccounts,
+    elsewhere,
     skip,
+    otherAccountSkipped: heldSkipped.length,
     repeats,
     checking,
     okLabel: input.lines.length ? importLinesLabel(proof.lineCount) : "Import",
-    okDisabled: proof.lineCount === 0 || !proof.proves || checking,
+    okDisabled: proof.lineCount === 0 || !proof.proves || checking || elsewhere !== null,
   };
 }
 
@@ -194,13 +232,15 @@ export interface ConfirmedStatementLines {
   proof: StatementProofPayload;
   /** The sets of identical lines as the dialog showed them, for what is said after the import. */
   repeats: RepeatGroup[];
+  /** Of the rows marked skip, how many another bank account holds (3.0.22), for what is said after the import. */
+  otherAccount: number;
 }
 
 /** What is sent for the statement as the dialog shows it. Pass `override` only from "Import anyway…". */
 export function confirmStatement(
   lines: readonly StatementLine[],
   marks: DialogMarks,
-  view: Pick<StatementDialogView, "proof" | "skip" | "repeats">,
+  view: Pick<StatementDialogView, "proof" | "skip" | "repeats"> & Partial<Pick<StatementDialogView, "otherAccountSkipped">>,
   override: StatementOverride | null = null,
 ): ConfirmedStatementLines {
   return {
@@ -208,6 +248,7 @@ export function confirmStatement(
     aside: [...new Set(marks.aside)].sort((a, b) => a - b),
     proof: proofPayload(view.proof, override),
     repeats: view.repeats,
+    otherAccount: view.otherAccountSkipped ?? 0,
   };
 }
 
