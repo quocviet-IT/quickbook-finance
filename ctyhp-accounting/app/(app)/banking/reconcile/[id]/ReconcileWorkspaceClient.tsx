@@ -601,7 +601,7 @@ export default function ReconcileWorkspaceClient({
    * here from another source marked skip) and the proof, and the
    * reconciliation keeps the opening and closing it was proved between.
    */
-  async function importStatement({ fileName, file, statement: pdf, lines: read, rows, proof, repeats }: ConfirmedImport) {
+  async function importStatement({ fileName, file, statement: pdf, lines: read, rows, proof, repeats, otherAccount }: ConfirmedImport) {
     setImporting(true);
     try {
       // Kept first, so the reconciliation takes its file with its lines (1.83);
@@ -631,6 +631,7 @@ export default function ReconcileWorkspaceClient({
         inserted: res.data.inserted,
         alreadyHere: res.data.duplicates,
         otherSource: res.data.otherSource,
+        otherAccount,
         repeats,
       });
       message.success(`${imported} ${pairingMessage(res.data.outcome)}`, 8);

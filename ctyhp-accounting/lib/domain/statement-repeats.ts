@@ -17,6 +17,7 @@
 import { formatDate, plural, pluralWord } from "@/lib/format";
 import { plainAmount } from "./statement-proof";
 import { repeatKey } from "./statement-key-text";
+import type { OtherAccountsCheck } from "./statement-other-accounts";
 
 export { repeatKey };
 
@@ -64,6 +65,8 @@ export interface StatementLinesCheck {
   present: number[];
   /** Lines already in Bank Transactions from another source, skipped by default. */
   otherSource: OtherSourceLine[];
+  /** Lines another bank account of the company already holds (3.0.22); absent where only this account was read. */
+  otherAccount?: OtherAccountsCheck;
 }
 
 /** Said beside a line already in Bank Transactions from another source. */
@@ -208,6 +211,8 @@ export interface ImportedCounts {
   alreadyHere: number;
   /** Lines sent marked skip, as already in Bank Transactions from another source. */
   otherSource: number;
+  /** Of those, the lines skipped because another bank account already holds them (3.0.22). */
+  otherAccount?: number;
   /** The file's sets of identical lines, as the dialog showed them before the import. */
   repeats: readonly RepeatGroup[];
 }
@@ -215,8 +220,8 @@ export interface ImportedCounts {
 /**
  * Said after the import: "Imported 40 lines. 2 were already here from this
  * statement; 3 skipped as already in Bank Transactions from another source;
- * 3 repeated lines on 03/31/2026 kept." Each part after the first appears only
- * when it is not zero.
+ * 8 skipped as already under another bank account; 3 repeated lines on
+ * 03/31/2026 kept." Each part after the first appears only when it is not zero.
  */
 export function importedSummary(counts: ImportedCounts): string {
   const n = counts.inserted;
@@ -228,12 +233,17 @@ export function importedSummary(counts: ImportedCounts): string {
     kept.reduce((sum, group) => sum + group.toImport, 0),
     n,
   );
+  const underAnotherAccount = Math.min(counts.otherAccount ?? 0, counts.otherSource);
+  const fromAnotherSource = counts.otherSource - underAnotherAccount;
   const parts = [
     counts.alreadyHere > 0
       ? `${counts.alreadyHere.toLocaleString("en-US")} ${pluralWord(counts.alreadyHere, "was", "were")} already here from this statement`
       : null,
-    counts.otherSource > 0
-      ? `${counts.otherSource.toLocaleString("en-US")} skipped as already in Bank Transactions from another source`
+    fromAnotherSource > 0
+      ? `${fromAnotherSource.toLocaleString("en-US")} skipped as already in Bank Transactions from another source`
+      : null,
+    underAnotherAccount > 0
+      ? `${underAnotherAccount.toLocaleString("en-US")} skipped as already under another bank account`
       : null,
     keptLines > 0
       ? `${plural(keptLines, "repeated line")} on ${daysSaid(kept.map((group) => group.date))} kept`

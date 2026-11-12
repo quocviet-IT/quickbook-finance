@@ -22,6 +22,7 @@ import {
 import {
   BankOutlined,
   CloudSyncOutlined,
+  EditOutlined,
   InboxOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -94,6 +95,8 @@ import {
 import { tokenVar } from "@/lib/design/tokens";
 import SettleFromBankModal, { type SettleTarget } from "@/components/banking/SettleFromBankModal";
 import { importedSummary } from "@/lib/domain/statement-repeats";
+import { EDIT_BANK_ACCOUNT } from "@/lib/domain/statement-other-accounts";
+import EditBankAccountModal from "./EditBankAccountModal";
 import { keepFailureMessage, linesSpan, serverFailure, statementFileAccount } from "@/lib/domain/statement-evidence";
 import type { KeptStatementFile } from "@/lib/client/keep-statement-file";
 import { formatDate, formatDateTime, formatMoney, plural } from "@/lib/format";
@@ -281,6 +284,7 @@ export default function BankingClient({
 
   const [acctForm] = Form.useForm();
   const [acctOpen, setAcctOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState(false);
   const [arrival] = useState(() =>
     importOnArrival({
       requested: initialImport,
@@ -423,7 +427,8 @@ export default function BankingClient({
       acctForm.resetFields();
       window.location.reload();
     } else {
-      message.error(result.error ?? "Failed to create bank account");
+      // A number another bank account already has is refused in a sentence worth the time to read (3.0.22).
+      message.error(result.error ?? "Failed to create bank account", 10);
     }
   }
 
@@ -568,7 +573,7 @@ export default function BankingClient({
   // (2.04) happen in ImportStatementModal, from rules in lib/domain that are
   // covered by tests. `rows` is what is sent: every line but those ticked Not a
   // transaction, those already here from another source marked skip.
-  async function confirmImport({ fileName, file, statement: pdf, lines, rows, proof, repeats }: ConfirmedImport) {
+  async function confirmImport({ fileName, file, statement: pdf, lines, rows, proof, repeats, otherAccount }: ConfirmedImport) {
     if (!selectedId || !selected || !rows.length) return;
     setBusy("import");
     try {
@@ -598,6 +603,7 @@ export default function BankingClient({
           inserted: result.data.inserted,
           alreadyHere: result.data.skipped,
           otherSource: result.data.otherSource,
+          otherAccount,
           repeats,
         }),
         8,
@@ -824,6 +830,15 @@ export default function BankingClient({
                   Add account
                 </Button>
               ) : null}
+              {/* One account's name and number (3.0.22): not offered while every account is showing. */}
+              <Button
+                icon={<EditOutlined />}
+                disabled={allAccounts || !selected}
+                title={allAccounts || !selected ? EDIT_BANK_ACCOUNT.needsOne : undefined}
+                onClick={() => setEditingAccount(true)}
+              >
+                {EDIT_BANK_ACCOUNT.button}
+              </Button>
               {!selectedConnection ? (
                 <Button
                   icon={<LinkOutlined />}
@@ -1174,6 +1189,15 @@ export default function BankingClient({
         form={acctForm}
         glBankAccounts={glBankAccounts}
         currencies={currencies}
+      />
+      <EditBankAccountModal
+        account={editingAccount && selected && !allAccounts ? selected : null}
+        onClose={() => setEditingAccount(false)}
+        onSaved={() => {
+          setEditingAccount(false);
+          // The account's name is drawn by the page: read it again, as adding one does.
+          window.location.reload();
+        }}
       />
     </div>
   );

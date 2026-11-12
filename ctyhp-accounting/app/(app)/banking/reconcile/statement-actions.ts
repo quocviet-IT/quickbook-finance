@@ -20,7 +20,9 @@ import {
   listReconciliations, getReconciliationDetail, completeReconciliation, getReconciliationLines, setClearedMany,
   BankRecError, type StatementFileInput,
 } from "@/lib/services/bankrec";
-import { generateSuggestions, importStatement, isCardBankAccount, markLinesAlreadyHere } from "@/lib/services/banking";
+import {
+  generateSuggestions, importStatement, isCardBankAccount, markLinesAlreadyHere, refuseAnotherAccountsStatement,
+} from "@/lib/services/banking";
 import { shown, stored } from "@/lib/domain/card-account";
 import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
@@ -135,10 +137,12 @@ export async function importStatementIntoReconciliationAction(
   try {
     const sb = await createSupabaseServerClient();
     const file = statementFile(parsed.data);
+    const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
+    // Another bank account's statement (3.0.22) is refused before it is kept here.
+    await refuseAnotherAccountsStatement(sb, bankAccountId, parsed.data.lines);
     // Kept first: a completed reconciliation refuses it before anything is imported.
     await setReconciliationStatement(sb, reconciliationId, file);
     kept = true;
-    const { bankAccountId } = await getReconciliationHeader(sb, reconciliationId);
     const imported = await importIntoBankTransactions(sb, bankAccountId, parsed.data);
     const outcome = await pairAndTick(sb, reconciliationId);
     revalidatePath(`/banking/reconcile/${reconciliationId}`);
@@ -312,8 +316,11 @@ export async function reconcileRunMonthAction(raw: unknown): Promise<ActionResul
       startedId = "card";
       return { ok: true, data: await reconcileCardMonth(sb, input) };
     }
-    // Read before anything is written: a run has no dialog to show the lines
-    // already in Bank Transactions from another source, so they are marked here.
+    // Read before anything is written: a run has no dialog. A statement another
+    // bank account holds whole (3.0.22) stops the month here; the lines already
+    // in Bank Transactions, from another source or under another bank account,
+    // are marked here.
+    await refuseAnotherAccountsStatement(sb, input.bank_account_id, input.lines);
     const lines = await markLinesAlreadyHere(sb, input.bank_account_id, input.lines);
     // The reconciliation keeps the statement whole, the lines already there included.
     const file = statementFile(input);

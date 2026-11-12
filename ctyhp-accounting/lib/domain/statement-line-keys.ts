@@ -26,6 +26,7 @@ import {
   type StatementLinesCheck,
 } from "./statement-repeats";
 import { rowKeyText, statementLineKeyText } from "./statement-key-text";
+import { otherAccountLines, type ElsewhereBankLine } from "./statement-other-accounts";
 
 export { rowKeyText, statementLineKeyText };
 
@@ -75,6 +76,8 @@ export interface StatementLineFacts {
   keys: LineKeyTable;
   /** The account's bank lines over the file's days (`acc_bank_lines_on`), with their keys. */
   bankLines: readonly BankLineOn[];
+  /** The company's OTHER bank accounts' lines over the file's days (3.0.22); absent where they were not read. */
+  elsewhere?: readonly ElsewhereBankLine[];
 }
 
 /**
@@ -104,15 +107,22 @@ export function keysAsSentFrom(
 
 /**
  * What the import dialog says about a statement's lines for the ticks as they
- * are: which are already here from this statement, and which are already in
- * Bank Transactions from another source — the server's rules over what the
- * server sent once, so a tick costs no round trip.
+ * are: which are already here from this statement, which are already in Bank
+ * Transactions from another source, and which another bank account already
+ * holds — the server's rules over what the server sent once, so a tick costs
+ * no round trip.
  */
 export function checkStatementLinesFrom(
   lines: readonly RepeatLine[],
   aside: Iterable<number>,
   facts: StatementLineFacts,
 ): StatementLinesCheck {
-  const hashes = keysAsSentFrom(lines, aside, facts.keys);
-  return { present: presentLines(hashes, facts.bankLines), otherSource: otherSourceLines(lines, hashes, facts.bankLines) };
+  // Read once: an iterable can be walked only once, and two rules need it.
+  const setAside = [...aside];
+  const hashes = keysAsSentFrom(lines, setAside, facts.keys);
+  return {
+    present: presentLines(hashes, facts.bankLines),
+    otherSource: otherSourceLines(lines, hashes, facts.bankLines),
+    ...(facts.elsewhere ? { otherAccount: otherAccountLines(lines, setAside, facts.elsewhere) } : {}),
+  };
 }

@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.22",
+    date: "2026-11-12",
+    headline: "One statement goes into one bank account, and a bank account's name can be corrected.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A statement already imported into one bank account is not imported into another",
+        detail:
+          "A company with two bank accounts set up for the same real account could choose the same statement for each. Every line came in a second time, and coding them put the same money in the books twice. Import statement now reads the company's other bank accounts as well. Lines one of them already holds are skipped unless you tick them back, and a statement another account holds every line of is not imported at all; the dialog names the account that has it. Importing a statement into a reconciliation, and reconciling from statement files, refuse it the same way.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Edit account: correct a bank account's name or its number",
+        detail:
+          "Bank Transactions has Edit account beside Add account. Choose one account, then change its name or its account number. Its ledger account and its currency stay as they are, because lines are already posted to them. The old and the new name are both kept in the audit log.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "A second bank account with an account number already in use is not added",
+        detail:
+          "Adding a bank account whose number another bank account already has is refused, and the message names the account that has it. If it is the same account, correct its name with Edit account. If it is a different account, enter more digits of its number so the two can be told apart.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.21",
     date: "2026-11-12",
     headline: "The guide's steps show a picture of their screen, with the button to press ringed in orange.",

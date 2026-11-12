@@ -280,7 +280,12 @@ describe("the import dialog", () => {
   const modal = read("ImportStatementModal.tsx");
 
   it("works out what it shows and sends with the domain, and keeps Import N lines to one click when it adds up", () => {
-    expect(modal).toContain("{ purpose, kind, lines: shownLines, figures: shownFigures, prior: shownPrior, marks, check, canOverride }");
+    // Everything the view rests on is handed to the domain, the bank accounts' names included (3.0.22).
+    const viewInput = modal.slice(modal.indexOf("statementDialogView("), modal.indexOf("(minor) => formatMoney(minor, currencyCode, decimals),"));
+    for (const field of ["purpose,", "kind,", "lines: shownLines,", "figures: shownFigures,", "prior: shownPrior,", "marks,", "check,", "canOverride,"]) {
+      expect(viewInput, field).toContain(field);
+    }
+    expect(viewInput).toContain("accounts: { here: hereLabel, labels: accountLabels ?? {} },");
     expect(modal).toContain("okButtonProps={{ disabled: view.okDisabled, loading: importing }}");
     expect(modal).toContain("onOk={confirm}");
     const confirm = body(modal, "function confirm() {");
@@ -294,15 +299,25 @@ describe("the import dialog", () => {
 
   it("asks the server once per statement read and never on a tick, and works out which lines are here in the browser", () => {
     // The only server calls the dialog makes: the prior closing when it opens,
-    // and the bank lines over the file's days when a statement is read.
+    // and, when a statement is read, the bank lines over the file's days: this
+    // account's, and the company's other accounts' (3.0.22).
     // A scanned PDF also asks once whether the company's OCR server is online (3.0.3).
-    expect([...new Set(modal.match(/\b\w+Action(?=\()/g) ?? [])].sort()).toEqual(["bankLinesOnAction", "ocrAvailableAction", "priorClosingAction"]);
+    expect([...new Set(modal.match(/\b\w+Action(?=\()/g) ?? [])].sort()).toEqual([
+      "bankLinesElsewhereAction",
+      "bankLinesOnAction",
+      "ocrAvailableAction",
+      "priorClosingAction",
+    ]);
     expect(modal).not.toContain("checkStatementLinesAction");
     expect(modal).toContain("priorClosingAction(accountId)");
     expect(modal).toContain('const factsKey = purpose === "import" && lines.length ? `${bankAccount.id}|${linesKey}` : "";');
-    expect(modal).toContain(
-      "Promise.all([bankLinesOnAction(bankAccount.id, days.from, days.to), statementLineKeyTable(bankAccount.id, lines)])",
-    );
+    // One round of reads per statement: the three are asked together.
+    const reads = modal.slice(modal.indexOf("Promise.all(["), modal.indexOf(".then(([res, other, keys])"));
+    expect(reads).toContain("bankLinesOnAction(bankAccount.id, days.from, days.to),");
+    expect(reads).toContain("bankLinesElsewhereAction(bankAccount.id, days.from, days.to),");
+    expect(reads).toContain("statementLineKeyTable(bankAccount.id, lines),");
+    // Nothing is imported until the other accounts' lines are in as well: a failed read is said, not passed over.
+    expect(modal).toContain("res.ok && other.ok");
     // Neither effect that calls the server runs again on a tick: neither hangs on the marks.
     for (const [call, deps] of [
       ["bankLinesOnAction(", "factsKey, bankAccount.id, lines"],

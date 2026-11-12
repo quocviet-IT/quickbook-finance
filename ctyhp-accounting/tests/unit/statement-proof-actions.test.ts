@@ -72,6 +72,7 @@ import { bankLinesOnAction, importStatementAction, priorClosingAction } from "@/
 import { importStatementIntoReconciliationAction, reconcileRunMonthAction } from "@/app/(app)/banking/reconcile/statement-actions";
 import { attachStatementFileAction } from "@/app/(app)/banking/statement-file-actions";
 import { PROOF_REFUSAL } from "@/lib/domain/statement-proof";
+import { wholeStatementElsewhere } from "@/lib/domain/statement-other-accounts";
 import { RUN_MESSAGES } from "@/lib/domain/statement-run";
 
 const BANK = "11111111-1111-4111-8111-111111111111";
@@ -84,7 +85,9 @@ type Row = Record<string, unknown>;
 /**
  * A stand-in for PostgREST: the proved import answers as configured; the
  * bank-lines read pages at the row cap; a table read records its filters and
- * answers its first row.
+ * answers its first row, its rows a page at a time, or all of them when it is
+ * awaited as it stands (3.0.22: the other bank accounts' lines, and the bank
+ * accounts' names).
  */
 function fakeClient(options: { imported?: Row; importError?: string; bankLines?: Row[]; tables?: Record<string, Row[]> } = {}) {
   const rpcs: { fn: string; args: Row }[] = [];
@@ -123,13 +126,15 @@ function fakeClient(options: { imported?: Row; importError?: string; bankLines?:
       queries.push(query);
       const rows = options.tables?.[table] ?? [];
       const chain: Record<string, unknown> = {};
-      for (const name of ["select", "eq", "order", "limit"]) {
+      for (const name of ["select", "eq", "neq", "is", "gte", "lte", "order", "limit"]) {
         chain[name] = (...args: unknown[]) => {
           query.calls.push(`${name}(${args.map((a) => JSON.stringify(a)).join(",")})`);
           return chain;
         };
       }
       chain.maybeSingle = () => Promise.resolve({ data: rows[0] ?? null, error: null });
+      chain.range = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null });
+      chain.then = (resolve: (answer: { data: Row[]; error: null }) => unknown) => resolve({ data: rows, error: null });
       return chain;
     },
   };
@@ -652,5 +657,91 @@ describe("attaching the statement", () => {
       error: "This reconciliation kept 1 line from 03/05/2026 to 03/31/2026; this file has 2 lines in those days.",
     });
     expect(mocks.linkReconciliationStatementFile).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 3.0.22: a statement another bank account of the company already holds. The
+ * dialog refuses it first; each way in refuses it again on the server, before
+ * anything is kept, started or imported.
+ */
+describe("a statement another bank account already holds", () => {
+  const OTHER = "44444444-4444-4444-8444-444444444444";
+  const ACCOUNTS = [
+    { id: BANK, bank_name: "Second Checking", account_number_masked: "4321", acc_account: { account_code: "1025", name: "Operating", account_type: "bank" } },
+    { id: OTHER, bank_name: "First Checking", account_number_masked: "4321", acc_account: { account_code: "1015", name: "Checking", account_type: "bank" } },
+  ];
+  /** The other account's bank lines: every line of PLAIN, word for word. */
+  const heldThere = (rows: Row[]) =>
+    rows.map((row, i) => ({ id: `held-${i}`, bank_account_id: OTHER, txn_date: row.txn_date, amount_minor: row.amount_minor, description: row.description }));
+  const REFUSAL = wholeStatementElsewhere("First Checking · 1015", "Second Checking · 1025");
+  const elsewhere = (rows: Row[]) => fakeClient({ tables: { acc_bank_transaction: heldThere(rows), acc_bank_account: ACCOUNTS } });
+
+  it("is refused on Import statement, naming both accounts, and nothing is imported", async () => {
+    client = elsewhere(PLAIN);
+    expect(await importStatementAction(BANK, "march.csv", PLAIN, null, PROOF)).toEqual({ ok: false, error: REFUSAL });
+    expect(proved()).toEqual([]);
+    expect(mocks.generateSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("is refused though every line was sent marked skip: they are on the statement", async () => {
+    client = elsewhere(PLAIN);
+    const skipped = PLAIN.map((row) => ({ ...row, skip: true }));
+    expect(await importStatementAction(BANK, "march.csv", skipped, null, PROOF)).toEqual({ ok: false, error: REFUSAL });
+    expect(proved()).toEqual([]);
+  });
+
+  it("reads the other accounts only: this account's own lines, a feed's withdrawn line and an ignored one are left out", async () => {
+    client = elsewhere(PLAIN);
+    await importStatementAction(BANK, "march.csv", PLAIN, null, PROOF);
+    const read = client.queries.find((q) => q.table === "acc_bank_transaction");
+    expect(read?.calls).toEqual(
+      expect.arrayContaining([
+        `neq("bank_account_id","${BANK}")`,
+        'is("provider_removed_at",null)',
+        'neq("status","ignored")',
+        'gte("txn_date","2026-03-05")',
+        'lte("txn_date","2026-03-09")',
+      ]),
+    );
+  });
+
+  it("is imported when the other account holds only one of its lines", async () => {
+    client = elsewhere(PLAIN.slice(0, 1));
+    expect((await importStatementAction(BANK, "march.csv", PLAIN, null, PROOF)).ok).toBe(true);
+    expect(proved()).toHaveLength(1);
+  });
+
+  it("is refused for a reconciliation before the statement is kept with it", async () => {
+    client = elsewhere(PLAIN);
+    const sent = { file_name: "march.csv", lines: PLAIN, proof: PROOF, statement_file_id: null };
+    expect(await importStatementIntoReconciliationAction(REC, sent)).toEqual({ ok: false, error: REFUSAL });
+    expect(mocks.setReconciliationStatement).not.toHaveBeenCalled();
+    expect(proved()).toEqual([]);
+  });
+
+  it("stops a month of a statement-files run before its reconciliation is started", async () => {
+    client = elsewhere(PLAIN);
+    const month = { kind: "month", bank_account_id: BANK, statement_date: "2026-03-31", sign: true, file_name: "march.csv", lines: PLAIN, proof: PROOF, statement_file_id: null };
+    expect(await reconcileRunMonthAction(month)).toEqual({ ok: false, error: REFUSAL });
+    expect(mocks.createReconciliationFromStatement).not.toHaveBeenCalled();
+    expect(proved()).toEqual([]);
+  });
+
+  it("skips, in a run, the lines another account holds when it does not hold them all", async () => {
+    /** Three lines out, 30.00 in all: opens at 1,000.00, closes at 970.00. */
+    const three = [...PLAIN, line("2026-03-12", -1000)];
+    client = elsewhere(PLAIN);
+    const month = {
+      kind: "month", bank_account_id: BANK, statement_date: "2026-03-31", sign: false, file_name: "march.csv",
+      lines: three, proof: { ...PROOF, closing_minor: 97000 }, statement_file_id: null,
+    };
+    expect((await reconcileRunMonthAction(month)).ok).toBe(true);
+    const [call] = proved();
+    expect((call.args.p_rows as Row[]).map((r) => [r.amount_minor, r.skip === true])).toEqual([
+      [-1500, true],
+      [-500, true],
+      [-1000, false],
+    ]);
   });
 });
