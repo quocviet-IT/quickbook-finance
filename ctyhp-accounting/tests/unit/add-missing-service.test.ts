@@ -85,6 +85,7 @@ function client(closing: number | null, duplicates: Rows = [], lines = statement
       acc_reconciliation_lines: book,
       acc_statement_line_duplicates: duplicates,
       acc_add_statement_lines_to_books: () => ({ data: null, error: null }),
+      acc_statement_match_window: () => ({ data: 5, error: null }),
       acc_set_cleared_many: (args) => ({ data: (args.p_journal_line_ids as string[]).length, error: null }),
     },
   );
@@ -184,13 +185,24 @@ describe("adding the lines", () => {
     expect(posted(calls)).toEqual([{ line_no: 3, bank_transaction_id: "t-fee", account_id: CHARGES }]);
   });
 
-  it("refuses, posting nothing, a line to another account than shown or one the plan no longer holds", async () => {
-    for (const shown of [[{ lineNo: 3, accountId: UNCAT_OUT }], [{ lineNo: 1, accountId: UNCAT_IN }]]) {
-      const { sb, calls } = client(PROVES);
-      const attempt = addMissingLines(sb, "rec-1", shown, [1]);
-      await expect(attempt).rejects.toThrow(AddMissingError);
-      await expect(addMissingLines(sb, "rec-1", shown, [1])).rejects.toThrow(PLAN_CHANGED);
-      expect(posted(calls)).toBeUndefined();
-    }
+  it("refuses, posting nothing, a line the plan no longer holds", async () => {
+    const { sb, calls } = client(PROVES);
+    const shown = [{ lineNo: 1, accountId: UNCAT_IN }];
+    await expect(addMissingLines(sb, "rec-1", shown, [1])).rejects.toThrow(AddMissingError);
+    await expect(addMissingLines(sb, "rec-1", shown, [1])).rejects.toThrow(PLAN_CHANGED);
+    expect(posted(calls)).toBeUndefined();
+  });
+
+  it("posts a line to the account the person chose, and counts it as Uncategorized only when that is where it went (3.0.24)", async () => {
+    const { sb, calls } = client(PROVES);
+    const added = await addMissingLines(sb, "rec-1", [{ lineNo: 3, accountId: UNCAT_OUT }]);
+    expect(posted(calls)).toEqual([{ line_no: 3, bank_transaction_id: "t-fee", account_id: UNCAT_OUT }]);
+    expect([added.added, added.uncategorized]).toEqual([1, 1]);
+  });
+
+  it("pairs by the company's window", async () => {
+    const { sb, calls } = client(PROVES);
+    await getAddMissingPlan(sb, "rec-1");
+    expect(calls.map((c) => c.fn)).toContain("acc_statement_match_window");
   });
 });

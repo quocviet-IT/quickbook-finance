@@ -199,7 +199,7 @@ describe("pairAndTick", () => {
     const ticking = calls.filter((c) => c.fn === "acc_set_cleared_many");
     expect(ticking).toHaveLength(1);
     expect(ticking[0].args).toEqual({ p_reconciliation_id: "rec-1", p_journal_line_ids: ["b"], p_cleared: true });
-    expect(outcome).toEqual({ lines: 3, paired: 2, ticked: 1, missing: 1, after: 0, flipped: false });
+    expect(outcome).toEqual({ lines: 3, paired: 2, ticked: 1, ambiguous: 0, missing: 1, after: 0, flipped: false });
   });
 
   it("never ticks the book line a set-aside statement line would pair with", async () => {
@@ -213,7 +213,7 @@ describe("pairAndTick", () => {
         acc_set_cleared_many: (args) => (args.p_journal_line_ids as string[]).length,
       },
     );
-    expect(await pairAndTick(sb, "rec-1")).toEqual({ lines: 1, paired: 0, ticked: 0, missing: 0, after: 0, flipped: false });
+    expect(await pairAndTick(sb, "rec-1")).toEqual({ lines: 1, paired: 0, ticked: 0, ambiguous: 0, missing: 0, after: 0, flipped: false });
     expect(calls.some((c) => c.fn === "acc_set_cleared_many")).toBe(false);
   });
 

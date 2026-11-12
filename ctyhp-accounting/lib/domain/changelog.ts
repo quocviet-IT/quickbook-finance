@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.24",
+    date: "2026-11-12",
+    headline: "Reconciling pairs by a window you set, leaves a line that fits two entries for you, and adds a missing line only to the account you choose.",
+    changes: [
+      {
+        kind: "added",
+        title: "Statement matching: set how many days apart a line and an entry may be",
+        detail:
+          "Banking › Rules has Statement matching. A statement line pairs with an entry in the books on the same bank account, for the same amount, dated within this many days, or with the same check number. It was always 5 days and still is until you change it. The reconciliation says the rule under its statement lines, and Match again, Add missing lines and reconciling from statement files all use it.",
+        route: "/banking/rules",
+      },
+      {
+        kind: "changed",
+        title: "A statement line that fits more than one entry is left for you to choose",
+        detail:
+          "When a statement line fits two entries equally, such as the same deposit entered twice, it used to be paired with the first and ticked. It is now tagged Fits 2 entries with their numbers, and nothing is ticked for it until you tick the one the bank paid in the book lines; the other stays outstanding, where a duplicate shows itself. A line whose other candidate is only a weaker match, a day apart where this one is the same day, or without the check number this one has, is still paired as before.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "A line the books do not have is added only to an account you confirm",
+        detail:
+          "The box for the lines the books are missing now has an account for each line: the one a card, related company, rule or past coding proposes, which you can change, or none when nothing places the line, so it is no longer sent to Uncategorized on its own. Add N to the books adds only the lines with an account, one entry each, and ticks them. Add anyway, for a held-back line, asks for its account too.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "3.0.23",
     date: "2026-11-12",
     headline: "A bank line that is posted, matched or reconciled is not deleted; Delete names what to do instead.",

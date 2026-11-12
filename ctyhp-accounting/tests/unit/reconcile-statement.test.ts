@@ -13,6 +13,8 @@ import {
   bringForwardAdvice,
   bringHistoryForwardConfirmation,
   broughtForwardNote,
+  chooseLabel,
+  chooseNote,
   closingAdvice,
   dayBefore,
   discardedMessage,
@@ -294,12 +296,74 @@ describe("discarding a reconciliation", () => {
 
 describe("pairingMessage", () => {
   it("counts what paired and was ticked, and sends what is missing to Bank Transactions", () => {
-    expect(pairingMessage({ lines: 12, paired: 10, ticked: 3, missing: 2, after: 0, flipped: false })).toBe(
+    expect(pairingMessage({ lines: 12, paired: 10, ticked: 3, ambiguous: 0, missing: 2, after: 0, flipped: false })).toBe(
       "10 of 12 statement lines paired with the books; 3 newly ticked. 2 not in the books — code them in Bank Transactions, then Match again.",
     );
-    expect(pairingMessage({ lines: 1, paired: 0, ticked: 0, missing: 1, after: 0, flipped: true })).toBe(
+    expect(pairingMessage({ lines: 1, paired: 0, ticked: 0, ambiguous: 0, missing: 1, after: 0, flipped: true })).toBe(
       "0 of 1 statement line paired with the books; 0 newly ticked. 1 not in the books — code it in Bank Transactions, then Match again. The statement's amounts were read the other way around to pair them.",
     );
+  });
+
+  it("says how many lines fit more than one entry, and that nothing was ticked for them (3.0.24)", () => {
+    expect(pairingMessage({ lines: 5, paired: 3, ticked: 3, ambiguous: 2, missing: 0, after: 0, flipped: false })).toBe(
+      "3 of 5 statement lines paired with the books; 3 newly ticked. 2 fit more than one entry — tick the one the bank paid in the book lines.",
+    );
+    expect(pairingMessage({ lines: 1, paired: 0, ticked: 0, ambiguous: 1, missing: 0, after: 0, flipped: false })).toBe(
+      "0 of 1 statement line paired with the books; 0 newly ticked. 1 fits more than one entry — tick the one the bank paid in the book lines.",
+    );
+  });
+});
+
+describe("a statement line that fits more than one entry (3.0.24)", () => {
+  const book = (id: string, date: string, amountMinor: number, cleared = false, entryNumber: string | null = id.toUpperCase()) => ({
+    id,
+    date,
+    amountMinor,
+    reference: null,
+    entryNumber,
+    cleared,
+  });
+  const line = (lineNo: number, date: string, amountMinor: number) => ({ lineNo, date, amountMinor, reference: null });
+
+  it("is left to choose, with every entry it fits, when the books hold the same deposit twice", () => {
+    const result = statementStandings([line(0, "2026-08-14", 50000)], [book("je-1", "2026-08-14", 50000), book("je-2", "2026-08-14", 50000)], "2026-08-31");
+    expect(result.standings).toEqual([
+      {
+        kind: "choose",
+        how: "date and amount",
+        candidates: [
+          { bookId: "je-1", entryNumber: "JE-1", date: "2026-08-14" },
+          { bookId: "je-2", entryNumber: "JE-2", date: "2026-08-14" },
+        ],
+      },
+    ]);
+    expect(result.paired).toBe(0);
+    expect(result.ambiguous).toBe(1);
+    expect(result.missing).toBe(0);
+    // Neither entry is ticked by Match again: both stay outstanding until a person chooses.
+    expect(result.outstanding.sort()).toEqual(["je-1", "je-2"]);
+  });
+
+  it("is settled by a person's tick", () => {
+    const result = statementStandings([line(0, "2026-08-14", 50000)], [book("je-1", "2026-08-14", 50000), book("je-2", "2026-08-14", 50000, true)], "2026-08-31");
+    expect(result.standings).toEqual([{ kind: "paired", how: "date and amount", bookId: "je-2", entryNumber: "JE-2", ticked: true }]);
+    expect(result.ambiguous).toBe(0);
+  });
+
+  it("pairs by the company's window", () => {
+    const lines = [line(0, "2026-08-20", 1500)];
+    const entries = [book("je-1", "2026-08-13", 1500)];
+    expect(statementStandings(lines, entries, "2026-08-31").standings[0].kind).toBe("missing");
+    expect(statementStandings(lines, entries, "2026-08-31", 7).standings[0]).toMatchObject({ kind: "paired", how: "amount, within 7 days" });
+  });
+
+  it("names the entries to choose from", () => {
+    expect(chooseLabel(2)).toBe("Fits 2 entries");
+    expect(chooseNote([
+      { bookId: "a", entryNumber: "JE-000123", date: "2026-08-14" },
+      { bookId: "b", entryNumber: "JE-000140", date: "2026-08-14" },
+      { bookId: "c", entryNumber: null, date: "2026-08-15" },
+    ])).toBe("JE-000123, JE-000140 or 08/15/2026 — tick the one the bank paid.");
   });
 });
 

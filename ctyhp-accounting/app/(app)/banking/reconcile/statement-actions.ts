@@ -27,6 +27,7 @@ import { shown, stored } from "@/lib/domain/card-account";
 import { AddMissingError, addMissingLines, getAddMissingPlan, type AddedLines } from "@/lib/services/add-missing";
 import { ADD_MISSING_LIMIT, type AddMissingPlan } from "@/lib/domain/add-missing";
 import { getBankingContext } from "@/lib/services/banking-surface/facts";
+import { getStatementMatchWindow } from "@/lib/services/banking-preference";
 import { broughtForwardNote, dayBefore, type PairingOutcome } from "@/lib/domain/reconcile-statement";
 import { formatMoney, formatDate } from "@/lib/format";
 import {
@@ -208,9 +209,10 @@ export async function previewRunAction(raw: unknown): Promise<ActionResult<RunPr
     }
     const first = statements[0];
     const through = statements[statements.length - 1].to as string;
-    const [openLines, reconciliations] = await Promise.all([
+    const [openLines, reconciliations, windowDays] = await Promise.all([
       getBankOpenLines(sb, bankAccountId, through),
       listReconciliations(sb, bankAccountId),
+      getStatementMatchWindow(sb),
     ]);
     const last = reconciliations.find((r) => r.status === "completed") ?? null;
     const preview =
@@ -226,6 +228,7 @@ export async function previewRunAction(raw: unknown): Promise<ActionResult<RunPr
         openLines.map((line) => ({ ...line, amountMinor: shown(line.amountMinor, side) })),
         { beginningMinor: last ? shown(Number(last.statement_ending_balance_minor), side) : null, broughtForward },
         money,
+        windowDays,
       ),
     };
   } catch (e) {

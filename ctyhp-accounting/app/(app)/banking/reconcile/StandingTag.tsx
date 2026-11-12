@@ -1,7 +1,7 @@
 "use client";
 import { Space, Tag, Typography } from "antd";
 import { EXTRA_LINE_NOTE, EXTRA_LINE_TAG } from "@/lib/domain/add-missing";
-import { NOT_A_TRANSACTION, pairedHowLabel, type Standing } from "@/lib/domain/reconcile-statement";
+import { NOT_A_TRANSACTION, chooseLabel, chooseNote, pairedHowLabel, type Standing } from "@/lib/domain/reconcile-statement";
 
 /**
  * How one statement line stands with the books — on a reconciliation, and in a
@@ -11,6 +11,17 @@ import { NOT_A_TRANSACTION, pairedHowLabel, type Standing } from "@/lib/domain/r
 export default function StandingTag({ standing, extra = false }: { standing: Standing; extra?: boolean }) {
   if (standing.kind === "aside") return <Tag>{NOT_A_TRANSACTION}</Tag>;
   if (standing.kind === "after") return <Tag>After the statement date</Tag>;
+  if (standing.kind === "choose") {
+    // Fits more than one entry (3.0.24): nothing was ticked for it, and the screen says which to choose from.
+    return (
+      <Space size={4} direction="vertical">
+        <Tag color="purple">{chooseLabel(standing.candidates.length)}</Tag>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {chooseNote(standing.candidates)}
+        </Typography.Text>
+      </Space>
+    );
+  }
   if (standing.kind === "missing") {
     return (
       <Space size={4} wrap>
