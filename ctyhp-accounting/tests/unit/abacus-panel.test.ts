@@ -7,6 +7,7 @@ import {
   filterConversations,
   groupByDay,
   guideForScreen,
+  guideTag,
   knownSource,
   plainAnswer,
   questionCounter,
@@ -297,6 +298,19 @@ describe("the screen an answer or a row belongs to", () => {
     expect(topicIcon("screen", "/banking")).toBe("banking");
     expect(topicIcon("controls", "/banking")).toBe("controls");
     expect(topicIcon("unknown", "/banking")).toBe("other");
+  });
+});
+
+describe("a common question's guide tag", () => {
+  const guide = { id: "import-transactions", title: "Bring bank lines in" };
+
+  it("names the guide that answers it", () => {
+    expect(guideTag({ question: 'What does "Import" do?', guide })).toBe("Bring bank lines in");
+  });
+
+  it("is left off when it would only repeat the question", () => {
+    expect(guideTag({ question: "How do I bring bank lines in?", guide })).toBeNull();
+    expect(guideTag({ question: "Why is it blocked?", guide: null })).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@
  */
 
 import { abacusBlocks, abacusSourceFromKey, type AbacusInline, type AbacusSource } from "@/lib/domain/abacus-answer";
+import type { AbacusQuestion } from "@/lib/domain/abacus-topics";
 import { HELP_NAV_ITEM, NAV, findActiveGroup, findActivePage } from "@/lib/domain/navigation";
 import { normaliseRoute } from "@/lib/domain/route-path";
 import { screenName } from "@/lib/domain/screen-names";
@@ -69,6 +70,16 @@ export function topicIcon(topicId: string, route: string): AbacusIconKind {
     default:
       return "other";
   }
+}
+
+/**
+ * The guide tag beside a common question, or null when it would only repeat
+ * the question: "How do I bring bank lines in?" needs no "Bring bank lines in"
+ * beside it, while "What does "Issue" do?" is told which guide answers it.
+ */
+export function guideTag(question: AbacusQuestion): string | null {
+  if (!question.guide) return null;
+  return question.question.toLowerCase().includes(question.guide.title.toLowerCase()) ? null : question.guide.title;
 }
 
 /** Where to read the steps when Abacus cannot answer: the guide that starts on this screen, or every guide. */

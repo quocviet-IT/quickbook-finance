@@ -412,7 +412,7 @@
   border-radius: 999px;
   padding: 1px 9px;
   white-space: nowrap;
-  max-width: 45%;
+  max-width: 55%;
   overflow: hidden;
   text-overflow: ellipsis;
 }

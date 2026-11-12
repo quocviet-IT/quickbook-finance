@@ -7,7 +7,7 @@ import { formatRecentMoment } from "@/lib/format";
 import type { AbacusConversationSummary } from "@/lib/services/abacus-history";
 import AbacusMark from "./AbacusMark";
 import ScreenIcon from "./ScreenIcon";
-import { screenArea, topicIcon } from "./abacus-view";
+import { guideTag, screenArea, topicIcon } from "./abacus-view";
 import styles from "./abacus.module.css";
 
 /** The person's conversations as the panel last read them. */
@@ -117,24 +117,27 @@ export default function AbacusStart({
             ))}
           </div>
           <div className={styles.questions}>
-            {selected.questions.map((question) => (
-              <button
-                key={question.question}
-                type="button"
-                className={styles.question}
-                disabled={busy}
-                title={question.guide ? `Answered by the guide “${question.guide.title}”` : undefined}
-                onClick={() => onAsk(question.question)}
-              >
-                <ArrowRightOutlined className={styles.icon} aria-hidden="true" />
-                <span>{question.question}</span>
-                {question.guide ? (
-                  <span className={styles.guideTag} aria-hidden="true">
-                    {question.guide.title}
-                  </span>
-                ) : null}
-              </button>
-            ))}
+            {selected.questions.map((question) => {
+              const tag = guideTag(question);
+              return (
+                <button
+                  key={question.question}
+                  type="button"
+                  className={styles.question}
+                  disabled={busy}
+                  title={question.guide ? `Answered by the guide “${question.guide.title}”` : undefined}
+                  onClick={() => onAsk(question.question)}
+                >
+                  <ArrowRightOutlined className={styles.icon} aria-hidden="true" />
+                  <span>{question.question}</span>
+                  {tag ? (
+                    <span className={styles.guideTag} aria-hidden="true">
+                      {tag}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </>
       ) : null}
