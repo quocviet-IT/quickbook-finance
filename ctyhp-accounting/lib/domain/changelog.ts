@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.19",
+    date: "2026-11-11",
+    headline: "The guide's steps show a picture of their screen, with the button to press ringed in orange.",
+    changes: [
+      {
+        kind: "added",
+        title: "A picture for every step",
+        detail:
+          "Each step now shows the part of its screen where the work happens, with the button, field or menu item it names ringed in orange: New invoice above the invoice list, Download PDF in an invoice's row menu, Close beside an open month. The pictures are shown at the size the screen draws them, so the words in them read as they do in OneBook; click one to enlarge it. They come from the sample company, never from a company's real books. Banking's guides get theirs next, once the sample company has bank accounts to show.",
+        route: "/guide",
+      },
+      {
+        kind: "fixed",
+        title: "Two more buttons named as the screens print them",
+        detail:
+          "Cancelling an invoice is Void invoice in the invoice's row menu, not Void, and a snapshot's button on Backups reads Restore; Restore as new company is the title of the page it opens.",
+        route: "/guide",
+      },
+    ],
+  },
+  {
     version: "3.0.18",
     date: "2026-11-11",
     headline: "The guide says each step in a line, and Banking has six short guides instead of one long one.",

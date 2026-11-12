@@ -125,10 +125,12 @@ export default function GuideFlowView({
                     {step.screenshot ? (
                       <figure className="system-guide__shot">
                         {/* Captured from a sample company, never from real books. */}
+                        {/* A picture per step (3.0.19): fetched as it scrolls into view. */}
                         <PreviewImage
                           src={step.screenshot.src}
                           alt={step.screenshot.alt}
                           width="100%"
+                          loading="lazy"
                           preview={{ mask: "Enlarge" }}
                         />
                         {step.screenshot.caption ? <figcaption>{step.screenshot.caption}</figcaption> : null}
