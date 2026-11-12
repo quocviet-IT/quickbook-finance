@@ -6,21 +6,23 @@ const linkStyle = { padding: 0, height: "auto", fontSize: 12 } as const;
 const small = { fontSize: 12 } as const;
 
 /**
- * The Category cell of a line recoded out of Uncategorized (1.85): where its
- * money went, then the entry that put it in Uncategorized and the recode that
- * moved it out. Undo recode is the only way back. Voiding the first entry is
- * not offered under a recode: it sat beside Undo recode and was pressed by
- * mistake.
+ * The Category cell of a recoded line (1.85; any account since 3.0.25): where
+ * its money went, the account its own entry names, and the two entries. Undo
+ * recode is the only way back. Voiding the first entry is not offered under a
+ * recode: it sat beside Undo recode and was pressed by mistake.
  */
 export default function RecodedCategory({
   recode,
+  from,
   entryNumber,
   onUndo,
   undoing,
   onCreateRule,
 }: {
   recode: BankRecodeRow;
-  /** The bank line's own entry, the one that put it in Uncategorized. */
+  /** The account the line's own entry names: where the money was before the recode. */
+  from: string;
+  /** The bank line's own entry. */
   entryNumber: string | null;
   /** Null when this person may not take the recode back. */
   onUndo: (() => void) | null;
@@ -32,8 +34,8 @@ export default function RecodedCategory({
   return (
     <Space direction="vertical" size={0} style={{ maxWidth: "100%" }}>
       <Typography.Text ellipsis={{ tooltip: account }}>{account}</Typography.Text>
-      <Typography.Text type="secondary" style={small}>
-        Recoded from Uncategorized
+      <Typography.Text type="secondary" style={small} ellipsis={{ tooltip: `Recoded from ${from}` }}>
+        Recoded from {from}
       </Typography.Text>
       <Typography.Text type="secondary" style={small}>
         {entryNumber ?? "posted"}

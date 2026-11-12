@@ -15,6 +15,7 @@ import {
   categoriseBankTransaction,
   uncategoriseBankTransaction,
   recodeUncategorized,
+  recodeBankTransaction,
   undoRecode,
   listBankStatementImports,
   undoBankStatementImport,
@@ -428,7 +429,30 @@ export async function recodeUncategorizedAction(
   }
 }
 
-/** Take a recode back: its entry is voided and the line is in Uncategorized again. */
+/**
+ * Recode (3.0.25): move a line coded in Bank Transactions to another account,
+ * in a reconciled month too. The bank side and its reconciliation stay as they
+ * are; the database refuses a line split across accounts, an import's line, a
+ * bank account and a closed period, each in its own words.
+ */
+export async function recodeBankTransactionAction(
+  transactionId: string,
+  accountId: string,
+): Promise<ActionResult<{ entry_number: string | null; account_code: string; account_name: string }>> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const sb = await createSupabaseServerClient();
+    const recoded = await recodeBankTransaction(sb, transactionId, accountId);
+    revalidatePath("/banking");
+    revalidatePath("/reports");
+    return { ok: true, data: recoded };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/** Take a recode back: its entry is voided and the line is on its own entry's account again. */
 export async function undoRecodeAction(transactionId: string): Promise<ActionResult<{ entry_number: string | null }>> {
   const denied = await guard();
   if (denied) return { ok: false, error: denied };

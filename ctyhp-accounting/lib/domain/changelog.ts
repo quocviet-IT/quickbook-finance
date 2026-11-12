@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.25",
+    date: "2026-11-12",
+    headline: "A coded bank line can be moved to another account inside a reconciled month; the reconciliation stays as it was.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Recode moves any line coded in Bank Transactions, in a reconciled month too",
+        detail:
+          "Recode used to move a line only out of Uncategorized, and a line in a reconciled month could not be moved to another account at all without reopening the month. Every line coded here to one account now offers Recode. It posts a second entry, the same day, that moves the amount from the account it was coded to onto the one you choose. The line, its date, its amount, its bank account and the reconciliation it is on stay exactly as they were, so the reconciliation still agrees and stays completed. The audit log keeps the account before and after. Undo recode puts it back; recoding it again moves it on, with only one recode standing.",
+        route: "/banking",
+      },
+      {
+        kind: "changed",
+        title: "Change on a line of a reconciled month names Recode",
+        detail:
+          "Change voids a line's entry, so it is still refused for a line ticked on a completed reconciliation. It now says that the line's date, amount and bank account stay as reconciled, and that Recode is the way to move it to another account.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.24",
     date: "2026-11-12",
     headline: "Reconciling pairs by a window you set, leaves a line that fits two entries for you, and adds a missing line only to the account you choose.",
