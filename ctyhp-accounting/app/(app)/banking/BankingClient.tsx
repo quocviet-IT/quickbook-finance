@@ -191,6 +191,7 @@ export default function BankingClient({
   canReadDocuments,
   canManageDocuments,
   canGovernDocuments,
+  canDeleteLines,
 }: {
   bankAccounts: BankAccountWithGl[];
   /** The labels a bank line may carry; a new one is appended as it is created. */
@@ -214,6 +215,8 @@ export default function BankingClient({
   canReadDocuments: boolean;
   canManageDocuments: boolean;
   canGovernDocuments: boolean;
+  /** The role holds Delete bank lines (3.0.23). */
+  canDeleteLines: boolean;
 }) {
   const { message } = App.useApp();
   const { timeZone } = useCompanyClock();
@@ -919,6 +922,7 @@ export default function BankingClient({
         initialFocusId={initialFocusId}
         canWrite={canWrite}
         canReadDocuments={canReadDocuments}
+        canDeleteLines={canDeleteLines}
         busy={busy}
         formatRowMoney={rowMoney}
         postableAccounts={postableAccounts}
@@ -940,19 +944,15 @@ export default function BankingClient({
         onSettle={openSettle}
         onApprove={approve}
         onReject={reject}
-        onDelete={(row, eligibility) => {
-          // The control is disabled whenever eligibility.kind is "blocked",
-          // so this only fires for "delete_only" or "void_then_delete" in
-          // practice; the check is defense in depth, not the real gate.
-          if (eligibility.kind === "blocked") return;
+        onDelete={(row) =>
+          // The dialog asks the database how the line stands before it offers anything (3.0.23).
           setDeleteTarget({
             id: row.transaction.id,
             txnDate: row.transaction.txn_date,
             description: row.transaction.description,
             amount: rowMoney(row),
-            eligibility,
-          });
-        }}
+          })
+        }
         onAttachments={(row) =>
           setAttachmentTarget({
             entityType: "bank_transaction",
@@ -1039,6 +1039,7 @@ export default function BankingClient({
           setImportsKey((count) => count + 1);
           reload();
         }}
+        onChanged={reload}
       />
 
       <BatchAssignAccountModal

@@ -40,6 +40,7 @@ export default async function BankingPage({
     canReadDocuments,
     canManageDocuments,
     canGovernDocuments,
+    canDeleteLines,
   ] = await Promise.all([
     bankAccountsRead,
     // The lines of the account the screen opens on, read here rather than by
@@ -54,6 +55,7 @@ export default async function BankingPage({
     hasPermission(sb, "documents.read"),
     hasPermission(sb, "documents.manage"),
     hasPermission(sb, "documents.govern"),
+    hasPermission(sb, "banking.delete_line"),
   ]);
 
   const linkedIds = new Set(bankAccounts.map((b) => b.account_id));
@@ -91,6 +93,7 @@ export default async function BankingPage({
         canReadDocuments={canReadDocuments}
         canManageDocuments={canManageDocuments}
         canGovernDocuments={canGovernDocuments}
+        canDeleteLines={canDeleteLines}
       />
     </div>
   );

@@ -22,6 +22,7 @@ import {
   type ElsewhereBankLine,
   type OtherAccountsCheck,
 } from "@/lib/domain/statement-other-accounts";
+import { bankLineDeleteStateOf, type BankLineDeleteState } from "@/lib/domain/bank-transaction-delete";
 import { BANK_DETAIL_TYPES } from "@/lib/domain/bank-account-detail";
 import { isCardAccountType } from "@/lib/domain/card-account";
 import { validFeedStart, type FeedSkips } from "@/lib/domain/bank-feed-start";
@@ -462,38 +463,39 @@ export async function undoBankStatementImport(
 }
 
 /**
- * Delete a bank line, voiding the journal entry categorising it posted
- * first — Correction to RQ-06, 2026-08-17.
+ * Delete a bank line (3.0.23, migration 0192): only one that is unposted,
+ * unmatched and unreconciled, such as a duplicate import. The database decides,
+ * holding the row, and keeps the whole line in the audit log; a posted,
+ * matched or reconciled line is refused in its own words, with the way out.
  *
- * `acc_delete_bank_transaction` only ever accepted an `unmatched` row, so
- * Delete was invisible on every row of a company where every line had been
- * categorised (categorising posts an entry — migration 0111). Voiding that
- * entry and removing the line is one act to the person pressing the button,
- * so it is one call here and one transaction in the database.
- *
- * It was two calls when it first shipped, decided in this function: read the
- * status, void, then delete. Two calls are two transactions, and a delete
- * that refused after the void had already committed left the entry voided and
- * the line alive — data changed by a failed delete, which is exactly what
- * RQ-06 says must not happen ("If deletion fails, the data must remain
- * unchanged"). Migration 0114 closes that by composing the same two audited
- * functions inside one `acc_delete_bank_transaction_with_void`, the shape
- * `acc_delete_payment` (0106) already uses for a customer receipt.
- *
- * Every refusal now arrives from there in its own words — a settlement, a
- * transactions-import batch, an entry something else owns, a closed period,
- * a reason too short, an `ignored` line, a suggested match still open — so
- * nothing is reworded on the way out.
+ * Until 3.0.23 a coded line was voided and deleted in one click (RQ-06's
+ * correction, 0114). Item C of the defect report of 11 Nov 2026 asked for a
+ * refusal in place of that warning: the entry is voided as a step of its own
+ * (Void, or Change in the Category column), and the line deleted after.
  */
-export async function deleteBankTransactionWithVoid(
-  sb: SupabaseClient,
-  id: string,
-  reason: string,
-): Promise<void> {
-  const { error } = await sb.rpc("acc_delete_bank_transaction_with_void", {
-    p_id: id,
-    p_reason: reason,
-  });
+export async function deleteBankTransaction(sb: SupabaseClient, id: string, reason: string): Promise<void> {
+  const { error } = await sb.rpc("acc_delete_bank_transaction", { p_id: id, p_reason: reason });
+  if (error) throw new BankingError(error.message);
+}
+
+/** How one bank line stands with deletion (acc_bank_line_delete_state, 0192). Reads only. */
+export async function getBankLineDeleteState(sb: SupabaseClient, id: string): Promise<BankLineDeleteState> {
+  const { data, error } = await sb.rpc("acc_bank_line_delete_state", { p_id: id });
+  if (error) throw new BankingError(error.message);
+  try {
+    return bankLineDeleteStateOf(data);
+  } catch (err) {
+    throw new BankingError(err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * Take back an approved match to an entry posted elsewhere (0192). The entry
+ * stays posted; the line waits for review again; the audit log keeps what was
+ * matched and why it was taken back.
+ */
+export async function unmatchBankTransaction(sb: SupabaseClient, id: string, reason: string): Promise<void> {
+  const { error } = await sb.rpc("acc_unmatch_bank_transaction", { p_id: id, p_reason: reason });
   if (error) throw new BankingError(error.message);
 }
 

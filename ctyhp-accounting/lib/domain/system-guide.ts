@@ -1029,7 +1029,8 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "lists them with what to do instead: " +
           "one ticked on a completed reconciliation (reopen it first), one dated in a closed period (reopen the " +
           "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
-          "(void the document). Needs the Post manual journals permission.",
+          "(void the document). Needs the Post manual journals permission, and Delete bank lines when an entry " +
+          "was coded from Bank Transactions.",
       },
       {
         action: "See what drags an account below zero",
