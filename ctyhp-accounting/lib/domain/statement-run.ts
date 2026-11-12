@@ -20,6 +20,7 @@
 import { formatDate, plural } from "@/lib/format";
 import { statementProof, toStatementLines, type PdfStatement } from "./pdf-statement";
 import { MAX_RUN_LINES } from "./statement-run-limits";
+import { PAIRING_WINDOW_DAYS } from "./statement-pairing";
 import {
   bringForwardAdvice,
   statementStandings,
@@ -503,8 +504,9 @@ export type MonthOutcome =
   | { kind: "agrees"; paired: number; of: number; outstanding: number }
   /** A card's month (2.46): the books' lines to its closing date come to its new balance. */
   | { kind: "agreesOnBalance"; lines: number }
-  | { kind: "balanceOnly"; unpaired: number; of: number }
-  | { kind: "outBy"; differenceMinor: number; missing: number }
+  /** `ambiguous`: of the lines that did not pair, those that fit more than one entry (3.0.24). */
+  | { kind: "balanceOnly"; unpaired: number; of: number; ambiguous?: number }
+  | { kind: "outBy"; differenceMinor: number; missing: number; ambiguous?: number }
   | { kind: "waiting" };
 
 export interface RunMonth {
@@ -544,6 +546,8 @@ export function simulateRun(
   openLines: readonly OpenBookLine[],
   start: RunStart,
   money: (minor: number) => string,
+  /** The company's statement matching window (3.0.24). */
+  windowDays = PAIRING_WINDOW_DAYS,
 ): RunPreview {
   let open = [...openLines];
   let beginning = start.beginningMinor ?? 0;
@@ -592,6 +596,7 @@ export function simulateRun(
       statement.lines.map((line, lineNo) => ({ lineNo, date: line.txn_date, amountMinor: line.amount_minor, reference: line.reference })),
       available.map((line) => ({ ...line, cleared: false })),
       to,
+      windowDays,
     );
     const pairedIds = new Set(result.standings.flatMap((s) => (s.kind === "paired" ? [s.bookId] : [])));
     const pairedMinor = available.reduce((sum, line) => (pairedIds.has(line.id) ? sum + line.amountMinor : sum), 0);
@@ -605,15 +610,23 @@ export function simulateRun(
       toSign += 1;
     } else if (monthBeginning + available.reduce((sum, line) => sum + line.amountMinor, 0) === closing) {
       // OneBook: the prototype ticks every open line here and signs the month.
-      outcome = { kind: "balanceOnly", unpaired: result.missing, of };
+      // A line that fits more than one entry did not pair either: a person says which (3.0.24).
+      const unsure = result.ambiguous ? { ambiguous: result.ambiguous } : {};
+      outcome = { kind: "balanceOnly", unpaired: result.missing + result.ambiguous, of, ...unsure };
       stopped = true;
     } else {
-      outcome = { kind: "outBy", differenceMinor, missing: result.missing };
+      const unsure = result.ambiguous ? { ambiguous: result.ambiguous } : {};
+      outcome = { kind: "outBy", differenceMinor, missing: result.missing, ...unsure };
       stopped = true;
     }
     months.push({ key: statement.key, statementDate: to, beginningMinor: monthBeginning, closingMinor: closing, outcome, standings: result.standings });
   }
   return { broughtForward, months, toSign };
+}
+
+/** "; 2 fit more than one entry" (3.0.24), or nothing. */
+function fitMore(ambiguous: number | undefined): string {
+  return ambiguous ? `; ${ambiguous} ${ambiguous === 1 ? "fits" : "fit"} more than one entry` : "";
 }
 
 /** What a month's row says in the preview. */
@@ -624,9 +637,14 @@ export function monthSentence(outcome: MonthOutcome, money: (minor: number) => s
     case "agreesOnBalance":
       return `Agrees — the books' ${plural(outcome.lines, "line")} to the closing date come to the new balance`;
     case "balanceOnly":
-      return `Agrees on the balance only — needs a look: ${plural(outcome.unpaired, "line")} did not pair`;
-    case "outBy":
-      return `Out by ${money(Math.abs(outcome.differenceMinor))}${outcome.missing ? ` — the bank shows ${plural(outcome.missing, "thing")} the books do not` : ""}`;
+      return `Agrees on the balance only — needs a look: ${plural(outcome.unpaired, "line")} did not pair${fitMore(outcome.ambiguous)}`;
+    case "outBy": {
+      const parts = [
+        outcome.missing ? `the bank shows ${plural(outcome.missing, "thing")} the books do not` : null,
+        outcome.ambiguous ? fitMore(outcome.ambiguous).slice(2) : null,
+      ].filter((part): part is string => part !== null);
+      return `Out by ${money(Math.abs(outcome.differenceMinor))}${parts.length ? ` — ${parts.join("; ")}` : ""}`;
+    }
     case "waiting":
       return "Waiting";
   }

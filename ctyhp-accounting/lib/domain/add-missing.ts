@@ -11,6 +11,13 @@
  * nothing places it, to Uncategorized Income or Expense by its direction, to be
  * recoded later. A line that cannot be added says why.
  *
+ * 3.0.24 (item E of the defect report of 11 Nov 2026): a line the books do not
+ * have does not post itself. The plan proposes an account for each line, and
+ * the person confirms or changes it, line by line, before anything is written;
+ * a line nothing places proposes none, so it is added only to an account the
+ * person chose (Uncategorized among them). Each line added writes exactly one
+ * entry.
+ *
  * Two kinds of line are held back from "Add all N" (2.03), each with its own
  * "Add anyway": a line the statement balances without, since a line the bank
  * never had is likely a misread (extraStatementLines); and a line the books
@@ -55,7 +62,8 @@ export interface AddSuggestion {
   why: string;
 }
 
-export type AddSource = AddSuggestion["source"] | "uncategorized";
+/** Where a line's account came from; "chosen" is the person's own choice in the box (3.0.24). */
+export type AddSource = AddSuggestion["source"] | "uncategorized" | "chosen";
 
 export interface AddItem {
   lineNo: number;
@@ -111,6 +119,8 @@ export interface AddMissingPlan {
   uncategorized: number;
   /** Why nothing can be added from here, when nothing can. */
   blocked: string | null;
+  /** The company's Uncategorized accounts: a line posted to one is counted as needing coding. */
+  holdingIds: string[];
 }
 
 export const EXTRA_LINE_NOTE = "Extra — likely not a transaction: the statement already balances without it.";
@@ -219,6 +229,7 @@ export function planAddMissing(input: {
   duplicates?: ReadonlyMap<number, readonly DuplicateMatch[]>;
 }): AddMissingPlan {
   const missingLines = input.lines.filter((_, i) => input.standings[i]?.kind === "missing");
+  const holdingIds = [input.holding.income?.id, input.holding.expense?.id].filter((id): id is string => Boolean(id));
   const empty = (blocked: string | null): AddMissingPlan => ({
     missing: missingLines.length,
     items: [],
@@ -226,6 +237,7 @@ export function planAddMissing(input: {
     cannot: [],
     uncategorized: 0,
     blocked,
+    holdingIds,
   });
   if (!missingLines.length) return empty(null);
   if (input.flipped) return empty(ADD_BLOCKED.flipped);
@@ -306,6 +318,7 @@ export function planAddMissing(input: {
     cannot,
     uncategorized: blocked ? 0 : items.filter((item) => item.source === "uncategorized").length,
     blocked,
+    holdingIds,
   };
 }
 
@@ -314,17 +327,28 @@ export function linesToCheckForDuplicates(plan: AddMissingPlan): number[] {
   return plan.blocked ? [] : plan.items.map((item) => item.lineNo);
 }
 
-/** A line the person asked to add, as the screen showed it: the line and the account it would post to. */
+/** A line the person asked to add, and the account they confirmed or chose for it. */
 export interface ChosenLine {
   lineNo: number;
   accountId: string;
 }
 
 /**
+ * The account the box starts a line on (3.0.24): what a rule, past coding, a
+ * card or a related company proposes. A line nothing places starts on none,
+ * so it is added only to an account the person chooses.
+ */
+export function proposedAccount(item: Pick<AddItem, "source" | "accountId">): string | null {
+  return item.source === "uncategorized" ? null : item.accountId;
+}
+
+/**
  * The lines to post, as the plan worked out again on the server has them: each
  * one asked for must be in "Add all N", or held back and chosen with "Add
- * anyway", and post to the account the person was shown. Null when the plan no
- * longer says what the person saw — nothing is posted unseen.
+ * anyway". Each posts to the account the person confirmed or chose (3.0.24);
+ * the database checks that it may take money. Null when the plan no longer
+ * holds a line asked for, or a line is asked for twice: nothing is posted
+ * unseen.
  */
 export function chooseLinesToAdd(
   plan: AddMissingPlan,
@@ -334,14 +358,19 @@ export function chooseLinesToAdd(
   const addAnyway = new Set(anyway);
   const byLine = new Map<number, AddItem>(plan.items.map((item) => [item.lineNo, item]));
   for (const line of plan.held) if (addAnyway.has(line.lineNo)) byLine.set(line.lineNo, line);
-  const asked = new Set<number>();
+  const asked = new Map<number, string>();
   for (const line of chosen) {
-    const item = byLine.get(line.lineNo);
-    if (!item || item.accountId !== line.accountId || asked.has(line.lineNo)) return null;
-    asked.add(line.lineNo);
+    if (!byLine.has(line.lineNo) || asked.has(line.lineNo)) return null;
+    asked.set(line.lineNo, line.accountId);
   }
-  // In statement order.
-  return [...byLine.values()].filter((item) => asked.has(item.lineNo)).sort((a, b) => a.lineNo - b.lineNo);
+  // In statement order, each on the account the person confirmed or chose.
+  return [...byLine.values()]
+    .filter((item) => asked.has(item.lineNo))
+    .sort((a, b) => a.lineNo - b.lineNo)
+    .map((item) => {
+      const accountId = asked.get(item.lineNo) as string;
+      return accountId === item.accountId ? item : { ...item, accountId, accountLabel: "", source: "chosen" as const, short: "", why: "" };
+    });
 }
 
 /** When the lines were posted but pairing them afterwards failed: they are in the books, not yet ticked. */

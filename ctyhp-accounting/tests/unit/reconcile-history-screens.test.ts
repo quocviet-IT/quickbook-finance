@@ -115,6 +115,7 @@ const plan = (items: AddItem[], heldLines: HeldLine[]): AddMissingPlan => ({
   cannot: [],
   uncategorized: 0,
   blocked: null,
+  holdingIds: [],
 });
 const duplicate = duplicateNote([{ journalLineId: "jl-1", entryId: "e-1", entryNumber: "JE-000310", entryDate: "2026-07-27" }]);
 
@@ -123,6 +124,7 @@ function renderBox(p: AddMissingPlan, withAddAnyway = true): string {
     createElement(AddMissingBox, {
       plan: p,
       bankAccountId: "bank-1",
+      accounts: [{ id: "acct-sales", label: "4000 — Sales" }],
       money,
       adding: false,
       onAdd: () => {},
@@ -146,9 +148,9 @@ describe("Add missing lines: the lines held back", () => {
     expect(out.split(ADD_ANYWAY).length - 1).toBe(2);
   });
 
-  it("keeps Add all N to what it adds: the lines that are not held back", () => {
+  it("keeps Add N to what it adds: the lines that are not held back, with an account (3.0.24)", () => {
     const out = text(renderBox(plan([wire], [held(shop, "duplicate", duplicate)])));
-    expect(out).toContain("Add all 1 to the books");
+    expect(out).toContain("Add 1 to the books");
     expect(out).toContain("The bank shows 2 things your books do not.");
   });
 
@@ -156,7 +158,7 @@ describe("Add missing lines: the lines held back", () => {
     const out = text(renderBox(plan([], [held(shop, "extra", EXTRA_LINE_NOTE), held(fee, "extra", EXTRA_LINE_NOTE)])));
     expect(out).toContain("The bank shows 2 things your books do not.");
     expect(out).toContain("POS EXAMPLE SHOP");
-    expect(out).not.toMatch(/Add all \d/);
+    expect(out).not.toMatch(/Add \d+ to the books/);
     expect(out.split(ADD_ANYWAY).length - 1).toBe(2);
   });
 
@@ -166,16 +168,14 @@ describe("Add missing lines: the lines held back", () => {
     expect(out).not.toContain(ADD_ANYWAY);
   });
 
-  it("is wired to post one held line alone, chosen with Add anyway, and Add all to post only its own lines", () => {
+  it("is wired to post one held line alone, chosen with Add anyway, and Add N to post only its own lines, each to its account", () => {
     const workspace = read("[id]", "ReconcileWorkspaceClient.tsx");
     const anyway = body(workspace, "async function addAnyway(", "\n  }\n");
-    expect(anyway).toContain(
-      "addMissingLinesAction(reconciliationId, [{ lineNo: line.lineNo, accountId: line.accountId }], [line.lineNo])",
-    );
+    expect(anyway).toContain("addMissingLinesAction(reconciliationId, [{ lineNo: line.lineNo, accountId }], [line.lineNo])");
     const all = body(workspace, "async function addAll(", "\n  }\n");
-    expect(all).toContain("shownPlan.items.map((item) => ({ lineNo: item.lineNo, accountId: item.accountId }))");
+    expect(all).toContain("afterAdding(await addMissingLinesAction(reconciliationId, chosen));");
     expect(all).not.toMatch(/held|anyway/i);
-    expect(workspace).toContain("onAddAnyway={(line) => void addAnyway(line)}");
+    expect(workspace).toContain("onAddAnyway={(line, accountId) => void addAnyway(line, accountId)}");
   });
 });
 
@@ -634,7 +634,7 @@ describe("the Guide's reconcile steps", () => {
   });
 
   it("says when a single line is Extra beside a line that is really missing", () => {
-    expect(note("Add a line held back from Add all")).toContain(
+    expect(note("Add a line held back from the others")).toContain(
       "When it does not add up and exactly one of them is the amount it is out by, that one alone is Extra.",
     );
   });

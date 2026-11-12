@@ -11,6 +11,7 @@ import {
   addedMessage,
   addedNotPairedMessage,
   chooseLinesToAdd,
+  proposedAccount,
   duplicateNote,
   extraLineNos,
   extraStatementLines,
@@ -221,7 +222,7 @@ describe("planAddMissing", () => {
       suggestions: new Map(),
       holding,
     });
-    expect(plan).toEqual({ missing: 1, items: [], held: [], cannot: [], uncategorized: 0, blocked: ADD_BLOCKED.flipped });
+    expect(plan).toEqual({ missing: 1, items: [], held: [], cannot: [], uncategorized: 0, blocked: ADD_BLOCKED.flipped, holdingIds: plan.holdingIds });
   });
 
   it("adds nothing when a line needs an Uncategorized account the chart does not have", () => {
@@ -253,7 +254,7 @@ describe("planAddMissing", () => {
   it("has nothing to say when every line is in the books", () => {
     expect(
       planAddMissing({ lines: [deposit], standings: [paired], flipped: false, transactions: [], suggestions: new Map(), holding }),
-    ).toEqual({ missing: 0, items: [], held: [], cannot: [], uncategorized: 0, blocked: null });
+    ).toMatchObject({ missing: 0, items: [], held: [], cannot: [], uncategorized: 0, blocked: null });
   });
 });
 
@@ -464,9 +465,27 @@ describe("chooseLinesToAdd", () => {
     expect(chooseLinesToAdd(plan, [{ lineNo: 9, accountId: "uncat-out" }], [9])).toBeNull();
   });
 
-  it("refuses a line posting to another account than shown, or asked for twice", () => {
-    expect(chooseLinesToAdd(plan, [{ lineNo: 3, accountId: "uncat-out" }], [])).toBeNull();
+  it("posts each line to the account the person confirmed or chose (3.0.24)", () => {
+    const chosen = chooseLinesToAdd(plan, [shown(3), { lineNo: 0, accountId: "acct-sales" }], []);
+    expect(chosen?.map((i) => [i.lineNo, i.accountId, i.source])).toEqual([
+      [0, "acct-sales", "chosen"],
+      [3, shown(3).accountId, plan.items.find((i) => i.lineNo === 3)!.source],
+    ]);
+  });
+
+  it("refuses a line asked for twice", () => {
     expect(chooseLinesToAdd(plan, [shown(0), shown(0)], [])).toBeNull();
+  });
+
+  it("proposes no account for a line nothing places, so the person chooses one", () => {
+    const uncategorized = plan.items.find((i) => i.source === "uncategorized")!;
+    expect(proposedAccount(uncategorized)).toBeNull();
+    const ruled = plan.items.find((i) => i.lineNo === 3)!;
+    expect(proposedAccount(ruled)).toBe(ruled.accountId);
+  });
+
+  it("names the company's Uncategorized accounts, so what went there is counted", () => {
+    expect(plan.holdingIds.length).toBeGreaterThan(0);
   });
 });
 

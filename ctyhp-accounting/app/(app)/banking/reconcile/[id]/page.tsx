@@ -7,6 +7,7 @@ import { listBankAccounts } from "@/lib/services/banking";
 import { findReconciliationHeader } from "@/lib/services/bankrec";
 import { listCurrencies } from "@/lib/services/reference";
 import { readReconciliationOverrides } from "@/lib/services/override-notices";
+import { getStatementMatchWindow } from "@/lib/services/banking-preference";
 import { formatMoney } from "@/lib/format";
 import { statementFileAccount } from "@/lib/domain/statement-evidence";
 import { balanceSideOf } from "@/lib/domain/card-account";
@@ -27,7 +28,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
   const header = await findReconciliationHeader(sb, id);
   if (!header) notFound();
   const currenciesRead = listCurrencies(sb);
-  const [accounts, currencies, banks, overrides, holdsComplete, holdsReopen, initialView] = await Promise.all([
+  const [accounts, currencies, banks, overrides, holdsComplete, holdsReopen, initialView, matchWindowDays] = await Promise.all([
     listAccounts(sb),
     currenciesRead,
     listBankAccounts(sb),
@@ -43,6 +44,8 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
     // The lines, figures and statement, read here for the first paint (2.92)
     // rather than by the screen once it has loaded.
     firstPaintRead(() => readReconcileWorkspace(sb, id)),
+    // The rule the statement lines are paired by (3.0.24).
+    getStatementMatchWindow(sb),
   ]);
   const base = currencies.find((c) => c.is_base);
   const { notices, unavailable: overridesUnavailable } = overrides;
@@ -78,6 +81,7 @@ export default async function ReconcileWorkspacePage({ params }: { params: Promi
         }}
         fileAccount={bank ? statementFileAccount(bank.bank_name || bank.account_name, bank.account_number_masked) : "Bank account"}
         initialView={initialView}
+        matchWindowDays={matchWindowDays}
       />
     </div>
   );

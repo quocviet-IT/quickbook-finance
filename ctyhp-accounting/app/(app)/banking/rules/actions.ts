@@ -11,7 +11,8 @@ import {
   repaymentPreviewSchema,
   rulePreviewInputSchema,
 } from "@/lib/domain/schemas";
-import { saveBankingPreference } from "@/lib/services/banking-preference";
+import { saveBankingPreference, saveStatementMatchWindow } from "@/lib/services/banking-preference";
+import { matchWindowProblem } from "@/lib/domain/statement-match-window";
 import {
   deleteBankRule,
   previewBankRule,
@@ -103,6 +104,27 @@ export async function saveBankingPreferenceAction(raw: unknown): Promise<ActionR
     const sb = await createSupabaseServerClient();
     await saveBankingPreference(sb, parsed.data);
     refresh();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+/**
+ * Statement matching (3.0.24): how many days apart a statement line and an
+ * entry of the same amount may be dated and still pair. Staff, as the other
+ * banking preferences; the database checks the role and the range again.
+ */
+export async function saveStatementMatchWindowAction(days: unknown): Promise<ActionResult> {
+  const denied = await guard();
+  if (denied) return { ok: false, error: denied };
+  const problem = typeof days === "number" ? matchWindowProblem(days) : "Choose a window from 0 to 31 days";
+  if (problem) return { ok: false, error: problem };
+  try {
+    const sb = await createSupabaseServerClient();
+    await saveStatementMatchWindow(sb, days as number);
+    refresh();
+    revalidatePath("/banking/reconcile");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: messageOf(err) };

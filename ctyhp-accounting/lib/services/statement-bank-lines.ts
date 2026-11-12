@@ -15,6 +15,7 @@ import {
 } from "@/lib/domain/statement-bank-lines";
 import { getReconciliationLines, getReconciliationStatement } from "./bankrec";
 import { readAllPages } from "./paging";
+import { getStatementMatchWindow } from "./banking-preference";
 
 export class StatementBankLinesError extends Error {}
 
@@ -54,11 +55,12 @@ export async function bankLinesBetween(sb: SupabaseClient, bankAccountId: string
 
 /** The pairs a completed reconciliation matches: each ticked statement pair and the bank line it was imported as. */
 export async function reconciledPairsOf(sb: SupabaseClient, reconciliationId: string): Promise<BankLinePair[]> {
-  const [statement, book] = await Promise.all([
+  const [statement, book, windowDays] = await Promise.all([
     getReconciliationStatement(sb, reconciliationId),
     getReconciliationLines(sb, reconciliationId),
+    getStatementMatchWindow(sb),
   ]);
-  const { standings } = reconciliationStandings(statement, book);
+  const { standings } = reconciliationStandings(statement, book, windowDays);
   const dates = statement.lines
     .filter((_, i) => {
       const standing = standings[i];

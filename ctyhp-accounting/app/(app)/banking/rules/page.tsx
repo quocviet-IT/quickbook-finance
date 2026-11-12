@@ -14,6 +14,7 @@ import { listRelatedCompanies, listRepayments } from "@/lib/services/repayment-r
 import { repaymentStats } from "@/lib/services/repayments";
 import PageHeader from "@/components/PageHeader";
 import PairsPreference from "./PairsPreference";
+import MatchWindowPreference from "./MatchWindowPreference";
 import RelatedCompaniesSection, { type RelatedListRow } from "./RelatedCompaniesSection";
 import RepaymentsSection, { type RepaymentListRow } from "./RepaymentsSection";
 import RulesClient, { type RuleListRow } from "./RulesClient";
@@ -84,6 +85,7 @@ export default async function BankRulesPage() {
         accounts={liabilities}
         canWrite={canWrite(role)}
       />
+      <MatchWindowPreference initialDays={preference.matchWindowDays} canWrite={canWrite(role)} />
       <RepaymentsSection
         rows={repaymentRows}
         cardAccounts={accounts.filter((account) => repaysAccountAllowed("card", codingAccountOf(account)))}

@@ -40,6 +40,7 @@ import {
   type ReconStatementHeader,
 } from "./bankrec";
 import { readAllPages } from "./paging";
+import { getStatementMatchWindow } from "./banking-preference";
 import { tieKeptStatementFile } from "./statement-files";
 
 /** What acc_bring_history_forward made. */
@@ -249,11 +250,12 @@ export async function setStatementLineAside(
   aside: boolean,
 ): Promise<void> {
   if (aside) {
-    const [statement, book] = await Promise.all([
+    const [statement, book, windowDays] = await Promise.all([
       getReconciliationStatement(sb, reconciliationId),
       getReconciliationLines(sb, reconciliationId),
+      getStatementMatchWindow(sb),
     ]);
-    const { standings } = reconciliationStandings(statement, book);
+    const { standings } = reconciliationStandings(statement, book, windowDays);
     const at = statement.lines.findIndex((line) => line.lineNo === lineNo);
     const refusal = setAsideRefusal(at >= 0 ? standings[at] : undefined, aside);
     if (refusal) throw new BankRecError(refusal);

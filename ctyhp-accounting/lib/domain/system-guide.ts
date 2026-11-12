@@ -862,7 +862,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         route: "/banking/reconcile",
         note:
           "The difference is explained in its parts, and Complete needs a difference of zero or a recorded " +
-          "adjustment somebody signs for. Complete then matches, in Bank Transactions, each bank line to the " +
+          "adjustment somebody signs for. A statement line pairs with an entry for the same amount dated within " +
+          "the window set on Banking › Rules (5 days unless changed), or with the same check number. One that fits " +
+          "more than one entry, such as a deposit entered twice, is tagged Fits N entries and nothing is ticked for " +
+          "it: tick the one the bank paid. Complete then matches, in Bank Transactions, each bank line to the " +
           "book line its statement line paired with; a bank line already matched to another entry, ignored, or " +
           "of the opposite sign is left as it was, and the message says how many to check there.",
       },
@@ -889,17 +892,19 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       },
       {
         action: "Add the lines the books are missing",
-        summary: "Posts every listed line, dated as the bank has it, then ticks them.",
-        control: "Add all N to the books",
+        summary: "Choose each line's account, then add them; each posts one entry, ticked.",
+        control: "Add N to the books",
         route: "/banking/reconcile",
         note:
-          "The box above the statement lines shows each line the books do not have and the account it would " +
-          "post to — by card, related company, rule or history, or else Uncategorized Income or Expense. Add all " +
-          "posts every one it lists, dated as the bank has it, or none, then pairs and ticks them; Complete stays " +
-          "yours. Or code them one by one in Bank Transactions and click Match again; no tick is ever removed.",
+          "The box above the statement lines shows each line the books do not have, with the account a card, " +
+          "related company, rule or history proposes for it; change any of them. A line nothing places has no " +
+          "account until you choose one, Uncategorized among them, and a line left without one is not added. The " +
+          "button posts one entry for each line with an account, dated as the bank has it, then pairs and ticks " +
+          "them; Complete stays yours. Or code them one by one in Bank Transactions and click Match again; no tick " +
+          "is ever removed.",
       },
       {
-        action: "Add a line held back from Add all",
+        action: "Add a line held back from the others",
         summary: "A line that looks extra or already booked waits for you to add it.",
         control: "Add anyway",
         route: "/banking/reconcile",
@@ -907,8 +912,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Two kinds of line are held back and listed apart, each with why. When the statement already balances " +
           "without the lines the books do not have, they are marked Extra: likely not transactions. When it does " +
           "not add up and exactly one of them is the amount it is out by, that one alone is Extra. A line whose " +
-          "amount the books already hold, with the same check number or within 5 days, names the entry it looks " +
-          "like. Add anyway posts that one line alone, because two identical lines on one day can both be real.",
+          "amount the books already hold, with the same check number or within the matching window, names the " +
+          "entry it looks like. Choose its account, and Add anyway posts that one line alone, because two " +
+          "identical lines on one day can both be real.",
       },
       {
         action: "Start a reconciliation again",

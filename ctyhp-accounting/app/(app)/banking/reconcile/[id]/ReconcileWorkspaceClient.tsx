@@ -74,8 +74,10 @@ import {
   addedNotPairedMessage,
   extraLineNos,
   type AddMissingPlan,
+  type ChosenLine,
   type HeldLine,
 } from "@/lib/domain/add-missing";
+import { matchRuleSentence } from "@/lib/domain/statement-match-window";
 import { bankLinesToCheck, completedMessage } from "@/lib/domain/statement-bank-lines";
 import {
   BALANCE_WORDS,
@@ -161,6 +163,8 @@ interface Props {
   fileAccount: string;
   /** What the page read for the first paint; null when it did not (2.92). */
   initialView: ReconcileWorkspaceView | null;
+  /** The company's statement matching window, in days (3.0.24, Banking › Rules). */
+  matchWindowDays: number;
 }
 
 /** Every part of the screen's read came back. */
@@ -182,6 +186,7 @@ export default function ReconcileWorkspaceClient({
   bankAccount,
   fileAccount,
   initialView,
+  matchWindowDays,
 }: Props) {
   const { message, modal } = App.useApp();
   const router = useRouter();
@@ -270,8 +275,8 @@ export default function ReconcileWorkspaceClient({
   // How each statement line stands with the books as they are now. Derived,
   // never stored: the same pairing Match again ticks by.
   const standings = useMemo(
-    () => (statement && statement.lines.length ? reconciliationStandings(statement, lines) : null),
-    [statement, lines],
+    () => (statement && statement.lines.length ? reconciliationStandings(statement, lines, matchWindowDays) : null),
+    [statement, lines, matchWindowDays],
   );
   const outstanding = useMemo(() => new Set(standings?.outstanding ?? []), [standings]);
   const standingOf = useMemo(
@@ -337,28 +342,22 @@ export default function ReconcileWorkspaceClient({
     void load();
   }
 
-  async function addAll() {
-    if (!shownPlan) return;
+  /** The lines the person gave an account, each to that account (3.0.24): nothing posts itself. */
+  async function addAll(chosen: ChosenLine[]) {
+    if (!shownPlan || !chosen.length) return;
     setAdding(true);
     try {
-      afterAdding(
-        await addMissingLinesAction(
-          reconciliationId,
-          shownPlan.items.map((item) => ({ lineNo: item.lineNo, accountId: item.accountId })),
-        ),
-      );
+      afterAdding(await addMissingLinesAction(reconciliationId, chosen));
     } finally {
       setAdding(false);
     }
   }
 
-  /** One held-back line alone, posted without the duplicate check: the person has looked at it. */
-  async function addAnyway(line: HeldLine) {
+  /** One held-back line alone, to the account chosen for it, without the duplicate check: the person has looked at it. */
+  async function addAnyway(line: HeldLine, accountId: string) {
     setAddingLine(line.lineNo);
     try {
-      afterAdding(
-        await addMissingLinesAction(reconciliationId, [{ lineNo: line.lineNo, accountId: line.accountId }], [line.lineNo]),
-      );
+      afterAdding(await addMissingLinesAction(reconciliationId, [{ lineNo: line.lineNo, accountId }], [line.lineNo]));
     } finally {
       setAddingLine(null);
     }
@@ -867,12 +866,14 @@ export default function ReconcileWorkspaceClient({
       ) : null}
       {shownPlan ? (
         <AddMissingBox
+          key={missingKey}
           plan={shownPlan}
           bankAccountId={bankAccount.id}
+          accounts={offsetAccounts}
           money={money}
           adding={adding}
-          onAdd={() => void addAll()}
-          onAddAnyway={(line) => void addAnyway(line)}
+          onAdd={(chosen) => void addAll(chosen)}
+          onAddAnyway={(line, accountId) => void addAnyway(line, accountId)}
           addingLine={addingLine}
         />
       ) : null}
@@ -887,12 +888,22 @@ export default function ReconcileWorkspaceClient({
           {standings ? (
             <Space size={4} wrap>
               <Tag color="green">{standings.paired} paired</Tag>
+              {standings.ambiguous > 0 ? (
+                <Tag color="purple">
+                  {standings.ambiguous} {standings.ambiguous === 1 ? "fits" : "fit"} more than one entry
+                </Tag>
+              ) : null}
               {standings.missing > 0 ? <Tag color="orange">{standings.missing} not in the books</Tag> : null}
               {standings.aside > 0 ? <Tag>{standings.aside} set aside</Tag> : null}
               {standings.after > 0 ? <Tag>{standings.after} after the statement date</Tag> : null}
             </Space>
           ) : null}
         </Space>
+        {standings ? (
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 4 }}>
+            {matchRuleSentence(matchWindowDays)}
+          </Typography.Paragraph>
+        ) : null}
         {standings?.flipped ? (
           <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
             This statement shows money in and out the other way around; its amounts were reversed to pair them.
