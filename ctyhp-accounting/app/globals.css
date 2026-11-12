@@ -4560,8 +4560,11 @@ body:has(.ant-drawer-open) .assistant-launcher {
 .system-guide__shot {
   margin: 10px 0 0;
 }
+/* No wider than the step pictures were taken (3.0.21: 640px at twice the
+   density), so the words in them read at the size they have on screen. */
 .system-guide__shot .ant-image {
   width: 100%;
+  max-width: 640px;
   border: 1px solid var(--ob-panel-border);
   border-radius: 8px;
   overflow: hidden;

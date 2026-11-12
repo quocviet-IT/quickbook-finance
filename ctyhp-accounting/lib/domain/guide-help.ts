@@ -74,9 +74,11 @@ export function stepScreen(flow: GuideFlow, step: GuideStep): string {
   return step.everyScreen ? "every screen" : screenName(step.route ?? flow.route);
 }
 
-/** What a workflow's card says under its purpose: "7 steps", "Starts on Invoices", "Pictures". */
+/**
+ * What a workflow's card says under its purpose: "7 steps", "Starts on Invoices".
+ * It said "Pictures" too while only the two import guides had them; since 3.0.21
+ * nearly every guide does, so it no longer tells one card from another.
+ */
 export function guideCardMeta(flow: GuideFlow): string[] {
-  const meta = [plural(flow.steps.length, "step"), `Starts on ${screenName(flow.route)}`];
-  if (flow.steps.some((step) => step.screenshot)) meta.push("Pictures");
-  return meta;
+  return [plural(flow.steps.length, "step"), `Starts on ${screenName(flow.route)}`];
 }

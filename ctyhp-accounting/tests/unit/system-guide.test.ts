@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -174,12 +174,15 @@ describe("the restore-a-backup flow", () => {
   });
 
   it("names the actual restore control and ties it to the source company being untouched", () => {
-    // "Restore as new company" is BackupsClient.tsx's literal button text
-    // (app/(app)/settings/backups/BackupsClient.tsx). Renaming that button
-    // without updating this step, or dropping the "not touched" guarantee
-    // from its note, makes this fail.
-    const step = flow?.steps.find((s) => s.control === "Restore as new company");
-    expect(step, "no step names the Restore as new company control").toBeDefined();
+    // "Restore" is the button on each snapshot's row in
+    // app/(app)/settings/backups/BackupsClient.tsx (it read "Restore as new
+    // company" until the column was narrowed; that sentence is now the title of
+    // the page it opens). Renaming the button without updating this step, or
+    // dropping the "not touched" guarantee from its note, makes this fail.
+    const backups = readFileSync(join(process.cwd(), "app", "(app)", "settings", "backups", "BackupsClient.tsx"), "utf8");
+    expect(backups).toMatch(/>\s*Restore\s*</);
+    const step = flow?.steps.find((s) => s.control === "Restore");
+    expect(step, "no step names the Restore control").toBeDefined();
     expect(step?.note ?? "").toMatch(/not touched/i);
   });
 

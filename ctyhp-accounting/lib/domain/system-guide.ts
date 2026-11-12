@@ -40,11 +40,11 @@ export interface GuideStep {
   control: string;
   /** Page the control is on. Omitted when the step happens where the flow started. */
   route?: string;
-  /** The control is on every screen, as the floating Report and Ask AI are (3.0.18). */
+  /** The control is on every screen, as the floating Report and Ask Abacus are (3.0.18). */
   everyScreen?: boolean;
   /**
    * What the system does behind the control, or the rule that can block it.
-   * Folded under Details on the guide's page; the search and Ask AI read it in
+   * Folded under Details on the guide's page; the search and Abacus read it in
    * full. Omitted when the summary already says it all.
    */
   note?: string;
@@ -207,6 +207,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Add a line per item or service. Totals and sales tax are calculated on " +
           "the server — a total typed by the browser is never trusted.",
+        screenshot: { src: "/guide/steps/get-paid-1.webp", alt: "The New invoice button above the Invoices list, ringed in orange" },
       },
       {
         action: "Send it to the ledger",
@@ -216,6 +217,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Issuing assigns the invoice number and posts the entry: debit Accounts " +
           "Receivable, credit income and sales tax. Until then it is a draft and " +
           "affects nothing.",
+        screenshot: { src: "/guide/steps/get-paid-2.webp", alt: "The Issue button on a draft invoice's row in the Invoices list, ringed in orange" },
       },
       {
         action: "Give the customer a copy",
@@ -224,6 +226,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Prints from the issued document, so what the customer receives matches " +
           "what the ledger holds. A draft prints with a DRAFT watermark.",
+        screenshot: { src: "/guide/steps/get-paid-3.webp", alt: "An invoice's row menu open, with Download PDF ringed in orange" },
       },
       {
         action: "Record the money received",
@@ -233,12 +236,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Allocate it against one or more open invoices. The allocation cannot " +
           "exceed the open balance, and the customer and currency must match.",
+        screenshot: { src: "/guide/steps/get-paid-4.webp", alt: "The Receive payment button on the Payments screen, ringed in orange" },
       },
       {
         action: "Check what is still outstanding",
         summary: "What each customer owes, by how overdue; it ties to Accounts Receivable.",
         control: "Accounts Receivable Aging",
         route: "/reports/ar-aging",
+        screenshot: { src: "/guide/steps/get-paid-5.webp", alt: "The top of the Accounts Receivable Aging report, its title ringed in orange" },
       },
       {
         action: "List open invoices and customer balances",
@@ -248,6 +253,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Customer Balances nets each customer's credits; both end with the A/R Aging total and say whether it " +
           "agrees with the receivables account. Sales by Customer adds up a period's income by customer.",
+        screenshot: { src: "/guide/steps/get-paid-6.webp", alt: "The top of the Open Invoices report, its title ringed in orange" },
       },
       {
         action: "Forecast the next thirteen weeks of cash",
@@ -258,6 +264,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "It starts from the cash on hand today, then adds what customers owe and takes off what is owed to " +
           "suppliers, week by week, plus recurring templates that fall due. By due date uses the dates on the " +
           "documents; As they usually pay moves each one by how late that customer or supplier has paid before.",
+        screenshot: { src: "/guide/steps/get-paid-7.webp", alt: "The top of the 13 Week Cash Forecast report, its title ringed in orange" },
       },
     ],
   },
@@ -277,6 +284,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Choose the customer, the estimate date and Valid until, which starts 30 days later. The lines " +
           "work as on an invoice: an item fills in its price, income account and tax code. Save gives it " +
           "its number, EST-000001 onwards. It posts nothing.",
+        screenshot: { src: "/guide/steps/quote-a-price-1.webp", alt: "The New estimate button on the Estimates screen, ringed in orange" },
       },
       {
         action: "Give the customer a copy",
@@ -286,6 +294,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Printed on the invoice's layout with Valid until in place of the due date, and Subtotal, Sales " +
           "tax and Total with no Balance due. It always ends: This is a quotation, not an invoice. Nothing " +
           "is owed on it.",
+        screenshot: { src: "/guide/steps/quote-a-price-2.webp", alt: "An estimate's row menu open, with Download PDF ringed in orange" },
       },
       {
         action: "Record a no",
@@ -295,6 +304,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Reopen brings it back if the customer changes their mind; a declined estimate is reopened before it " +
           "can be turned into an invoice. An estimate past its Valid until date reads Expired on its own; it " +
           "can still be edited, or turned into an invoice after a question.",
+        screenshot: { src: "/guide/steps/quote-a-price-3.webp", alt: "An estimate's row menu open, with Mark declined ringed in orange" },
       },
       {
         action: "Turn a yes into an invoice",
@@ -303,6 +313,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Opens New invoice on the Invoices screen with the customer and lines filled in, marked From " +
           "estimate. Change anything you need first; Cancel changes nothing.",
+        screenshot: { src: "/guide/steps/quote-a-price-4.webp", alt: "An estimate's row menu open, with Turn into an invoice ringed in orange" },
       },
       {
         action: "Create the draft",
@@ -312,12 +323,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "The draft is linked to the estimate, which reads Converted and is locked from then on. The draft " +
           "itself affects nothing yet: check it over before issuing it.",
+        screenshot: { src: "/guide/steps/quote-a-price-5.webp", alt: "The New invoice form filled in from an estimate, with Save draft ringed in orange" },
       },
       {
         action: "Issue the invoice",
         summary: "It posts like any other invoice; the estimate itself never posts.",
         control: "Issue",
         route: "/invoices",
+        screenshot: { src: "/guide/steps/quote-a-price-6.webp", alt: "A draft invoice opened from the list, with its Issue button ringed in orange" },
       },
       {
         action: "If the sale falls through after all",
@@ -328,6 +341,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Voiding the invoice made from an estimate opens the estimate again: it reads Open, so it can be " +
           "turned into a new invoice or marked declined. An estimate that has had an invoice made from it " +
           "cannot be deleted.",
+        screenshot: { src: "/guide/steps/quote-a-price-7.webp", alt: "An invoice's row menu open, with Void invoice ringed in orange" },
       },
     ],
   },
@@ -346,6 +360,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Choose the customer; for walk-in sales, add one customer such as Cash Customer once and use it for " +
           "all of them. The lines work as on an invoice: an item fills in its price, income account and tax code.",
+        screenshot: { src: "/guide/steps/record-a-paid-sale-1.webp", alt: "The New sales receipt button on the Sales Receipts screen, ringed in orange" },
       },
       {
         action: "Say where the money went",
@@ -355,6 +370,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "It starts on the first bank account, so the deposit the bank later shows is matched to this receipt " +
           "in Bank Transactions. Choose 1210 Undeposited Funds only for takings that will be banked together " +
           "later. Payment method and Reference (a check number, say) are printed on the receipt.",
+        screenshot: { src: "/guide/steps/record-a-paid-sale-2.webp", alt: "The Deposit to field on a new sales receipt, ringed in orange" },
       },
       {
         action: "Post it",
@@ -364,11 +380,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Gives it its number, SR-000001 onwards, and posts at once: the deposit account up by the total, " +
           "income by the subtotal and Sales Tax Payable by the tax. An item kept in stock also takes its cost " +
           "off the shelf, as an invoice does. A date in a closed period is refused.",
+        screenshot: { src: "/guide/steps/record-a-paid-sale-3.webp", alt: "The Save and post button at the foot of a new sales receipt, ringed in orange" },
       },
       {
         action: "Give the customer a copy",
         summary: "It prints as a Sales Receipt, ending Paid in full.",
         control: "Download PDF",
+        screenshot: { src: "/guide/steps/record-a-paid-sale-4.webp", alt: "A sales receipt's row menu open, with Download PDF ringed in orange" },
       },
       {
         action: "Correct a mistake",
@@ -377,6 +395,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "A saved receipt is never edited. Void it with the reason, which is kept with it; its entries stop " +
           "counting and any goods go back on the shelf. Then enter the sale again as a new receipt.",
+        screenshot: { src: "/guide/steps/record-a-paid-sale-5.webp", alt: "A sales receipt's row menu open, with Void ringed in orange" },
       },
     ],
   },
@@ -390,18 +409,20 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       {
         action: "Cancel an invoice that should not exist",
         summary: "Voiding keeps the invoice but drops it from the reports; remove payments first.",
-        control: "Void",
+        control: "Void invoice",
         route: "/invoices",
         note:
           "Voiding does not delete anything. The entry is marked void and drops out " +
           "of the reports, which read posted entries only. An invoice with a payment " +
           "applied must have the payment removed first.",
+        screenshot: { src: "/guide/steps/correct-a-sale-1.webp", alt: "An unpaid invoice's row menu open, with Void invoice ringed in orange" },
       },
       {
         action: "Reduce what a customer owes",
         summary: "Apply it to an open invoice, or leave it as a credit for later.",
         control: "New credit memo",
         route: "/credit-memos",
+        screenshot: { src: "/guide/steps/correct-a-sale-2.webp", alt: "The New credit memo button on the Credit Memos screen, ringed in orange" },
       },
       {
         action: "Give money back",
@@ -411,12 +432,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "In a payment's menu, when part of it is not applied to an invoice. Records the cash going out " +
           "of the bank account you choose and reduces what is left of the payment.",
+        screenshot: { src: "/guide/steps/correct-a-sale-3.webp", alt: "A payment's row menu open, with Refund ringed in orange" },
       },
       {
         action: "Write off what will never be collected",
         summary: "Above the approval limit, a second person must approve it before it posts.",
         control: "Write off",
         route: "/invoices",
+        screenshot: { src: "/guide/steps/correct-a-sale-4.webp", alt: "An invoice's row menu open, with Write off ringed in orange" },
       },
     ],
   },
@@ -432,12 +455,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "The same vendor and reference cannot be entered twice.",
         control: "New bill",
         route: "/bills",
+        screenshot: { src: "/guide/steps/pay-suppliers-1.webp", alt: "The New bill button on the Bills screen, ringed in orange" },
       },
       {
         action: "Record a direct expense",
         summary: "Purchase tax is part of the cost; there is no separate tax line.",
         control: "New expense",
         route: "/expenses",
+        screenshot: { src: "/guide/steps/pay-suppliers-2.webp", alt: "The New expense button on the Expenses screen, ringed in orange" },
       },
       {
         action: "Attach the supporting document",
@@ -446,18 +471,21 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "The file and its checksum are kept with the transaction, privately, so the " +
           "evidence stays with the entry and every look at it is logged.",
+        screenshot: { src: "/guide/steps/pay-suppliers-3.webp", alt: "The paperclip that holds a bill's attachments, ringed in orange" },
       },
       {
         action: "Pay one or many bills",
         summary: "A payment never exceeds what is open; preparing and approving can be split.",
         control: "Pay bills",
         route: "/pay-bills",
+        screenshot: { src: "/guide/steps/pay-suppliers-4.webp", alt: "The Pay bills button on the Pay Bills screen, ringed in orange" },
       },
       {
         action: "See what is due",
         summary: "What each vendor is owed, by how overdue; it ties to Accounts Payable.",
         control: "Accounts Payable Aging",
         route: "/reports/ap-aging",
+        screenshot: { src: "/guide/steps/pay-suppliers-5.webp", alt: "The top of the Accounts Payable Aging report, its title ringed in orange" },
       },
       {
         action: "List unpaid bills and vendor balances",
@@ -467,6 +495,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Vendor Balances nets each vendor's credits and is held to the payables account. Expenses by Vendor " +
           "adds up a period's spending by vendor, to the Profit and Loss's cost of sales, expenses and other expenses.",
+        screenshot: { src: "/guide/steps/pay-suppliers-6.webp", alt: "The top of the Unpaid Bills report, its title ringed in orange" },
       },
     ],
   },
@@ -483,6 +512,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "An order commits to the purchase; it posts nothing to the books.",
         control: "New purchase order",
         route: "/purchase-orders",
+        screenshot: { src: "/guide/steps/purchasing-1.webp", alt: "The New purchase order button on the Purchase Orders screen, ringed in orange" },
       },
       {
         action: "Receive what arrived",
@@ -492,6 +522,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Partial receipts are normal. Stock only enters inventory through a " +
           "receipt against an order, which is what keeps the inventory subledger " +
           "reconcilable.",
+        screenshot: { src: "/guide/steps/purchasing-2.webp", alt: "A purchase order part received, with its Receive button ringed in orange" },
       },
       {
         action: "Match the supplier's bill",
@@ -500,18 +531,21 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Three-way matching compares order, receipt and bill. A quantity or price " +
           "variance outside tolerance raises an exception instead of posting quietly.",
+        screenshot: { src: "/guide/steps/purchasing-3.webp", alt: "A purchase order part received, with its Create bill button ringed in orange" },
       },
       {
         action: "Find what arrived but was never billed",
         summary: "Goods received with no vendor bill yet, so not in the ledger.",
         control: "Received Not Billed",
         route: "/purchase-orders/received-not-billed",
+        screenshot: { src: "/guide/steps/purchasing-4.webp", alt: "The top of the Received Not Billed screen, its title ringed in orange" },
       },
       {
         action: "Check inventory value",
         summary: "Stock on hand, valued at weighted average cost.",
         control: "Inventory Valuation",
         route: "/reports/inventory-valuation",
+        screenshot: { src: "/guide/steps/purchasing-5.webp", alt: "The top of the Inventory Valuation report, its title ringed in orange" },
       },
       {
         action: "Check purchases and that stock adds up",
@@ -522,6 +556,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Year by year, Opening stock plus Net purchases plus Count adjustment, less Cost of sales, comes " +
           "to Closing stock; a year that does not is marked off by the difference. Who it was bought from and " +
           "Month by month follow the dates you pick.",
+        screenshot: { src: "/guide/steps/purchasing-6.webp", alt: "The top of the Purchases and Inventory report, its title ringed in orange" },
       },
     ],
   },
@@ -540,6 +575,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Pick the first and last period. Each line shows Actual, Budget, Over / Under and % of Budget; an " +
           "account with no budget shows a dash. A Month by month table sits under the statement.",
+        screenshot: { src: "/guide/steps/budget-1.webp", alt: "Budget vs Actual chosen on the Reports screen, its title ringed in orange" },
       },
       {
         action: "Open the whole year as one grid",
@@ -548,6 +584,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Needs permission to manage the budget. Twelve month columns and a Year column for every account " +
           "with a budget; Add an account brings in more.",
+        screenshot: { src: "/guide/steps/budget-2.webp", alt: "The Manage budget button on Budget vs Actual, ringed in orange" },
       },
       {
         action: "Fill it from the books, or by hand",
@@ -557,6 +594,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Start from this year’s actuals does the same with the current year. Uplift adds a percentage on top " +
           "and may be negative. Typing a figure in a Year cell spreads it evenly over the twelve months. " +
           "Clear this year empties the grid.",
+        screenshot: { src: "/guide/steps/budget-3.webp", alt: "The budget for the year, with Start from last year's actuals ringed in orange" },
       },
       {
         action: "Save the budget",
@@ -565,6 +603,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Nothing reaches the books until you press Save, which writes only the months you changed. If one " +
           "month fails, the others are kept and the notice names the month and the reason; Save tries the rest.",
+        screenshot: { src: "/guide/steps/budget-4.webp", alt: "The budget for the year, with its Save button ringed in orange" },
       },
     ],
   },
@@ -580,6 +619,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "Dated today with the last count's lines, unless a count is still open.",
         control: "New count",
         route: "/inventory/stock-count",
+        screenshot: { src: "/guide/steps/count-stock-1.webp", alt: "The New count button on the Stock Count screen, ringed in orange" },
       },
       {
         action: "Put the counted lines in",
@@ -588,6 +628,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "One line each: name, quantity, cost, and Sells for if you like. Press Read it to add them; a line that cannot " +
           "be read stays in the box with its line number. Add a line types one in by hand.",
+        screenshot: { src: "/guide/steps/count-stock-2.webp", alt: "A draft count's Paste a count sheet box, ringed in orange" },
       },
       {
         action: "Keep the count",
@@ -596,6 +637,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Nothing reaches the books. Counted at cost, On the books and Difference show the result; change the As of " +
           "date and On the books is read again for it.",
+        screenshot: { src: "/guide/steps/count-stock-3.webp", alt: "A draft count's Save draft button, ringed in orange" },
       },
       {
         action: "Correct the books to the count",
@@ -606,6 +648,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "the Offset account (a cost-of-sales account), check the entry shown, then press Post the adjustment. Above the " +
           "inventory-adjustment approval limit it is Sent for approval and posts when a second person approves it on " +
           "Approvals. Companies that track items adjust item by item instead.",
+        screenshot: { src: "/guide/steps/count-stock-4.webp", alt: "A saved count's Adjust inventory by button, ringed in orange" },
       },
     ],
   },
@@ -1030,6 +1073,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "Total debits must equal total credits. They always do, or the post was rejected.",
         control: "Trial Balance",
         route: "/reports",
+        screenshot: { src: "/guide/steps/period-close-1.webp", alt: "The Trial Balance chosen on the Reports screen, its title ringed in orange" },
       },
       {
         action: "Read each account's month-end balance",
@@ -1042,6 +1086,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "A figure in parentheses is the wrong way round for its account. Click a name or a balance to list the entries " +
           "behind it with a running balance, then click an entry to see both sides. Setup, beside Balances, is where an " +
           "account is edited or deactivated.",
+        screenshot: { src: "/guide/steps/period-close-2.webp", alt: "The As of date on the Chart of Accounts, ringed in orange" },
       },
       {
         action: "Check that clearing accounts have emptied",
@@ -1054,6 +1099,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "items, the oldest, and when it last moved, counted to the report’s end date. One with no movement for more " +
           "than 60 days, or an item more than 90 days old, is Left standing: money not yet banked, or something counted " +
           "twice. The oldest items are found first in, first out.",
+        screenshot: { src: "/guide/steps/period-close-3.webp", alt: "Clearing accounts that have not emptied, one of the Exception Report's checks, ringed in orange" },
       },
       {
         action: "Close the period",
@@ -1064,17 +1110,20 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Needs the Close accounting periods permission, which admins hold; an admin can give it to an accountant " +
           "in Settings › Permissions. After closing, the database itself refuses to post or void into that " +
           "period — the block is not just in the interface.",
+        screenshot: { src: "/guide/steps/period-close-4.webp", alt: "An open month's Close button on Accounting Periods, ringed in orange" },
       },
       {
         action: "Fix something in a closed period",
         summary: "Needs a reason and is audited; a reversal in the open period is usually better.",
         control: "Reopen",
+        screenshot: { src: "/guide/steps/period-close-5.webp", alt: "A closed month's Reopen button on Accounting Periods, ringed in orange" },
       },
       {
         action: "See every close and reopen of the year",
         summary: "When, by whom, and the reason given at the time, month by month.",
         control: "Month-End Close Log",
         route: "/reports/close-log",
+        screenshot: { src: "/guide/steps/period-close-6.webp", alt: "The top of the Month-End Close Log, its title ringed in orange" },
       },
       {
         action: "Compare this year's ratios with last year's",
@@ -1084,6 +1133,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Fifteen ratios for liquidity, leverage and margin, with the figures behind them listed underneath. " +
           "A ratio with nothing to divide by is left blank.",
+        screenshot: { src: "/guide/steps/period-close-7.webp", alt: "The top of the Financial Ratios report, its title ringed in orange" },
       },
       {
         action: "Take the whole ledger as one plain-text file",
@@ -1093,6 +1143,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Last under Accounting in the sidebar. The file is for bean-check and Fava, with a balance line per " +
           "reconciled statement.",
+        screenshot: { src: "/guide/steps/period-close-8.webp", alt: "The top of the Beancount screen, its title ringed in orange" },
       },
     ],
   },
@@ -1108,17 +1159,20 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "Give each rate its effective dates; overlapping or invalid periods are rejected.",
         control: "New rate",
         route: "/sales-tax",
+        screenshot: { src: "/guide/steps/sales-tax-1.webp", alt: "The New rate button on the Sales Tax screen's Tax rates tab, ringed in orange" },
       },
       {
         action: "See what is owed",
         summary: "The Liability tab reconciles to the sales tax control accounts.",
         control: "Liability",
         route: "/sales-tax",
+        screenshot: { src: "/guide/steps/sales-tax-2.webp", alt: "The Liability tab on the Sales Tax screen, ringed in orange" },
       },
       {
         action: "Record a remittance",
         summary: "A filed period locks; a later correction is a linked adjustment, not an edit.",
         control: "Record payment",
+        screenshot: { src: "/guide/steps/sales-tax-3.webp", alt: "The Record payment button on the Sales Tax screen, ringed in orange" },
       },
       {
         action: "See tax collected, paid and owed by period",
@@ -1128,6 +1182,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Choose Monthly, Quarterly or Yearly. It is read from the entries, and a proof line says whether the " +
           "amount owed agrees with the tax accounts. Record a payment there opens the same dialog as above.",
+        screenshot: { src: "/guide/steps/sales-tax-4.webp", alt: "The Sales Tax Liability by period link on the Sales Tax screen, ringed in orange" },
       },
     ],
   },
@@ -1143,12 +1198,14 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         summary: "Taxpayer ID numbers are masked on screen and kept out of reports and audit records.",
         control: "Tax profile",
         route: "/vendors",
+        screenshot: { src: "/guide/steps/year-end-1.webp", alt: "The Tax profile link on a vendor's row, ringed in orange" },
       },
       {
         action: "Produce the review worksheet",
         summary: "A cash-basis review worksheet, not a filing; someone qualified must check it first.",
         control: "1099 Review",
         route: "/reports/1099",
+        screenshot: { src: "/guide/steps/year-end-2.webp", alt: "The top of the 1099 Review report, its title ringed in orange" },
       },
     ],
   },
@@ -1167,6 +1224,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Add user creates a new sign-in; Add existing account gives this company to someone who already signs in " +
           "for another company you also work in. Give the least role that does the job.",
+        screenshot: { src: "/guide/steps/governance-1.webp", alt: "The Add user button on the Users screen, ringed in orange" },
       },
       {
         action: "Stop someone who has left",
@@ -1176,6 +1234,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "It takes effect at once on every screen, report and export. If they approved requests, check that two " +
           "people still hold Approve or reject requests; if they belonged to other companies, repeat it in each.",
+        screenshot: { src: "/guide/steps/governance-2.webp", alt: "A user's row menu open, with Suspend ringed in orange" },
       },
       {
         action: "Set what each role may do",
@@ -1185,18 +1244,21 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "Each switch is checked before its action runs, so turning one off takes effect at once. Bookkeeping " +
           "actions also need the admin or accountant role, and reopening a period or a reconciliation needs an admin.",
+        screenshot: { src: "/guide/steps/governance-3.webp", alt: "The top of the Permissions screen, its title ringed in orange" },
       },
       {
         action: "Require a second pair of eyes",
         summary: "Choose which actions need approval, above what amount; nobody approves their own.",
         control: "Approvals",
         route: "/settings/approvals",
+        screenshot: { src: "/guide/steps/governance-4.webp", alt: "The top of the approval settings screen, its title ringed in orange" },
       },
       {
         action: "See who changed what",
         summary: "Every protected change records who did it, what, and the values before and after.",
         control: "Audit history",
         route: "/settings/audit",
+        screenshot: { src: "/guide/steps/governance-5.webp", alt: "The top of the Audit history screen, its title ringed in orange" },
       },
       {
         action: "Review changes, voids and reversals",
@@ -1206,6 +1268,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "The Change Log reads the audit log and needs the same permission. Voided and Reversed Entries lists " +
           "every entry voided or reversed in a period; nothing in OneBook is deleted.",
+        screenshot: { src: "/guide/steps/governance-6.webp", alt: "The top of the Change Log report, its title ringed in orange" },
       },
       {
         action: "Review access every quarter",
@@ -1216,6 +1279,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Confirm each active person still needs their role, suspend anyone who has left, check any change to " +
           "Permissions is still wanted, read Audit history for users and permissions since the last review, and " +
           "note the date and who reviewed.",
+        screenshot: { src: "/guide/steps/governance-7.webp", alt: "The top of the Users screen, its title ringed in orange" },
       },
     ],
   },
@@ -1235,6 +1299,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Only a platform administrator sees it. Choose the chart of accounts to start from; building the books takes "
           + "about half a minute, and you are the company's first administrator. Then choose it in the company list "
           + "at the top.",
+        screenshot: { src: "/guide/steps/set-up-a-company-1.webp", alt: "The New company button on the Companies screen, ringed in orange" },
       },
       {
         action: "Fill in the company's details",
@@ -1245,6 +1310,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Setting up this company, at the top of Settings › Company, shows the four steps and how far each is. Edit "
           + "saves the legal name, the address, phone and email that invoices, estimates and sales receipts print, the "
           + "time zone every date is read in and the month the fiscal year starts. Each save is a new version.",
+        screenshot: { src: "/guide/steps/set-up-a-company-2.webp", alt: "The Edit button on the company's details, ringed in orange" },
       },
       {
         action: "Choose where new documents land",
@@ -1255,6 +1321,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "On Posting defaults, under the company's details: where money in lands, where money out comes from, and "
           + "the income and expense accounts a line starts on. They only fill a form; a saved document keeps its own "
           + "accounts.",
+        screenshot: { src: "/guide/steps/set-up-a-company-3.webp", alt: "The Edit button on Posting defaults, ringed in orange" },
       },
       {
         action: "Enter where the books start",
@@ -1264,18 +1331,21 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "What each account held on the day the books start in OneBook. A business that starts with nothing can skip "
           + "this; books brought in from another system usually carry their balances in their first entries instead.",
+        screenshot: { src: "/guide/steps/set-up-a-company-4.webp", alt: "The Post opening balances button, ringed in orange" },
       },
       {
         action: "Add the bank and card accounts",
         summary: "Each links a ledger account to the statements reconciled against it.",
         control: "Add bank account",
         route: "/banking",
+        screenshot: { src: "/guide/steps/set-up-a-company-5.webp", alt: "The Add bank account button on Bank Transactions, ringed in orange" },
       },
       {
         action: "Add the people who work in the books",
         summary: "Someone already in OneBook for another company: Add existing account.",
         control: "Add user",
         route: "/settings/users",
+        screenshot: { src: "/guide/steps/set-up-a-company-6.webp", alt: "Add user on the Users screen, where the people who keep the books are added, ringed in orange" },
       },
     ],
   },
@@ -1319,6 +1389,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "One row per snapshot, newest first. A row saying Skipped means the books had not "
           + "changed since the previous snapshot, so that day's figures are the ones in the row "
           + "above it. Only a Stored row can be downloaded or restored.",
+        screenshot: { src: "/guide/steps/restore-a-backup-1.webp", alt: "The top of the Backups screen, its title ringed in orange" },
       },
       {
         action: "Take a copy of the file for yourself",
@@ -1328,15 +1399,17 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "A single ZIP holding one CSV per table, plus a manifest listing the row counts and "
           + "the totals recorded when it was taken — the same file Company settings' Export "
           + "button produces. The link is good for five minutes.",
+        screenshot: { src: "/guide/steps/restore-a-backup-2.webp", alt: "A snapshot's Download button on the Backups screen, ringed in orange" },
       },
       {
         action: "Open that day's books as a separate company",
         summary: "Name the new company and confirm; the company you work in is untouched.",
-        control: "Restore as new company",
+        control: "Restore",
         note:
           "Opens a page to name the new company. Confirm with Restore into a new company: it "
           + "creates the company and loads the snapshot into it. The company you are working in "
           + "is not touched, and cannot be — no part of this writes back to it.",
+        screenshot: { src: "/guide/steps/restore-a-backup-3.webp", alt: "A snapshot's Restore button on the Backups screen, ringed in orange" },
       },
       {
         action: "Check the copy came back whole",
@@ -1349,6 +1422,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           + "names the figure and both values rather than failing quietly. A snapshot taken "
           + "before some kinds of record were backed up (before November 11, 2026) lists those "
           + "kinds under the verdict: they come back empty, and the totals do not cover them.",
+        screenshot: { src: "/guide/steps/restore-a-backup-4.webp", alt: "The note on the restore page that the control totals are checked when it finishes, ringed in orange" },
       },
       {
         action: "Read the two side by side",
@@ -1358,6 +1432,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Switch between the restored copy and the running books and open the same report on "
           + "each. Comparing a balance sheet on both is the fastest way to see which account "
           + "moved and by how much.",
+        screenshot: { src: "/guide/steps/restore-a-backup-5.webp", alt: "The company list at the top of the screen, ringed in orange" },
       },
     ],
   },
@@ -1669,18 +1744,21 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "The floating Report button works on every page. It captures a screenshot " +
           "of what you are looking at — you can send the report without it.",
+        screenshot: { src: "/guide/steps/feedback-1.webp", alt: "The Report button at the bottom right of the screen, ringed in orange" },
       },
       {
         action: "Ask how something is meant to work",
         summary: "Answers come from these guides; the assistant cannot see your figures.",
         control: "Ask Abacus",
         everyScreen: true,
+        screenshot: { src: "/guide/steps/feedback-2.webp", alt: "The Ask Abacus button at the bottom right of the screen, ringed in orange" },
       },
       {
         action: "Follow what happens to a report",
         summary: "Reports move through New, Reviewing, Resolved and Declined.",
         control: "Feedback triage",
         route: "/settings/feedback",
+        screenshot: { src: "/guide/steps/feedback-3.webp", alt: "The top of the Feedback triage screen, its title ringed in orange" },
       },
     ],
   },
