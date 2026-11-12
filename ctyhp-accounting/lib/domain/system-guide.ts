@@ -1092,8 +1092,10 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Balances, the default view, shows each account at the As of date: set it to the last day of the month. " +
           "Balance sheet accounts show what they hold on that date; income and expense accounts show the year to date. " +
           "A figure in parentheses is the wrong way round for its account. Click a name or a balance to list the entries " +
-          "behind it with a running balance, then click an entry to see both sides. Setup, beside Balances, is where an " +
-          "account is edited or deactivated.",
+          "behind it with a running balance, then click an entry to see both sides. The pencil beside a name renames " +
+          "the account in either view, on an account with postings too: every report reads the new name, and no " +
+          "balance moves. Setup, beside Balances, is where an account is edited or deactivated; an account with " +
+          "postings keeps its type and its code.",
         screenshot: { src: "/guide/steps/period-close-2.webp", alt: "The As of date on the Chart of Accounts, ringed in orange" },
       },
       {
