@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.27",
+    date: "2026-11-12",
+    headline: "Banking's thirty guide steps show a picture of their screen too, so every step in the guide now has one.",
+    changes: [
+      {
+        kind: "added",
+        title: "A picture for every Banking step",
+        detail:
+          "Bringing bank lines in, matching and coding them, cards and loans, reconciling by hand and from statement files, and checking reconciled accounts: each step shows the screen it happens on, with the button to press ringed in orange. The pictures come from the sample company, Meridian Consulting Group, which now holds made-up statements from First National Bank for January to March 2026, a term loan, and a bank feed from Plaid's test service, so the same screens can be opened there and tried.",
+        route: "/guide",
+      },
+    ],
+  },
+  {
     version: "3.0.26",
     date: "2026-11-12",
     headline: "Rename an account where you see it, in either view of the Chart of Accounts; an account with postings keeps its type.",
