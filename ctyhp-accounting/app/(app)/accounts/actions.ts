@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getUserRole, canWrite } from "@/lib/auth";
 import {
+  accountHasPostings,
   createAccount,
   updateAccount,
   setAccountStatus,
@@ -108,6 +109,24 @@ export async function updateAccountAction(id: string, raw: unknown): Promise<Act
     await updateAccount(sb, id, parsed.data);
     revalidatePath("/accounts");
     return { ok: true };
+  } catch (err) {
+    return { ok: false, error: messageFrom(err) };
+  }
+}
+
+/**
+ * Whether an account has postings (3.0.26): its type is then locked, and Edit
+ * account says so before anything is sent. The database refuses the change
+ * either way (acc_account_shape_guard, 0195). Reads only.
+ */
+export async function accountHasPostingsAction(id: string): Promise<ActionResult<boolean>> {
+  const role = await getUserRole();
+  if (!role) return { ok: false, error: "Not authorized" };
+  const parsed = z.uuid("Choose an account").safeParse(id);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await accountHasPostings(sb, parsed.data) };
   } catch (err) {
     return { ok: false, error: messageFrom(err) };
   }

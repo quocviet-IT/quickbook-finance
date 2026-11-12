@@ -14,9 +14,19 @@ import {
   Spin,
   Switch,
   Tag,
+  Tooltip,
   type TableColumnsType,
 } from "antd";
-import { CheckOutlined, DownloadOutlined, EditOutlined, PlusOutlined, SearchOutlined, StopOutlined } from "@ant-design/icons";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  StopOutlined,
+} from "@ant-design/icons";
+import { ACCOUNT_RENAME, accountNameProblem, typeLockedNote } from "@/lib/domain/account-rename";
 import { downloadTextFile } from "@/lib/client/download";
 import { chartOfAccountsCsv, chartOfAccountsFileName } from "@/lib/domain/chart-export";
 import dayjs from "dayjs";
@@ -75,6 +85,7 @@ import { daysFromTo } from "@/lib/domain/bank-standing";
 import ClassifyAccountsButton from "./ClassifyAccountsButton";
 import type { ClassificationPlanSummary } from "@/lib/services/account-classification";
 import {
+  accountHasPostingsAction,
   chartBalancesAction,
   createAccountAction,
   updateAccountAction,
@@ -197,8 +208,13 @@ export default function AccountsClient({
   const watchedType = Form.useWatch("account_type", form);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);
+  // Whether the account in Edit account has postings: null while it is asked (3.0.26).
+  const [editingHasPostings, setEditingHasPostings] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The account being renamed in place (3.0.26), and whether its new name is on its way.
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renamingBusy, setRenamingBusy] = useState(false);
 
   // The address is the one source of truth, so a link, the back button and the
   // switch itself all agree on the view.
@@ -319,8 +335,42 @@ export default function AccountsClient({
     setOpen(true);
   }
 
+  /**
+   * Rename in place (3.0.26, item B of the defect report of 11 Nov 2026): the
+   * name is the account's label, not its identity, so it changes at any time,
+   * on an account with postings too; every report reads it as it is now. The
+   * audit trigger on the table keeps the old and the new name.
+   */
+  async function rename(account: AccountRow, typed: string) {
+    const name = typed.trim();
+    if (name === account.name) {
+      setRenaming(null);
+      return;
+    }
+    const problem = accountNameProblem(name);
+    if (problem) {
+      message.error(problem);
+      return;
+    }
+    setRenamingBusy(true);
+    try {
+      const result = await updateAccountAction(account.id, { name });
+      if (!result.ok) {
+        message.error(result.error ?? "The account could not be renamed");
+        return;
+      }
+      message.success(ACCOUNT_RENAME.renamed(account.account_code, name));
+      setRenaming(null);
+    } finally {
+      setRenamingBusy(false);
+    }
+  }
+
   function openEdit(row: AccountRow) {
     setEditing(row);
+    // Whether its type can still change: asked as the dialog opens, the database decides again on save.
+    setEditingHasPostings(null);
+    void accountHasPostingsAction(row.id).then((res) => setEditingHasPostings(res.ok ? (res.data ?? false) : false));
     form.setFieldsValue({
       account_code: row.account_code,
       name: row.name,
@@ -433,16 +483,56 @@ export default function AccountsClient({
               ↳
             </span>
           ) : null}
-          <button
-            type="button"
-            className={styles.nameLink}
-            onClick={() => openAccount(account)}
-            disabled={balancesUnavailable}
-            aria-label={openAccountLabel(account)}
-            title={account.name}
-          >
-            {account.name}
-          </button>
+          {renaming === account.id ? (
+            <Space.Compact size="small" style={{ minWidth: 0, flex: "1 1 auto", maxWidth: 360 }}>
+              <Input
+                autoFocus
+                aria-label={ACCOUNT_RENAME.inputLabel(account.account_code)}
+                defaultValue={account.name}
+                maxLength={120}
+                disabled={renamingBusy}
+                onPressEnter={(event) => void rename(account, (event.target as HTMLInputElement).value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setRenaming(null);
+                }}
+                id={`rename-${account.id}`}
+              />
+              <Tooltip title={ACCOUNT_RENAME.save}>
+                <Button
+                  aria-label={ACCOUNT_RENAME.save}
+                  icon={<CheckOutlined />}
+                  loading={renamingBusy}
+                  onClick={() => {
+                    const input = document.getElementById(`rename-${account.id}`) as HTMLInputElement | null;
+                    void rename(account, input?.value ?? account.name);
+                  }}
+                />
+              </Tooltip>
+              <Tooltip title={ACCOUNT_RENAME.cancel}>
+                <Button aria-label={ACCOUNT_RENAME.cancel} icon={<CloseOutlined />} disabled={renamingBusy} onClick={() => setRenaming(null)} />
+              </Tooltip>
+            </Space.Compact>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.nameLink}
+                onClick={() => openAccount(account)}
+                disabled={balancesUnavailable}
+                aria-label={openAccountLabel(account)}
+                title={account.name}
+              >
+                {account.name}
+              </button>
+              {canWrite ? (
+                <IconActionButton
+                  label={ACCOUNT_RENAME.button(account.name)}
+                  icon={<EditOutlined />}
+                  onClick={() => setRenaming(account.id)}
+                />
+              ) : null}
+            </>
+          )}
           {account.is_contra ? <Tag color="purple">Contra</Tag> : null}
           {account.is_clearing ? <Tag>Clearing</Tag> : null}
           {balancesView && isRetired(account.status) ? (
@@ -742,11 +832,17 @@ export default function AccountsClient({
           <Form.Item name="name" label="Account name" rules={[{ required: true, message: "Enter a name" }]}>
             <Input placeholder="e.g. Sales Revenue" />
           </Form.Item>
-          <Form.Item name="account_type" label="Account type" rules={[{ required: true, message: "Select a type" }]}>
+          <Form.Item
+            name="account_type"
+            label="Account type"
+            rules={[{ required: true, message: "Select a type" }]}
+            extra={editing && editingHasPostings ? typeLockedNote(ACCOUNT_TYPE_LABEL[editing.account_type as AccountType]) : undefined}
+          >
             <Select
               options={ACCOUNT_TYPES.map((t) => ({ value: t, label: ACCOUNT_TYPE_LABEL[t] }))}
               placeholder="Select an account type"
               onChange={onTypeChange}
+              disabled={Boolean(editing) && editingHasPostings !== false}
             />
           </Form.Item>
           <Form.Item

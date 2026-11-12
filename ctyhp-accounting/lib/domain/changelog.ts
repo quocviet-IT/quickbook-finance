@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.26",
+    date: "2026-11-12",
+    headline: "Rename an account where you see it, in either view of the Chart of Accounts; an account with postings keeps its type.",
+    changes: [
+      {
+        kind: "added",
+        title: "Rename an account in place",
+        detail:
+          "A pencil beside each account's name, in Balances as well as Setup, opens the name for editing: press Enter to save. An account with postings can be renamed too. Its code, its id and every balance stay as they are, and the balance sheet, profit and loss, the journal and exports show the new name at once. The audit log keeps the old name, the new one and who changed it.",
+        route: "/accounts",
+      },
+      {
+        kind: "changed",
+        title: "An account with postings keeps its type and its code",
+        detail:
+          "Changing an account's type moves its whole balance to another line of the statements, so it is refused once anything has been posted to the account, and Edit account says so beside Account type. Its code stays too. An account nothing has been posted to can still change both. To move a balance, create the new account and post a journal entry.",
+        route: "/accounts",
+      },
+    ],
+  },
+  {
     version: "3.0.25",
     date: "2026-11-12",
     headline: "A coded bank line can be moved to another account inside a reconciled month; the reconciliation stays as it was.",
