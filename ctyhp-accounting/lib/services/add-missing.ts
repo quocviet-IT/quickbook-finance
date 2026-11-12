@@ -26,6 +26,7 @@ import { getReconciliationLines, getReconciliationStatement, listReconciliations
 import { codingSuggestions } from "./coding";
 import { statementLineDuplicates } from "./reconcile-history";
 import { bankLinesBetween } from "./statement-bank-lines";
+import { getStatementMatchWindow } from "./banking-preference";
 
 export class AddMissingError extends Error {}
 
@@ -35,11 +36,12 @@ export class AddMissingError extends Error {}
  * "Add all" would add, and only when there are some.
  */
 export async function getAddMissingPlan(sb: SupabaseClient, reconciliationId: string): Promise<AddMissingPlan> {
-  const [statement, book] = await Promise.all([
+  const [statement, book, windowDays] = await Promise.all([
     getReconciliationStatement(sb, reconciliationId),
     getReconciliationLines(sb, reconciliationId),
+    getStatementMatchWindow(sb),
   ]);
-  const standings = reconciliationStandings(statement, book);
+  const standings = reconciliationStandings(statement, book, windowDays);
   const balances = { openingMinor: statement.openingMinor, closingMinor: statement.closingMinor };
   const missingDates = statement.lines.filter((_, i) => standings.standings[i]?.kind === "missing").map((l) => l.txnDate).sort();
   if (!missingDates.length || standings.flipped) {
@@ -138,7 +140,8 @@ export async function addMissingLines(
   if (error) throw new AddMissingError(error.message);
   // The lines are in the books now, whatever happens next: a pairing that fails
   // is said as such, never as lines that were not added.
-  const added = { added: chosen.length, uncategorized: chosen.filter((item) => item.source === "uncategorized").length };
+  const holding = new Set(plan.holdingIds);
+  const added = { added: chosen.length, uncategorized: chosen.filter((item) => holding.has(item.accountId)).length };
   try {
     return { ...added, outcome: await pairAndTick(sb, reconciliationId), pairingError: null };
   } catch (e) {

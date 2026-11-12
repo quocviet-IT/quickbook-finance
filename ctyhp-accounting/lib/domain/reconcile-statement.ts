@@ -5,7 +5,7 @@
  * is written.
  */
 import { periodLabel } from "./pdf-statement-view";
-import { matchStatement, type PairBookLine, type PairStatementLine } from "./statement-pairing";
+import { PAIRING_WINDOW_DAYS, matchStatement, type PairBookLine, type PairStatementLine } from "./statement-pairing";
 
 import { formatDate, plural, pluralWord } from "@/lib/format";
 /** What bringing an account forward through a day would sign off. */
@@ -239,12 +239,35 @@ export interface StandingStatementLine extends PairStatementLine {
   setAside?: boolean;
 }
 
+/** An entry a statement line fits, as a person is shown it to choose from. */
+export interface StandingCandidate {
+  bookId: string;
+  entryNumber: string | null;
+  date: string;
+}
+
 export type Standing =
   | { kind: "paired"; how: string; bookId: string; entryNumber: string | null; ticked: boolean }
+  /** Fits more than one entry (3.0.24): nothing is ticked for it; a person ticks the one the bank paid. */
+  | { kind: "choose"; how: string; candidates: StandingCandidate[] }
   | { kind: "missing" }
   | { kind: "after" }
   /** Set aside as not a transaction (a misread line): never paired, never missing, never added. */
   | { kind: "aside" };
+
+// --- A statement line that fits more than one entry (3.0.24) ------------------
+
+/** The tag: "Fits 2 entries". */
+export function chooseLabel(count: number): string {
+  return `Fits ${plural(count, "entry", "entries")}`;
+}
+
+/** Under the tag: the entries it fits, and what to do. "JE-000123 or JE-000140 — tick the one the bank paid." */
+export function chooseNote(candidates: readonly StandingCandidate[]): string {
+  const names = candidates.map((c) => c.entryNumber ?? formatDate(c.date));
+  const list = names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+  return `${list} — tick the one the bank paid.`;
+}
 
 // --- A statement line set aside as not a transaction (2.03) ------------------
 
@@ -299,6 +322,8 @@ export interface StatementStandings {
   /** One per statement line, in the order given. */
   standings: Standing[];
   paired: number;
+  /** Lines that fit more than one entry, left for a person (3.0.24). */
+  ambiguous: number;
   missing: number;
   after: number;
   /** Lines set aside as not a transaction. */
@@ -317,16 +342,30 @@ export function statementStandings(
   lines: readonly StandingStatementLine[],
   book: readonly StandingBookLine[],
   statementDate: string,
+  windowDays = PAIRING_WINDOW_DAYS,
 ): StatementStandings {
   const taking = lines
     .filter((line) => !line.setAside)
     .map((line) => ({ lineNo: line.lineNo, date: line.date, amountMinor: line.amountMinor, reference: line.reference }));
-  const match = matchStatement(taking, book, statementDate);
+  const match = matchStatement(taking, book, statementDate, windowDays);
   const byLine = new Map(match.pairs.map((pair) => [pair.line.lineNo, pair]));
+  const unsure = new Map(match.ambiguous.map((line) => [line.line.lineNo, line]));
   const byId = new Map(book.map((entry) => [entry.id, entry]));
   const standings = lines.map((line): Standing => {
     if (line.setAside) return { kind: "aside" };
     if (line.date > statementDate) return { kind: "after" };
+    const choice = unsure.get(line.lineNo);
+    if (choice) {
+      return {
+        kind: "choose",
+        how: choice.how,
+        candidates: choice.candidates.map((entry) => ({
+          bookId: entry.id,
+          entryNumber: byId.get(entry.id)?.entryNumber ?? null,
+          date: entry.date,
+        })),
+      };
+    }
     const pair = byLine.get(line.lineNo);
     if (!pair) return { kind: "missing" };
     const entry = byId.get(pair.book.id);
@@ -341,6 +380,7 @@ export function statementStandings(
   return {
     standings,
     paired: match.pairs.length,
+    ambiguous: match.ambiguous.length,
     missing: match.missing.length,
     after: match.ignored,
     aside: lines.length - taking.length,
@@ -363,6 +403,7 @@ export function reconciliationStandings(
     entryNumber: string | null;
     cleared: boolean;
   }[],
+  windowDays = PAIRING_WINDOW_DAYS,
 ): StatementStandings {
   return statementStandings(
     statement.lines.map((l) => ({
@@ -381,6 +422,7 @@ export function reconciliationStandings(
       cleared: b.cleared,
     })),
     statement.endingDate,
+    windowDays,
   );
 }
 
@@ -390,6 +432,8 @@ export interface PairingOutcome {
   paired: number;
   /** Book lines ticked by this pairing; pairs already ticked are not counted. */
   ticked: number;
+  /** Lines that fit more than one entry: nothing ticked for them (3.0.24). */
+  ambiguous: number;
   missing: number;
   after: number;
   flipped: boolean;
@@ -398,6 +442,9 @@ export interface PairingOutcome {
 /** What importing or matching again says when it is done. */
 export function pairingMessage(outcome: PairingOutcome): string {
   let text = `${outcome.paired} of ${plural(outcome.lines, "statement line")} paired with the books; ${outcome.ticked} newly ticked.`;
+  if (outcome.ambiguous > 0) {
+    text += ` ${outcome.ambiguous} ${pluralWord(outcome.ambiguous, "fits", "fit")} more than one entry — tick the one the bank paid in the book lines.`;
+  }
   if (outcome.missing > 0) {
     text += ` ${outcome.missing} not in the books — code ${pluralWord(outcome.missing, "it", "them")} in Bank Transactions, then Match again.`;
   }

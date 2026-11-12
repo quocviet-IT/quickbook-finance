@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatementReconciliationRow } from "@/lib/db/types";
 import { readAllPages } from "@/lib/services/paging";
+import { getStatementMatchWindow } from "@/lib/services/banking-preference";
 import type { ReconciliationCreateInput, ReconciliationAdjustmentInput, ReconciliationReopenInput } from "@/lib/domain/schemas";
 import type { StatementLine } from "@/lib/domain/statement-import";
 import { reconciliationStandings, type BroughtForwardPreview, type PairingOutcome } from "@/lib/domain/reconcile-statement";
@@ -354,12 +355,17 @@ export async function getReconciliationStatement(sb: SupabaseClient, id: string)
  * and ticks every pair not ticked yet. No tick is removed, as in the prototype.
  */
 export async function pairAndTick(sb: SupabaseClient, id: string): Promise<PairingOutcome> {
-  const [statement, book] = await Promise.all([getReconciliationStatement(sb, id), getReconciliationLines(sb, id)]);
-  const result = reconciliationStandings(statement, book);
+  const [statement, book, windowDays] = await Promise.all([
+    getReconciliationStatement(sb, id),
+    getReconciliationLines(sb, id),
+    getStatementMatchWindow(sb),
+  ]);
+  const result = reconciliationStandings(statement, book, windowDays);
+  // A line that fits more than one entry ticks nothing: a person chooses (3.0.24).
   const toTick = result.standings.flatMap((s) => (s.kind === "paired" && !s.ticked ? [s.bookId] : []));
   const ticked = await setClearedMany(sb, id, toTick, true);
   return {
-    lines: statement.lines.length, paired: result.paired, ticked,
+    lines: statement.lines.length, paired: result.paired, ticked, ambiguous: result.ambiguous,
     missing: result.missing, after: result.after, flipped: result.flipped,
   };
 }
