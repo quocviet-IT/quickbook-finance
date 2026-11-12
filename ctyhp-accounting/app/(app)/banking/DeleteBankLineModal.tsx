@@ -1,108 +1,200 @@
 "use client";
 import { formatDate } from "@/lib/format";
-import { useState } from "react";
-import { App, Alert, Input, Modal, Space } from "antd";
-import { deleteBankTransactionAction } from "./actions";
-import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
+import { useEffect, useState } from "react";
+import { App, Alert, Button, Input, Modal, Space, Spin, Typography } from "antd";
+import {
+  bankLineDeleteStateAction,
+  deleteBankTransactionAction,
+  uncategoriseBankTransactionAction,
+  unmatchBankTransactionAction,
+} from "./actions";
+import {
+  DELETE_DIALOG,
+  deleteStep,
+  reasonIsEnough,
+  type BankLineDeleteState,
+} from "@/lib/domain/bank-transaction-delete";
+import { serverFailure } from "@/lib/domain/statement-evidence";
 
 export interface DeleteBankLineTarget {
   id: string;
   txnDate: string;
   description: string;
   amount: string;
-  /** Computed by the table when the control was clicked — see
-   *  lib/domain/bank-transaction-delete.ts. Only "delete_only" and
-   *  "void_then_delete" ever reach here; a "blocked" row's control is
-   *  disabled rather than wired to open this dialog. */
-  eligibility: BankTransactionDeleteEligibility;
 }
 
 export interface DeleteBankLineModalProps {
   target: DeleteBankLineTarget | null;
   onClose: () => void;
+  /** The line is gone from the register. */
   onDeleted: () => void;
+  /** The line changed but stays: its entry voided, or its match taken back. */
+  onChanged: () => void;
+}
+
+/** How the line stood when it was last asked about. */
+interface Read {
+  id: string;
+  state: BankLineDeleteState | null;
+  error: string | null;
 }
 
 /**
- * Removing one bank line for good — and, when the line was categorised,
- * taking back the journal entry categorising it posted, first.
+ * Deleting one bank line, or the way out when it is not deleted (3.0.23).
  *
- * Correction to RQ-06, 2026-08-17: a Delete that only ever worked on an
- * `unmatched` row was invisible on every row for the company that asked for
- * it, because categorising posts a journal entry and every one of theirs had
- * been categorised. One confirmed click now does both steps when a row needs
- * both — void, then delete — and this dialog names both effects before
- * either happens, with the entry's own number when one is known. Both steps
- * run inside one database transaction (migration 0114), so the two effects
- * named here either both happen or neither does; what actually runs is
- * documented on `deleteBankTransactionWithVoid` in lib/services/banking.ts.
+ * The dialog asks the database how the line stands as it opens
+ * (acc_bank_line_delete_state). A line that is unposted, unmatched and
+ * unreconciled is deleted with a reason, and the whole line is kept in the
+ * audit log. Any other line is refused in the database's own words, with the
+ * way out beside it: Void its entry (posted here), Unmatch (matched to an entry
+ * posted elsewhere), or the reconciliation to reopen (reconciled). After a void
+ * or an unmatch the dialog asks again, so a duplicate can then be deleted
+ * without starting over. Nothing is deleted on the way to anything else.
  */
-export default function DeleteBankLineModal({
-  target,
-  onClose,
-  onDeleted,
-}: DeleteBankLineModalProps) {
+export default function DeleteBankLineModal({ target, onClose, onDeleted, onChanged }: DeleteBankLineModalProps) {
   const { message } = App.useApp();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [read, setRead] = useState<Read | null>(null);
 
-  const willVoid = target?.eligibility.kind === "void_then_delete";
-  const entryNumber = target?.eligibility.kind === "void_then_delete" ? target.eligibility.entryNumber : null;
+  const ask = (id: string, live: () => boolean = () => true) =>
+    bankLineDeleteStateAction(id)
+      .then((res) => {
+        if (!live()) return;
+        setRead(
+          res.ok && res.data
+            ? { id, state: res.data, error: null }
+            : { id, state: null, error: res.error ?? serverFailure(null) },
+        );
+      })
+      .catch((error: unknown) => {
+        if (live()) setRead({ id, state: null, error: serverFailure(error) });
+      });
+
+  const targetId = target?.id ?? null;
+  useEffect(() => {
+    if (!targetId) return;
+    let live = true;
+    void ask(targetId, () => live);
+    return () => {
+      live = false;
+    };
+  }, [targetId]);
+
+  const here = read && read.id === targetId ? read : null;
+  const state = here?.state ?? null;
+  const step = state ? deleteStep(state) : null;
+  const needsReason = step?.kind === "delete" || step?.kind === "void" || step?.kind === "unmatch";
 
   const close = () => {
     setReason("");
+    setRead(null);
     onClose();
   };
 
-  const confirm = async () => {
-    if (!target) return;
+  async function act() {
+    if (!target || !step || busy || !reasonIsEnough(reason)) return;
     setBusy(true);
-    const result = await deleteBankTransactionAction(target.id, reason);
-    setBusy(false);
-    if (!result.ok) {
-      message.error(result.error ?? "Could not delete this line");
-      return;
+    try {
+      if (step.kind === "delete") {
+        const result = await deleteBankTransactionAction(target.id, reason);
+        if (!result.ok) {
+          message.error(result.error ?? "Could not delete this line", 10);
+          void ask(target.id);
+          return;
+        }
+        message.success(DELETE_DIALOG.deleted);
+        setReason("");
+        setRead(null);
+        onDeleted();
+        return;
+      }
+      const result =
+        step.kind === "void"
+          ? await uncategoriseBankTransactionAction(target.id, reason)
+          : step.kind === "unmatch"
+            ? await unmatchBankTransactionAction(target.id, reason)
+            : null;
+      if (!result) return;
+      if (!result.ok) {
+        message.error(result.error ?? "Could not change this line", 10);
+        return;
+      }
+      message.success(step.kind === "void" ? DELETE_DIALOG.voided : DELETE_DIALOG.unmatched, 8);
+      onChanged();
+      // Asked again: a line voided or unmatched can now be deleted, if that was the point.
+      await ask(target.id);
+    } catch (error) {
+      message.error(serverFailure(error), 10);
+    } finally {
+      setBusy(false);
     }
-    message.success(
-      willVoid
-        ? `Voided ${entryNumber ?? "the journal entry"} and deleted the bank transaction`
-        : "Bank transaction deleted",
-    );
-    setReason("");
-    onDeleted();
-  };
+  }
+
+  const actionLabel =
+    step?.kind === "delete" ? DELETE_DIALOG.deleteLabel : step?.kind === "void" || step?.kind === "unmatch" ? step.label : null;
+  const footer = [
+    <Button key="close" onClick={close} disabled={busy}>
+      {actionLabel ? "Cancel" : "Close"}
+    </Button>,
+    step?.kind === "open" ? (
+      <Button key="open" type="primary" href={step.href}>
+        {step.label}
+      </Button>
+    ) : null,
+    actionLabel ? (
+      <Button
+        key="act"
+        type="primary"
+        danger={step?.kind === "delete"}
+        loading={busy}
+        disabled={!reasonIsEnough(reason)}
+        onClick={() => void act()}
+      >
+        {actionLabel}
+      </Button>
+    ) : null,
+  ];
 
   return (
     <Modal
       open={target !== null}
-      title="Delete this bank transaction?"
-      okText="Delete it"
-      okButtonProps={{ danger: true, loading: busy, disabled: reason.trim().length < 10 }}
-      onOk={confirm}
+      title={state && state.kind !== "deletable" ? DELETE_DIALOG.refusedTitle : DELETE_DIALOG.deleteTitle}
       onCancel={close}
+      footer={footer}
+      destroyOnHidden
     >
-      <Space direction="vertical" size="small" style={{ width: "100%" }}>
+      <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
         <div>
           <b>{formatDate(target?.txnDate)}</b> · {target?.description} · {target?.amount}
         </div>
-        <Alert
-          type="warning"
-          showIcon
-          message="This cannot be undone"
-          description={
-            willVoid
-              ? `This voids ${entryNumber ?? "the journal entry"} this line posted, and removes ` +
-                "the line from the bank register. Both steps are recorded in the audit log."
-              : "The line is removed from the bank register. Nothing in the ledger changes — an " +
-                "unmatched line has not been posted — and the deletion is recorded in the audit log."
-          }
-        />
-        <Input.TextArea
-          rows={2}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Why is this line being deleted? A sentence, at least."
-        />
+        {here?.error ? (
+          <Alert type="error" showIcon title={here.error} />
+        ) : !state ? (
+          <Space>
+            <Spin size="small" />
+            <Typography.Text type="secondary">{DELETE_DIALOG.checking}</Typography.Text>
+          </Space>
+        ) : state.kind === "deletable" ? (
+          <Alert type="warning" showIcon title="This cannot be undone" description={DELETE_DIALOG.deleteNote} />
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            title={state.message}
+            description={step && step.kind !== "none" && step.kind !== "delete" ? step.note : undefined}
+          />
+        )}
+        {needsReason ? (
+          <Input.TextArea
+            aria-label="Reason"
+            rows={2}
+            value={reason}
+            maxLength={500}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder={DELETE_DIALOG.reasonPlaceholder}
+          />
+        ) : null}
       </Space>
     </Modal>
   );

@@ -18,7 +18,9 @@ import {
   undoRecode,
   listBankStatementImports,
   undoBankStatementImport,
-  deleteBankTransactionWithVoid,
+  deleteBankTransaction,
+  getBankLineDeleteState,
+  unmatchBankTransaction,
   type BankStatementImportRow,
   generateSuggestions,
   approveReconciliation,
@@ -48,6 +50,7 @@ import {
   type PriorClosing,
 } from "@/lib/domain/statement-proof";
 import type { BankLineOn } from "@/lib/domain/statement-repeats";
+import type { BankLineDeleteState } from "@/lib/domain/bank-transaction-delete";
 import { formatMoney } from "@/lib/format";
 import { getPriorClosing } from "@/lib/services/bankrec";
 import { codeFromSuggestions, codingSuggestions, type CodeItem, type CodeOutcome } from "@/lib/services/coding";
@@ -298,24 +301,61 @@ export async function undoStatementImportAction(
 }
 
 /**
- * Delete a bank line — Correction to RQ-06, 2026-08-17. When the line still
- * carries the journal entry categorising it posted, the void of that entry and
- * the removal of the line happen together in one database transaction
- * (migration 0114), so the control works on a `matched` row, not only
- * `unmatched`, and a refusal at any point leaves the books exactly as they
- * were. See `deleteBankTransactionWithVoid`.
+ * Delete a bank line (3.0.23): only one that is unposted, unmatched and
+ * unreconciled, and only for a role holding Delete bank lines. A posted,
+ * matched or reconciled line is refused by the database in its own words;
+ * the dialog offers the way out first (bankLineDeleteStateAction). See
+ * `deleteBankTransaction`.
  */
 export async function deleteBankTransactionAction(
   id: string,
   reason: string,
 ): Promise<ActionResult> {
-  const denied = await guard();
+  const denied = (await guard()) ?? (await guardPermission("banking.delete_line"));
   if (denied) return { ok: false, error: denied };
+  const line = lineIdSchema.safeParse(id);
+  if (!line.success) return { ok: false, error: line.error.issues[0]?.message ?? "Invalid data" };
   try {
     const sb = await createSupabaseServerClient();
-    await deleteBankTransactionWithVoid(sb, id, reason);
+    await deleteBankTransaction(sb, line.data, reason);
     revalidatePath("/banking");
-    revalidatePath("/reports");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+const lineIdSchema = z.uuid("Choose a bank line");
+
+/**
+ * How one bank line stands with deletion (3.0.23): deletable, or why not and
+ * what to do instead. The delete dialog asks when it opens. Reads only.
+ */
+export async function bankLineDeleteStateAction(id: string): Promise<ActionResult<BankLineDeleteState>> {
+  const line = lineIdSchema.safeParse(id);
+  if (!line.success) return { ok: false, error: line.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    return { ok: true, data: await getBankLineDeleteState(sb, line.data) };
+  } catch (err) {
+    return { ok: false, error: msg(err) };
+  }
+}
+
+/**
+ * Unmatch (3.0.23): take back an approved match to an entry posted elsewhere.
+ * The entry stays posted and the line goes back to For review. Asks for
+ * Review bank matches, as approving one does.
+ */
+export async function unmatchBankTransactionAction(id: string, reason: string): Promise<ActionResult> {
+  const denied = (await guard()) ?? (await guardPermission("banking.match"));
+  if (denied) return { ok: false, error: denied };
+  const line = lineIdSchema.safeParse(id);
+  if (!line.success) return { ok: false, error: line.error.issues[0]?.message ?? "Invalid data" };
+  try {
+    const sb = await createSupabaseServerClient();
+    await unmatchBankTransaction(sb, line.data, reason);
+    revalidatePath("/banking");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: msg(err) };

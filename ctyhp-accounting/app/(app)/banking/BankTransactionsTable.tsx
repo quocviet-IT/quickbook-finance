@@ -33,7 +33,6 @@ import type { BankPostingRow, BankRecodeRow } from "@/lib/services/banking";
 import type { CodingSuggestionView } from "@/lib/domain/coding";
 import { tokenVar } from "@/lib/design/tokens";
 import { bankTransactionsPagination, BANK_TRANSACTIONS_DEFAULT_PAGE_SIZE } from "./bank-transactions-pagination";
-import type { BankTransactionDeleteEligibility } from "@/lib/domain/bank-transaction-delete";
 
 export type BankReviewTableRow = BankReviewRow<BankTransactionRow, SuggestionView>;
 
@@ -49,6 +48,8 @@ export interface BankTransactionsTableProps {
   initialFocusId: string | null;
   canWrite: boolean;
   canReadDocuments: boolean;
+  /** The role holds Delete bank lines (3.0.23); without it the Delete control is shown disabled. */
+  canDeleteLines: boolean;
   /** The suggestion currently being approved or rejected, if any. */
   busy: string | null;
   formatRowMoney: (row: BankReviewTableRow) => string;
@@ -71,12 +72,10 @@ export interface BankTransactionsTableProps {
   onApprove: (suggestionId: string) => void;
   onReject: (suggestionId: string) => void;
   onAttachments: (row: BankReviewTableRow) => void;
-  /** Remove a line that should never have been imported — every row carries
-   *  the control now (Correction to RQ-06); `eligibility` says whether this
-   *  click deletes outright, voids an entry first, or was blocked before it
-   *  could fire (a blocked row's control is disabled, so this only ever
-   *  arrives as "delete_only" or "void_then_delete" in practice). */
-  onDelete: (row: BankReviewTableRow, eligibility: BankTransactionDeleteEligibility) => void;
+  /** Delete a line that should never have been imported (3.0.23): the dialog
+   *  asks the database how the line stands, and either deletes it or offers
+   *  the way out. Every row carries the control. */
+  onDelete: (row: BankReviewTableRow) => void;
   /** RQ-03: already pruned against `rows` by the caller, so this is always a
    *  subset of what is currently in the filtered result — never a row that
    *  has dropped out of it. */
@@ -99,6 +98,7 @@ export default function BankTransactionsTable({
   initialFocusId,
   canWrite,
   canReadDocuments,
+  canDeleteLines,
   busy,
   formatRowMoney,
   postableAccounts,
@@ -261,11 +261,7 @@ export default function BankTransactionsTable({
             key: "delete",
             width: COLUMN.ACTION,
             render: (_value: unknown, row: BankReviewTableRow) => (
-              <DeleteRowAction
-                row={row}
-                posting={postings.get(row.transaction.id)}
-                onDelete={onDelete}
-              />
+              <DeleteRowAction row={row} canDelete={canDeleteLines} onDelete={onDelete} />
             ),
           } as TableColumnsType<BankReviewTableRow>[number],
         ]

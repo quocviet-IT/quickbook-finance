@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.23",
+    date: "2026-11-12",
+    headline: "A bank line that is posted, matched or reconciled is not deleted; Delete names what to do instead.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Delete removes only a line that was never posted, matched or reconciled",
+        detail:
+          "Delete on a line in Bank Transactions used to void the line's entry and remove the line after a warning. It now deletes only a line nothing in the books relies on, such as a duplicate import, and the whole line is kept in the audit log. For any other line, Delete says why it stays and offers the way out. A line coded here offers Void, which keeps the entry in the journal, marked Void, and puts the line back in For review, where it can then be deleted. A line matched to an entry posted elsewhere offers Unmatch. A line on a completed reconciliation opens that reconciliation, which an administrator can reopen.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Unmatch: take back a match to an entry posted elsewhere",
+        detail:
+          "An approved match to a journal entry, deposit or payment posted outside Bank Transactions can now be taken back from Delete, with a reason. The entry stays posted, the line goes back to For review, and the audit log keeps what was matched.",
+        route: "/banking",
+      },
+      {
+        kind: "added",
+        title: "Delete bank lines is a permission of its own",
+        detail:
+          "Settings › Permissions has Delete bank lines under Banking. It is on for administrators and accountants, as before, and can be turned off for either role. It also covers Remove these N entries on Reconcile, which takes out the bank lines of entries coded from Bank Transactions.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "3.0.22",
     date: "2026-11-12",
     headline: "One statement goes into one bank account, and a bank account's name can be corrected.",
