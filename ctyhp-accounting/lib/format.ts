@@ -156,6 +156,58 @@ export function formatDateTime(iso: string | null | undefined, timeZone: string)
   return `${formatDateInTimeZone(iso, timeZone)} ${formatTime(iso, timeZone)}`;
 }
 
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** A calendar date as a count of days, for the distance between two of them. */
+function dayNumber(date: string): number | null {
+  const match = ISO_DATE.exec(date);
+  return match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86_400_000 : null;
+}
+
+/**
+ * The weekday of a calendar date: `2026-11-06` → `Friday`. Like
+ * {@link formatDate} it works on the string alone, so no time zone can move
+ * the day; anything that is not a date comes back as it was.
+ */
+export function weekdayOf(date: string): string {
+  const day = dayNumber(date);
+  // Day 0 of the epoch, 1970-01-01, was a Thursday.
+  return day === null ? date : WEEKDAY_NAMES[(((day + 4) % 7) + 7) % 7];
+}
+
+/** How many days before the company's today a moment fell, on its clock: 0 today, 1 yesterday. */
+function daysAgo(iso: string, timeZone: string, today: string): { day: string; ago: number | null } {
+  const day = clockParts(iso, timeZone).date;
+  const from = dayNumber(day);
+  const to = dayNumber(today);
+  return { day, ago: from === null || to === null ? null : to - from };
+}
+
+/**
+ * The day a moment fell on, as a heading over the things that happened on it:
+ * `Today`, `Yesterday`, then `Friday, 11/06/2026`. On the company's clock,
+ * against its today (Abacus's history, 3.0.20).
+ */
+export function formatDayHeading(iso: string, timeZone: string, today: string): string {
+  const { day, ago } = daysAgo(iso, timeZone, today);
+  if (ago === 0) return "Today";
+  if (ago === 1) return "Yesterday";
+  return `${weekdayOf(day)}, ${formatDate(day)}`;
+}
+
+/**
+ * When something happened, as short as a list row allows: the time today
+ * (`2:14 PM`), `Yesterday`, the weekday within the past week (`Friday`), and
+ * the date before that (`10/28/2026`). On the company's clock.
+ */
+export function formatRecentMoment(iso: string, timeZone: string, today: string): string {
+  const { day, ago } = daysAgo(iso, timeZone, today);
+  if (ago === 0) return formatTime(iso, timeZone);
+  if (ago === 1) return "Yesterday";
+  if (ago !== null && ago > 1 && ago < 7) return weekdayOf(day);
+  return formatDate(day);
+}
+
 /**
  * A count with its noun: `1 record`, `2 records`, `1,204 records`.
  *

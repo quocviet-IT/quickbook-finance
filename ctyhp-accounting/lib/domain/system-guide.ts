@@ -40,11 +40,11 @@ export interface GuideStep {
   control: string;
   /** Page the control is on. Omitted when the step happens where the flow started. */
   route?: string;
-  /** The control is on every screen, as the floating Report and Ask AI are (3.0.18). */
+  /** The control is on every screen, as the floating Report and Ask Abacus are (3.0.18). */
   everyScreen?: boolean;
   /**
    * What the system does behind the control, or the rule that can block it.
-   * Folded under Details on the guide's page; the search and Ask AI read it in
+   * Folded under Details on the guide's page; the search and Abacus read it in
    * full. Omitted when the summary already says it all.
    */
   note?: string;
@@ -1749,9 +1749,9 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       {
         action: "Ask how something is meant to work",
         summary: "Answers come from these guides; the assistant cannot see your figures.",
-        control: "Ask AI",
+        control: "Ask Abacus",
         everyScreen: true,
-        screenshot: { src: "/guide/steps/feedback-2.webp", alt: "The Ask AI button at the bottom right of the screen, ringed in orange" },
+        screenshot: { src: "/guide/steps/feedback-2.webp", alt: "The Ask Abacus button at the bottom right of the screen, ringed in orange" },
       },
       {
         action: "Follow what happens to a report",

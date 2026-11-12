@@ -33,8 +33,17 @@ import { describe, expect, it } from "vitest";
  *
  * Left as an empty map rather than deleted: the next stylesheet to arrive with
  * colour in it should have to write down why, in the place the last two did.
+ *
+ * The Abacus mark (3.0.20) is the first: a logo, drawn as a light tile that is
+ * the same in both themes, so it carries its own colours rather than the
+ * page's. Its panel's stylesheet reads tokens like everything else.
  */
-const ALLOWLIST = new Map<string, string>([]);
+const ALLOWLIST = new Map<string, string>([
+  [
+    "components/abacus/AbacusMark.tsx",
+    "the Abacus mark: a self-contained light tile, the same in both themes, as a logo is",
+  ],
+]);
 
 /**
  * Built fresh on each use, never shared.

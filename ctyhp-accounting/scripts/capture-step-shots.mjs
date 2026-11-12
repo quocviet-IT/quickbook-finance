@@ -1,12 +1,12 @@
 /**
- * Pictures for the guide's steps (3.0.19): each step's screen, cropped around
+ * Pictures for the guide's steps (3.0.21): each step's screen, cropped around
  * the control the step names, with that control ringed in orange.
  *
  *   npm run guide:step-shots -- [baseUrl] [--only=get-paid,budget]
  *
  * Run it against a running server (`npm run dev` or a built one) after a change
  * to any screen the guide shows. Each picture lands in public/guide/steps as
- * WebP, named after its step; tests/unit/guide-pictures-319.test.ts checks that
+ * WebP, named after its step; tests/unit/guide-pictures-321.test.ts checks that
  * every step has one and that this file holds a recipe for each.
  *
  * Safety:
@@ -198,7 +198,7 @@ async function open(route) {
   await page.goto(`${base}${route}`, { waitUntil: "domcontentloaded" });
   await page.locator("main, .app-shell__content").first().waitFor({ timeout: 120_000 });
   await settle();
-  // The floating Report and Ask AI buttons sit over every screen's bottom right,
+  // The floating Report and Ask Abacus buttons sit over every screen's bottom right,
   // and a development server's own badge over its bottom left.
   await page.addStyleTag({ content: ".assistant-launcher, nextjs-portal { visibility: hidden !important; }" });
 }
@@ -529,7 +529,7 @@ const openMenu = (label) => async () => {
 };
 
 // --- One recipe per step --------------------------------------------------------
-// `shot` names the picture; tests/unit/guide-pictures-319.test.ts holds the list
+// `shot` names the picture; tests/unit/guide-pictures-321.test.ts holds the list
 // to the steps in lib/domain/system-guide.ts.
 
 const RECIPES = [
@@ -896,7 +896,7 @@ const RECIPES = [
     shot: "feedback-2",
     route: "/invoices",
     prepare: async () => page.addStyleTag({ content: ".assistant-launcher { visibility: visible !important; }" }),
-    target: () => button(/^Ask AI$/),
+    target: () => page.locator(".assistant-launcher").getByRole("button", { name: /Ask Abacus/ }),
     frame: { height: 220 },
   },
   { shot: "feedback-3", route: "/settings/feedback", target: () => heading("Feedback triage") },

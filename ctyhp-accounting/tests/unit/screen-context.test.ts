@@ -118,7 +118,31 @@ describe("describeContextForAssistant", () => {
 
   it("names the controls on that screen, so the answer can point at one", () => {
     const briefing = describeContextForAssistant(base);
-    expect(briefing).toContain('control "');
+    expect(briefing).toContain('use "');
+    // The old notation was copied into answers word for word (3.0.20).
+    expect(briefing).not.toContain("— control");
+  });
+
+  it("names a control that is the screen it opens once, as the route", () => {
+    const flow = GUIDE_FLOWS.find((f) => f.steps.some((s) => s.route === "/reports/ar-aging"));
+    expect(flow).toBeDefined();
+    const briefing = describeContextForAssistant({ ...base, route: flow!.route });
+    expect(briefing).toContain("open /reports/ar-aging");
+    expect(briefing).not.toMatch(/use "[^"]*" on \/reports\/ar-aging/);
+  });
+
+  it("names the guide beside each workflow, so the answer can cite it", () => {
+    const starting = describeContextForAssistant(base);
+    const flow = GUIDE_FLOWS.find((f) => f.route === "/invoices");
+    expect(flow).toBeDefined();
+    expect(starting).toContain(`- Workflow "${flow!.title}" (guide ${flow!.id}) starts here. Steps:`);
+
+    // A screen that only some workflow passes through, with none starting there.
+    const startRoutes = new Set(GUIDE_FLOWS.map((f) => f.route));
+    const partway = GUIDE_FLOWS.flatMap((f) => f.steps).find((step) => step.route && !startRoutes.has(step.route));
+    expect(partway).toBeDefined();
+    const through = describeContextForAssistant({ ...base, route: partway!.route! });
+    expect(through).toMatch(/- Part of "[^"]+" \(guide [a-z0-9-]+\): /);
   });
 
   it("says plainly when the books are a sample", () => {

@@ -85,7 +85,7 @@ export default function GuideFlowView({
 
           <ol className="guide-steps">
             {flow.steps.map((step, index) => {
-              // Report and Ask AI float over every screen, so no one screen is theirs.
+              // Report and Ask Abacus float over every screen, so no one screen is theirs.
               const screen = step.everyScreen ? "every screen" : screenName(step.route ?? flow.route);
               const here = from !== null && !step.everyScreen && (step.route ?? flow.route) === from.route;
               // A report is its own control: "Open Invoices on Open Invoices" says it twice.
@@ -125,7 +125,7 @@ export default function GuideFlowView({
                     {step.screenshot ? (
                       <figure className="system-guide__shot">
                         {/* Captured from a sample company, never from real books. */}
-                        {/* A picture per step (3.0.19): fetched as it scrolls into view. */}
+                        {/* A picture per step (3.0.21): fetched as it scrolls into view. */}
                         <PreviewImage
                           src={step.screenshot.src}
                           alt={step.screenshot.alt}
@@ -155,7 +155,7 @@ export default function GuideFlowView({
           </div>
           <div className="guide-rail__box">
             <strong>Still stuck?</strong>
-            <span>Ask AI and Report sit at the bottom right of every screen.</span>
+            <span>Ask Abacus and Report sit at the bottom right of every screen.</span>
           </div>
         </nav>
       </div>

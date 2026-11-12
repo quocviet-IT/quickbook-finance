@@ -17,6 +17,7 @@ import { GUIDE_FLOWS, type GuideFlow, type GuideStep } from "./system-guide";
 import type { Release } from "./changelog";
 import { currentVersionName } from "./version-name";
 import { plural, pluralWord } from "@/lib/format";
+import { screenName } from "./screen-names";
 
 export interface ScreenContext {
   /** The route as the browser has it. */
@@ -222,6 +223,19 @@ function stepText(step: GuideStep): string {
   return step.note ? `${step.summary} ${step.note}` : step.summary;
 }
 
+/**
+ * How a step's control is named to the assistant (3.0.20). It used to read
+ * `— control "Accounts Receivable Aging" on /reports/ar-aging`, and answers
+ * copied that notation word for word, naming a report twice beside its own
+ * link. A control that is the screen it opens is now just the route.
+ */
+function stepControl(step: GuideStep): string {
+  if (step.route && step.control.trim().toLowerCase() === screenName(step.route).toLowerCase()) {
+    return `open ${step.route}`;
+  }
+  return `use "${step.control}"${step.route ? ` on ${step.route}` : ""}`;
+}
+
 export function describeContextForAssistant(context: AssistantContext): string {
   const screen = screenContextFor(context.route);
   const lines: string[] = [
@@ -249,18 +263,15 @@ export function describeContextForAssistant(context: AssistantContext): string {
 
   if (screen.flowsStartingHere.length > 0) {
     for (const flow of screen.flowsStartingHere) {
-      add(`- Workflow "${flow.title}" starts here. Steps:`);
+      add(`- Workflow "${flow.title}" (guide ${flow.id}) starts here. Steps:`);
       for (const step of flow.steps) {
-        add(
-          `    * ${step.action} — control "${step.control}"${step.route ? ` on ${step.route}` : ""}` +
-            `. ${stepText(step)}`,
-        );
+        add(`    * ${step.action}: ${stepControl(step)}. ${stepText(step)}`);
       }
     }
   } else if (screen.flowsPassingThrough.length > 0) {
     for (const entry of screen.flowsPassingThrough) {
       for (const step of entry.steps) {
-        add(`- Part of "${entry.flow.title}": ${step.action} — control "${step.control}". ${stepText(step)}`);
+        add(`- Part of "${entry.flow.title}" (guide ${entry.flow.id}): ${step.action}: ${stepControl({ ...step, route: undefined })}. ${stepText(step)}`);
       }
     }
   }

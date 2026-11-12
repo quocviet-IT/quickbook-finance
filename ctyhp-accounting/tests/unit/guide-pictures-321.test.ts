@@ -3,11 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GUIDE_FLOWS } from "@/lib/domain/system-guide";
 import { RELEASES } from "@/lib/domain/changelog";
+import { guideCardMeta } from "@/lib/domain/guide-help";
 
 /**
- * 3.0.19: a picture for every step. Each is captured from the sample company by
+ * 3.0.21: a picture for every step. Each is captured from the sample company by
  * scripts/capture-step-shots.mjs: the step's screen, cropped around its control,
- * with the control ringed in orange. Banking's thirty steps follow in 3.0.20,
+ * with the control ringed in orange. Banking's thirty steps follow in a later release,
  * once the sample company has bank accounts to show.
  */
 
@@ -17,10 +18,10 @@ const steps = GUIDE_FLOWS.flatMap((flow) =>
   flow.steps.map((step, index) => ({ flow, step, label: `${flow.id} step ${index + 1}` })),
 );
 
-/** Steps still without a picture, all of them Banking's. Only ever goes down; 3.0.20 makes it zero. */
+/** Steps still without a picture, all of them Banking's. Only ever goes down, to zero once Banking has its pictures. */
 const WAITING_FOR_BANK_DATA = 30;
 
-describe("a picture for every step (3.0.19)", () => {
+describe("a picture for every step (3.0.21)", () => {
   it("gives every step outside Banking a picture", () => {
     const missing = steps.filter(({ flow, step }) => flow.area !== "banking" && !step.screenshot).map(({ label }) => label);
     expect(missing).toEqual([]);
@@ -80,7 +81,14 @@ describe("a picture for every step (3.0.19)", () => {
   });
 });
 
-describe("the guide's page shows the pictures (3.0.19)", () => {
+describe("the guide's cards (3.0.21)", () => {
+  it("no longer mark a guide Pictures, now that nearly every guide has them", () => {
+    // The chip told the two import guides apart from sixteen without a picture.
+    for (const flow of GUIDE_FLOWS) expect(guideCardMeta(flow), flow.id).not.toContain("Pictures");
+  });
+});
+
+describe("the guide's page shows the pictures (3.0.21)", () => {
   const view = read("app", "(app)", "guide", "[id]", "GuideFlowView.tsx");
 
   it("loads a step's picture only as it scrolls into view", () => {
@@ -93,9 +101,9 @@ describe("the guide's page shows the pictures (3.0.19)", () => {
   });
 });
 
-describe("the release note (3.0.19)", () => {
+describe("the release note (3.0.21)", () => {
   it("says every step has a picture, and that Banking's come next", () => {
-    const release = RELEASES.find((candidate) => candidate.version === "3.0.19");
+    const release = RELEASES.find((candidate) => candidate.version === "3.0.21");
     expect(release).toBeDefined();
     const said = (release?.changes ?? []).map((change) => `${change.title} ${change.detail ?? ""}`).join(" ");
     expect(said).toContain("picture");

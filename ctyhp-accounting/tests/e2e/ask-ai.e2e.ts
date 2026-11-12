@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { askAiChapters, buildAskAiSystemPrompt } from "@/lib/ai/ask-prompt";
 import { MANUAL_CONTEXT } from "@/lib/ai/manual-context.generated";
 import { aiConfigured, askProvider } from "@/lib/ai/provider";
+import { parseAbacusAnswer } from "@/lib/domain/abacus-answer";
 
 /**
  * A citation can name the file, the chapter number, or the heading the chapter
@@ -24,6 +25,9 @@ function acceptedCitations(): string[] {
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 function citesAChapter(answer: string): boolean {
+  // Abacus ends an answer with `Source: <guide id | chapter file | none>`; a
+  // guide id or a chapter file named there is a citation.
+  if (parseAbacusAnswer(answer).source !== null) return true;
   const haystack = normalize(answer);
   return acceptedCitations().some((citation) => haystack.includes(normalize(citation)));
 }
@@ -33,7 +37,7 @@ function citesAChapter(answer: string): boolean {
  * configured, so the suite still runs on a machine without a key — but never
  * silently passes: aiConfigured() is asserted in its own test below.
  */
-describe("Ask AI against the configured provider", () => {
+describe("Abacus against the configured provider", () => {
   it("reports whether a provider is configured", () => {
     if (!aiConfigured()) {
       console.info(
@@ -44,7 +48,7 @@ describe("Ask AI against the configured provider", () => {
   });
 
   it.skipIf(!aiConfigured())(
-    "answers a workflow question from the manual and names its chapter",
+    "answers a workflow question from the guides and names its source",
     async () => {
       const answer = await askProvider({
         system: buildAskAiSystemPrompt(),

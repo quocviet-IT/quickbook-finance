@@ -157,7 +157,7 @@ export default function GuideHome({
             </div>
           ) : (
             <span className="guide-from__empty">
-              Nothing in the guide covers {from.screen} yet. Every guide is listed below, and Ask AI, at the bottom
+              Nothing in the guide covers {from.screen} yet. Every guide is listed below, and Ask Abacus, at the bottom
               right of every screen, can answer about this one.{" "}
               <IntentLink href={from.route}>Back to {from.screen}</IntentLink>
             </span>

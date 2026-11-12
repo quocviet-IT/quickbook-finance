@@ -48,15 +48,15 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
-    version: "3.0.19",
-    date: "2026-11-11",
+    version: "3.0.21",
+    date: "2026-11-12",
     headline: "The guide's steps show a picture of their screen, with the button to press ringed in orange.",
     changes: [
       {
         kind: "added",
         title: "A picture for every step",
         detail:
-          "Each step now shows the part of its screen where the work happens, with the button, field or menu item it names ringed in orange: New invoice above the invoice list, Download PDF in an invoice's row menu, Close beside an open month. The pictures are shown at the size the screen draws them, so the words in them read as they do in OneBook; click one to enlarge it. They come from the sample company, never from a company's real books. Banking's guides get theirs next, once the sample company has bank accounts to show.",
+          "Each step now shows the part of its screen where the work happens, with the button, field or menu item it names ringed in orange: New invoice above the invoice list, Download PDF in an invoice's row menu, Close beside an open month. The pictures are shown at the size the screen draws them, so the words in them read as they do in OneBook; click one to enlarge it. They come from the sample company, never from a company's real books. Banking's guides get theirs next, once the sample company has bank accounts to show. A guide's card no longer says Pictures, since nearly every guide now has them.",
         route: "/guide",
       },
       {
@@ -65,6 +65,33 @@ export const RELEASES: Release[] = [
         detail:
           "Cancelling an invoice is Void invoice in the invoice's row menu, not Void, and a snapshot's button on Backups reads Restore; Restore as new company is the title of the page it opens.",
         route: "/guide",
+      },
+    ],
+  },
+  {
+    version: "3.0.20",
+    date: "2026-11-11",
+    headline: "Ask AI is now Abacus, and every conversation is kept under your account to open again.",
+    changes: [
+      {
+        kind: "added",
+        title: "Past conversations: open one again, read it whole and carry on asking; search them or delete them",
+        detail:
+          "History, at the top of the Abacus panel, lists your last 20 conversations in the company that is open, grouped by day, with the screen each was asked on. Open one to read every question and answer, and ask on from where it ended; Abacus remembers what was said. Search by the first or the last question asked, or by the screen; delete one, or clear them all. They are kept under your account, not in the browser, so they follow you to another computer, and nobody else sees them.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Answers show their steps in order, link the screen to open and name the guide they come from",
+        detail:
+          "Steps are numbered and joined down the side, and the name of a button reads as a key. A screen an answer mentions opens in one click. Under each answer, Ref. names the guide it came from and opens it. When the guides do not cover a question, the answer says so. Copy, and Helpful or Not right on the newest answer, sit beside it.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Common questions by topic, and the screen you are asking about is shown in the box you type in",
+        detail:
+          "An empty panel asks what you need to do on the screen you are on, says what Abacus can answer and what it cannot see, and offers common questions for this screen and for each area of the guide, each tagged with the guide that answers it. The box you type in reads About and the screen's name, so you know which screen the answer is about.",
       },
     ],
   },
