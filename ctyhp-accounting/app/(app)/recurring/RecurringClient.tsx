@@ -611,6 +611,7 @@ export default function RecurringClient({
             style={{ width: 240 }}
           />
           <Select
+            aria-label="Filter by transaction type"
             value={typeFilter}
             onChange={setTypeFilter}
             style={{ width: 170 }}
@@ -620,6 +621,7 @@ export default function RecurringClient({
             ]}
           />
           <Select
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={setStatusFilter}
             style={{ width: 140 }}

@@ -141,7 +141,7 @@ export default function RelatedCompaniesSection({
       key: "active",
       width: RELATED_COLUMN_WIDTH.active,
       render: (_: unknown, row: RelatedListRow) => (
-        <Switch size="small" checked={row.isActive} disabled={!canWrite} loading={busy === row.id} onChange={(checked) => void setActive(row, checked)} />
+        <Switch size="small" aria-label={`Related company ${row.name}`} checked={row.isActive} disabled={!canWrite} loading={busy === row.id} onChange={(checked) => void setActive(row, checked)} />
       ),
     },
     ...(canWrite

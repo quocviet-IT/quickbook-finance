@@ -933,6 +933,7 @@ export default function FixedAssetsClient({
             onChange={(event) => setSearch(event.target.value)}
           />
           <Select
+            aria-label="Filter assets by status"
             value={status}
             style={{ width: 180 }}
             onChange={setStatus}

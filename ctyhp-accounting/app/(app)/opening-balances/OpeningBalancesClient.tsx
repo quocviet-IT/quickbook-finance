@@ -108,9 +108,10 @@ export default function OpeningBalancesClient({ canWrite, accounts, baseCurrency
             title: "Account",
             // Elastic, and not cut: it holds a select.
             minWidth: COLUMN.RICH_MIN,
-            render: (_, r) => (
+            render: (_, r, index) => (
               <Select
                 showSearch
+                aria-label={`Account, line ${index + 1}`}
                 style={{ width: 320, maxWidth: "100%" }}
                 placeholder="Account"
                 optionFilterProp="label"

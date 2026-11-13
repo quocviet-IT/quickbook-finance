@@ -187,6 +187,7 @@ export default function BankTransactionsTable({
         return (
           <CategoriseCell
             transactionId={row.transaction.id}
+            lineLabel={row.transaction.description}
             status={row.transaction.status}
             accounts={postableAccounts}
             posting={posting}

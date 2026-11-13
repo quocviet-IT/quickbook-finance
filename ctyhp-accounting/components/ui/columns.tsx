@@ -266,6 +266,8 @@ export function secondaryLine(text: ReactNode, title?: string): ReactElement {
   return (
     <span
       title={whole}
+      // A link in the line (the entry it posted to) is underlined there, see globals.css.
+      className="accounting-secondary-line"
       style={{
         display: "block",
         fontSize: 12,

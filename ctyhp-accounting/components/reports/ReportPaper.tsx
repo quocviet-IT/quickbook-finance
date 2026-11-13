@@ -107,7 +107,8 @@ export function ReportSection({
 
 /** The closing note under a report. */
 export function ReportFoot({ children }: { children: ReactNode }) {
-  return <div className={styles.foot}>{children}</div>;
+  // Running text: a link in it is underlined (accounting-prose, 3.0.30).
+  return <div className={`${styles.foot} accounting-prose`}>{children}</div>;
 }
 
 const TONE_COLOR: Record<SourceTone, string | undefined> = {

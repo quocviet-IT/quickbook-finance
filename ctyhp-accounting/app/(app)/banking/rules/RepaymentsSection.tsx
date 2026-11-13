@@ -176,7 +176,7 @@ export default function RepaymentsSection({
       key: "active",
       width: COLUMN.ACTION * 1.5,
       render: (_: unknown, row: RepaymentListRow) => (
-        <Switch size="small" checked={row.isActive} disabled={!canWrite} loading={busy === row.id} onChange={(checked) => void setActive(row, checked)} />
+        <Switch size="small" aria-label={`Repayment to ${row.accountLabel}`} checked={row.isActive} disabled={!canWrite} loading={busy === row.id} onChange={(checked) => void setActive(row, checked)} />
       ),
     },
     ...(canWrite

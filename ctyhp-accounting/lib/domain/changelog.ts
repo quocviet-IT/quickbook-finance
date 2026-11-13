@@ -48,6 +48,48 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.30",
+    date: "2026-11-13",
+    headline: "Easier to read in both themes: the dark theme's buttons, every placeholder and small print, the coloured tags, and links inside a sentence.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Primary buttons in the dark theme are lettered dark",
+        detail:
+          "In the dark theme, New transaction, Ask Abacus, Save and every other primary button had white letters on light teal, at 2.5:1, half of what text needs. They now have dark letters on the same teal, which reads at 7.6:1. The light theme is unchanged.",
+        route: "/dashboard",
+      },
+      {
+        kind: "fixed",
+        title: "Placeholders and small print read on every surface",
+        detail:
+          "The placeholder in the search box at the top of every screen was at 1.8:1, and Find account in Banking, captions, description labels and the context line above each report were below 4.5:1. They are all a little darker in the light theme and a little lighter in the dark one, so they still look secondary but can be read.",
+        route: "/banking",
+      },
+      {
+        kind: "fixed",
+        title: "Coloured tags have darker letters",
+        detail:
+          "Orange, gold, green, cyan and similar tags, such as Sample company, Never counted, High and Clean, were lettered too pale for their tint, as low as 2:1. Each now uses a deeper shade of its own colour, so a tag keeps its colour and reads at 4.5:1 or better, in both themes.",
+        route: "/accounts",
+      },
+      {
+        kind: "changed",
+        title: "Links inside a sentence are underlined",
+        detail:
+          "A link in running text, such as the journal entry under a bill or Set the work policy, was told from the words around it by colour alone. It is now underlined. A link that stands on its own, a name in a table or the menu, is not.",
+        route: "/bills",
+      },
+      {
+        kind: "fixed",
+        title: "Every picker and switch has a name, and small links are easier to press",
+        detail:
+          "A screen reader now hears what each control is for: the account picker on every Banking line, named after the line, the status and type filters on Fixed Assets and Recurring Transactions, the fiscal year on Accounting Periods, the account on each opening balance line, and each bank rule's on/off switch. Small links such as Change, Create rule and Count cash, and the closing checklist on Accounting Periods, are at least 24 pixels tall.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.29",
     date: "2026-11-13",
     headline: "The company settings, the New vendor form, Work policy and Purchasing save once, keep what you typed, and say why a save failed beside the Save button.",

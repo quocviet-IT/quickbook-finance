@@ -378,6 +378,9 @@ export function CashFlowBridgeChart({
             </div>
             <div
               className="cash-flow-component__scale"
+              // A div may only carry a name with a role; as a picture of one
+              // figure, it is an image whose name is that figure (3.0.30).
+              role="img"
               aria-label={`${item.label}: ${formatMoney(item.value)}`}
             >
               <span className="cash-flow-component__axis" />

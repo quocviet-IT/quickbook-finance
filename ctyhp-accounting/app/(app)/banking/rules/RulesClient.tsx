@@ -154,6 +154,7 @@ export default function RulesClient({
       render: (_: unknown, rule: RuleListRow) => (
         <Switch
           size="small"
+          aria-label={`Rule for “${rule.matchText}”`}
           checked={rule.isActive}
           disabled={!canWrite}
           loading={busy === rule.id}

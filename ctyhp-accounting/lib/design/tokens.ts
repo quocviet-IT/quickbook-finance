@@ -43,6 +43,13 @@ export const TOKENS = {
      * behind white text has to.
      */
     primarySolid: PALETTE.teal700,
+    /**
+     * What is written on a solid `primary` fill: a primary button's label,
+     * a chosen solid radio. White on the light theme's deep teal; on the
+     * dark theme's light teal white read 2.5:1, so there it is the darkest
+     * ink instead (3.0.30).
+     */
+    onPrimary: PALETTE.white,
     success: PALETTE.green700,
     warning: PALETTE.amber700,
     danger: PALETTE.red700,
@@ -54,8 +61,11 @@ export const TOKENS = {
     // Between body and secondary. The shell's buttons and account name use it.
     strong: PALETTE.slate700,
     secondary: PALETTE.slate600,
-    faint: PALETTE.slate500,
-    caption: PALETTE.neutral500,
+    // Small print, placeholders and captions. Both used to fall below 4.5:1
+    // — 4.4:1 on the page grey and 3.4:1 on a card — and now read on every
+    // light surface (3.0.30).
+    faint: PALETTE.slate550,
+    caption: PALETTE.slate550,
     onDark: PALETTE.white,
   },
   surface: {
@@ -281,6 +291,25 @@ export const TOKENS = {
     debit: PALETTE.green200,
     credit: PALETTE.red400,
   },
+  /**
+   * What a preset Ant Design tag (`<Tag color="orange">`) is lettered in
+   * (3.0.30). Ant Design letters one in step 7 of its colour on step 1, and
+   * for orange, gold, green, cyan, lime, yellow and volcano in light, and
+   * purple and geekblue in dark, that came to 2.05:1–4.4:1. globals.css points
+   * each tag's step 7 here; a token cannot, as Ant Design derives its palettes
+   * again from their seeds and drops a step given to it.
+   */
+  tag: {
+    cyan: PALETTE.antCyan8,
+    green: PALETTE.antGreen8,
+    orange: PALETTE.antOrange8,
+    volcano: PALETTE.antVolcano8,
+    yellow: PALETTE.antYellow9,
+    lime: PALETTE.antLime9,
+    gold: PALETTE.antGold9,
+    purple: PALETTE.antPurple7,
+    geekblue: PALETTE.antGeekblue7,
+  },
 } as const;
 
 /**
@@ -304,6 +333,7 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
   intent: {
     primary: PALETTE.teal400,
     primarySolid: PALETTE.teal700,
+    onPrimary: PALETTE.ink950,
     success: PALETTE.green400,
     warning: PALETTE.amber400,
     danger: PALETTE.red400,
@@ -469,6 +499,17 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     debit: PALETTE.green200,
     credit: PALETTE.red400,
   },
+  tag: {
+    cyan: PALETTE.antCyanDark7,
+    green: PALETTE.antGreenDark7,
+    orange: PALETTE.antOrangeDark7,
+    volcano: PALETTE.antVolcanoDark7,
+    yellow: PALETTE.antYellowDark7,
+    lime: PALETTE.antLimeDark7,
+    gold: PALETTE.antGoldDark7,
+    purple: PALETTE.antPurpleDark8,
+    geekblue: PALETTE.antGeekblueDark8,
+  },
 };
 
 export type Tokens = typeof TOKENS;
@@ -580,6 +621,18 @@ export const TEXT_ON_SURFACE_PAIRS: readonly [TokenPath, TokenPath][] = [
    */
   ["text.onDark", "intent.primarySolid"],
   /**
+   * A primary button's label on its fill, in both themes. Ant Design writes
+   * it white whatever the fill, and the dark theme's light teal took white
+   * to 2.5:1 on every New button in the app (3.0.30).
+   */
+  ["intent.onPrimary", "intent.primary"],
+  /** Small print, placeholders and captions, on every surface they sit on (3.0.30). */
+  ["text.faint", "surface.page"],
+  ["text.faint", "surface.card"],
+  ["text.faint", "surface.muted"],
+  ["text.caption", "surface.page"],
+  ["text.caption", "surface.card"],
+  /**
    * The featured dashboard card is the same deep teal in both themes, so what
    * is written on it has to be readable in both without inverting. Both
    * halves of its trend are here because the falling one was not: it borrowed
@@ -670,8 +723,17 @@ export function antdThemeTokens(theme: ThemeName = "light") {
       // captions. Left to Ant Design it was a translucent grey that read
       // 3.32:1 under every page title (3.0.10).
       colorTextDescription: t("text.secondary"),
+      // The rest of Ant Design's greys, for the same reason (3.0.30): its
+      // tertiary grey wrote description labels and table notes at 3.4:1,
+      // and its placeholder grey, the search box's "Search…", at 1.8:1.
+      colorTextSecondary: t("text.secondary"),
+      colorTextTertiary: t("text.faint"),
+      colorTextPlaceholder: t("text.faint"),
     },
     components: {
+      // A solid primary fill's label. See `intent.onPrimary`.
+      Button: { primaryColor: t("intent.onPrimary") },
+      Radio: { buttonSolidCheckedColor: t("intent.onPrimary") },
       Layout: {
         siderBg: t("surface.sider"),
         triggerBg: t("surface.sider"),
