@@ -167,9 +167,13 @@ export default function PeriodsClient({
     }
     let reason = "";
     modal.confirm({
+      // The reason is what is asked for, so the cursor starts there.
+      autoFocusButton: null,
       title: `Reopen ${row.label}?`,
       content: (
         <Input
+          autoFocus
+          aria-label="Reason"
           placeholder="Reason"
           onChange={(e) => {
             reason = e.target.value;

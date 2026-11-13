@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { App, Button, Form, Input, InputNumber, Modal, Select, Space } from "antd";
+import { Alert, App, Button, Form, Input, InputNumber, Modal, Select, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
@@ -9,6 +9,9 @@ import type { AccountRow, Box1099Row, VendorRow } from "@/lib/db/types";
 import { parsePaymentTerms } from "@/lib/domain/payment-terms";
 import { filterContacts, type ActiveFilter } from "@/lib/domain/contact-filter";
 import { createVendorAction } from "./actions";
+import { closeOrConfirmDiscard } from "@/lib/client/destructive-confirm";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 import VendorTaxDrawer from "./VendorTaxDrawer";
 
 export default function VendorsClient({
@@ -27,29 +30,56 @@ export default function VendorsClient({
   /** The elevated vendor.tax_manage permission. */
   canManageTax: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [open, setOpen] = useState(false);
+  // The New vendor form works as the customer one does (3.0.30): typing is
+  // not thrown away by a stray Cancel, Escape or link, and a refused save
+  // says why inside the form, where it stays until the next attempt.
+  const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useUnsavedGuard(open && dirty, modal, "this vendor");
 
   // The same search Customers has, from the same shared definition of
   // "matches" — the two registers are mirrors and must not find differently.
   const [keyword, setKeyword] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const visibleVendors = filterContacts(vendors, keyword, activeFilter);
+  const narrowed = Boolean(keyword) || activeFilter !== "all";
+  function clearFilters() {
+    setKeyword("");
+    setActiveFilter("all");
+  }
   const [taxFor, setTaxFor] = useState<VendorRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
 
+  function finishForm() {
+    setDirty(false);
+    setSaveError(null);
+    setOpen(false);
+    // The form outlives the dialog: clear it, or the next New vendor opens on the old draft.
+    form.resetFields();
+  }
+
+  /** Escape, the close button and Cancel: asks first once something has been typed. */
+  function closeForm() {
+    closeOrConfirmDiscard({ dirty, what: "this vendor", confirm: modal.confirm, close: finishForm });
+  }
+
   async function submit() {
-    const values = await form.validateFields();
+    if (saving) return;
+    // On a wrong or missing field: focus goes to the first one, nothing is sent.
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
+    setSaveError(null);
     const res = await createVendorAction(values);
     setSaving(false);
     if (res.ok) {
-      message.success("Vendor created");
-      setOpen(false);
-      form.resetFields();
+      message.success(`Vendor ${String(values.name).trim()} created`);
+      finishForm();
     } else {
-      message.error(res.error ?? "Failed to create vendor");
+      setSaveError(res.error ?? "The vendor could not be created.");
     }
   }
 
@@ -104,11 +134,20 @@ export default function VendorsClient({
       <DataTable<VendorRow>
         rowKey="id"
         dataSource={visibleVendors}
-        emptyTitle={keyword || activeFilter !== "all" ? "No vendors match these filters" : "No vendors yet"}
+        emptyTitle={narrowed ? "No vendors match these filters" : "No vendors yet"}
         emptyDescription={
-          keyword || activeFilter !== "all"
-            ? "Clear a filter, or widen the search."
+          narrowed
+            ? "Clear the filters, or widen the search."
             : "Add a vendor to record bills, expenses, and payments."
+        }
+        emptyAction={
+          narrowed ? (
+            <Button onClick={clearFilters}>Clear filters</Button>
+          ) : canWrite ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+              New vendor
+            </Button>
+          ) : undefined
         }
         columns={[
           { title: "Name", dataIndex: "name" },
@@ -143,20 +182,22 @@ export default function VendorsClient({
       <Modal
         title="New vendor"
         open={open}
-        onOk={submit}
-        onCancel={() => setOpen(false)}
+        onOk={() => void submit()}
+        onCancel={closeForm}
+        // A click beside the form is too easy to make to cost what was typed.
+        maskClosable={false}
         confirmLoading={saving}
         okText="Create"
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}>
+        <Form form={form} layout="vertical" onValuesChange={() => setDirty(true)}>
+          <Form.Item name="name" label="Name" rules={[{ required: true, message: "Enter a name" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="Email">
-            <Input type="email" />
+          <Form.Item name="email" label="Email" rules={[{ type: "email", message: "Enter a valid email" }]}>
+            <Input type="email" autoComplete="email" />
           </Form.Item>
           <Form.Item name="phone" label="Phone">
-            <Input />
+            <Input type="tel" autoComplete="tel" />
           </Form.Item>
           <Form.Item
             name="payment_terms"
@@ -194,6 +235,7 @@ export default function VendorsClient({
           <Form.Item name="default_expense_account_id" label="Default expense account (optional)">
             <Select allowClear options={expenseAccounts.map((a) => ({ value: a.id, label: `${a.account_code} — ${a.name}` }))} />
           </Form.Item>
+          {saveError ? <Alert type="error" showIcon role="alert" title={saveError} /> : null}
         </Form>
       </Modal>
 

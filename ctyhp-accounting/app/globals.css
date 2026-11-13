@@ -921,18 +921,83 @@ body {
 }
 
 /* A page form's buttons (components/ui/FormActions.tsx): under the form, primary first. */
+/*
+ * A page form's buttons (FormActions). Sticky since 3.0.30: the row rests at
+ * the foot of the window while the form runs on under it, then settles under
+ * the last field. It needs the page itself to scroll — nothing between it and
+ * the window may set overflow — and a ground of its own, or the fields would
+ * show through it as they pass. A rule above it and no shadow, like every
+ * other surface that is not floating.
+ */
 .accounting-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 14px 0 12px;
+  border-top: 1px solid var(--ob-border-subtle);
+  background: var(--ob-surface-card);
+}
+
+.accounting-form-actions__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  margin-top: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ob-border-subtle);
 }
 
 .accounting-form-actions__note {
   color: var(--ob-text-secondary);
+}
+
+.accounting-form-actions__note:empty {
+  display: none;
+}
+
+/*
+ * A page form in titled sections (3.0.30): one field to a row, each sized to
+ * what it holds, and a pair only where two fields read as one value — a city
+ * and its state, a postal code and its country.
+ */
+.accounting-form-section {
+  min-width: 0;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.accounting-form-section + .accounting-form-section {
+  margin-top: 16px;
+}
+
+/*
+ * The section's title, ruled off below. `fieldset.` because Ant Design's own
+ * `.ant-form legend` is as specific and loads after this sheet: it wrote the
+ * titles in the pale description grey.
+ */
+fieldset.accounting-form-section > legend {
+  margin-bottom: 16px;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 1px solid var(--ob-border-subtle);
+  color: var(--ob-text-heading);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.accounting-form-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  gap: 0 16px;
+}
+
+@media (max-width: 575px) {
+  .accounting-form-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /*

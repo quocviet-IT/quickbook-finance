@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Form, InputNumber, Space } from "antd";
 import FormActions from "@/components/ui/FormActions";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 import type { PurchasingConfigRow } from "@/lib/db/types";
 import { setPurchasingConfigAction } from "./actions";
 
@@ -14,24 +16,33 @@ export default function PurchasingConfigClient({
   config: PurchasingConfigRow;
   canEdit: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  // Edited and not saved (3.0.30): said beside Save, and leaving the page asks first.
+  const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useUnsavedGuard(dirty, modal, "the matching tolerances");
 
   async function submit() {
-    const values = await form.validateFields();
+    if (saving) return;
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
+    setSaveError(null);
     const res = await setPurchasingConfigAction({
       price_tolerance_bps: Math.round(values.price_tolerance_pct * 100),
       qty_tolerance_bps: Math.round(values.qty_tolerance_pct * 100),
     });
     setSaving(false);
     if (res.ok) {
+      setDirty(false);
       message.success("Tolerances saved");
       router.refresh();
     } else {
-      message.error(res.error ?? "Failed to save tolerances");
+      // Beside Save, where it stays until the next attempt.
+      setSaveError(res.error ?? "The tolerances could not be saved.");
     }
   }
 
@@ -48,6 +59,7 @@ export default function PurchasingConfigClient({
           form={form}
           layout="vertical"
           disabled={!canEdit}
+          onValuesChange={() => setDirty(true)}
           initialValues={{
             price_tolerance_pct: config.price_tolerance_bps / 100,
             qty_tolerance_pct: config.qty_tolerance_bps / 100,
@@ -70,8 +82,8 @@ export default function PurchasingConfigClient({
             <InputNumber min={0} max={100} step={0.25} precision={2} style={{ width: 200 }} />
           </Form.Item>
           {canEdit ? (
-            <FormActions>
-              <Button type="primary" loading={saving} onClick={submit}>
+            <FormActions dirty={dirty} error={saveError}>
+              <Button type="primary" loading={saving} onClick={() => void submit()}>
                 Save tolerances
               </Button>
             </FormActions>

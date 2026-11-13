@@ -73,6 +73,7 @@ export default function ApprovalsClient({
 
   async function approve(req: ApprovalRequestRow) {
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Approve "${req.title}"?`,
       content: `Approving performs the action now, in your name. ${req.amount_minor ? money(req.amount_minor) : ""}`,
       okText: "Approve and execute",

@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.29",
+    date: "2026-11-13",
+    headline: "The company settings, the New vendor form, Work policy and Purchasing save once, keep what you typed, and say why a save failed beside the Save button.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Save stays in view on the settings forms",
+        detail:
+          "On Company settings, Work policy, Purchasing, Posting defaults, Approval policies and Opening balances, the row with Save now stays at the foot of the window while the form runs on below it, instead of sitting under the last field where a long form hid it off screen. Once you change something it says Unsaved changes, and leaving the page asks first. If a save is refused, the reason stays beside Save, with everything you typed still in the form, until you try again.",
+        route: "/settings/company",
+      },
+      {
+        kind: "fixed",
+        title: "The company settings form saves once and asks before Cancel",
+        detail:
+          "Save is busy while the settings are being saved, so a second click no longer saves the same settings again as a second version. Cancel, a link or closing the tab asks before throwing changes away. The form is in sections, Company, Address and contact, Accounting, Inventory and Invoices, with one field to a row; only a city and its state, and a postal code and its country, share one. If the version history cannot be read, the card says so and offers Retry, instead of showing an empty list as if there were no versions. Version numbers line up on the right.",
+        route: "/settings/company",
+      },
+      {
+        kind: "fixed",
+        title: "The New vendor form works like the customer one",
+        detail:
+          "Cancel, Escape or a link asks before a vendor you have started is thrown away, and a click beside the form no longer closes it. A refused save says why inside the form, and a missing name puts the cursor in Name. The phone field opens a number pad on a phone, and an email that is not an address is caught before saving. When no vendor matches the search, Clear filters brings the list back.",
+        route: "/vendors",
+      },
+      {
+        kind: "fixed",
+        title: "Questions before importing, approving or reopening",
+        detail:
+          "Import into the company, Approve and execute, and bringing reconciliation history forward now open with Cancel selected, so pressing Enter does not run them. Reopening a period or a reconciliation, and the questions on Users and purchase orders that ask for a reason, open with the cursor in the Reason field.",
+        route: "/settings/periods",
+      },
+    ],
+  },
+  {
     version: "3.0.28",
     date: "2026-11-13",
     headline: "The six guides used most open with a short narrated video of each step being done, captions on, with a mark where each step starts.",

@@ -408,6 +408,7 @@ export default function ReconcileWorkspaceClient({
     if (bringing) return;
     setBringing(true);
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `${BRING_HISTORY_FORWARD}?`,
       content: bringHistoryForwardConfirmation(entries, facts.through),
       okText: BRING_HISTORY_FORWARD,
@@ -561,9 +562,13 @@ export default function ReconcileWorkspaceClient({
     setReopening(true);
     let reason = "";
     modal.confirm({
+      // The reason is what is asked for, so the cursor starts there.
+      autoFocusButton: null,
       title: "Reopen reconciliation?",
       content: (
         <Input
+          autoFocus
+          aria-label="Reason"
           placeholder="Reason"
           onChange={(e) => {
             reason = e.target.value;

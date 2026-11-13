@@ -145,6 +145,7 @@ export default function ImportClient({
     if (!preview) return;
     const balances = withBalances && preview.openingTotalMinor !== 0;
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `Import into ${companyName}?`,
       width: 540,
       okText: "Import",

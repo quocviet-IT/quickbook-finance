@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Form, Input, InputNumber, Space } from "antd";
 import FormActions from "@/components/ui/FormActions";
+import { useUnsavedGuard } from "@/lib/client/use-unsaved-guard";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 import type { WorkPolicy } from "@/lib/domain/accounting-dashboard/policy";
 import { fromMinor, toMinor } from "@/lib/domain/money";
 import { saveWorkPolicyAction } from "./actions";
@@ -27,14 +29,21 @@ export default function WorkPolicyClient({
   baseDecimals: number;
   canManage: boolean;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  // Edited and not saved (3.0.30): said beside Save, and leaving the page asks first.
+  const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useUnsavedGuard(dirty, modal, "the work policy");
 
   async function submit() {
-    const values = await form.validateFields();
+    if (saving) return;
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
+    setSaveError(null);
     const result = await saveWorkPolicyAction({
       materialityMinor:
         values.materiality === null || values.materiality === undefined
@@ -47,10 +56,12 @@ export default function WorkPolicyClient({
     });
     setSaving(false);
     if (result.ok) {
+      setDirty(false);
       message.success("Work policy saved");
       router.refresh();
     } else {
-      message.error(result.error ?? "Could not save the policy");
+      // Beside Save, where it stays until the next attempt.
+      setSaveError(result.error ?? "The policy could not be saved.");
     }
   }
 
@@ -82,6 +93,7 @@ export default function WorkPolicyClient({
           form={form}
           layout="vertical"
           disabled={!canManage}
+          onValuesChange={() => setDirty(true)}
           initialValues={{
             materiality:
               policy.materialityMinor === null
@@ -129,7 +141,7 @@ export default function WorkPolicyClient({
           </Form.Item>
 
           {canManage ? (
-            <FormActions>
+            <FormActions dirty={dirty} error={saveError}>
               <Button type="primary" loading={saving} onClick={() => void submit()}>
                 Save the policy
               </Button>
