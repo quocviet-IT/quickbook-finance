@@ -217,7 +217,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       "Bill a customer for work, then record the money when it arrives, so the " +
       "receivable clears itself.",
     route: "/invoices",
-    video: { name: "get-paid-3.0.28", duration: 69.1, chapters: [8.6, 16.3, 24.1, 32.4, 40.5, 49.5, 59.3] },
+    video: { name: "get-paid-3.0.28", duration: 76.3, chapters: [8.4, 21.9, 29.4, 37.6, 48.3, 57.1, 66.7] },
     steps: [
       {
         action: "Create the invoice",
@@ -294,7 +294,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Give a customer an estimate and turn it into an invoice",
     purpose: "Promise a price before the sale, then turn it into an invoice when the customer says yes.",
     route: "/estimates",
-    video: { name: "quote-a-price-3.0.28", duration: 65.7, chapters: [9, 16.7, 24.3, 31.4, 39.3, 48.2, 56] },
+    video: { name: "quote-a-price-3.0.28", duration: 77.1, chapters: [8.8, 20.2, 27.7, 34.5, 45.6, 56.7, 67.7] },
     steps: [
       {
         action: "Write the estimate",
@@ -470,6 +470,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Record what you owe and pay it",
     purpose: "Capture supplier bills and expenses, then settle them.",
     route: "/bills",
+    video: { name: "pay-suppliers-3.0.28", duration: 71.1, chapters: [6.3, 21.3, 34.9, 44.4, 54.2, 62.3] },
     steps: [
       {
         action: "Enter a supplier bill",
@@ -679,7 +680,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Bring bank lines in",
     purpose: "Load a statement or a bank feed, and make sure what comes in adds up.",
     route: "/banking",
-    video: { name: "bank-lines-in-3.0.28", duration: 66.4, chapters: [7.8, 20.7, 30, 39.4, 49.3, 58.9] },
+    video: { name: "bank-lines-in-3.0.28", duration: 65, chapters: [7.6, 20.3, 29.4, 38.6, 48.4, 57.7] },
     steps: [
       {
         action: "Bring in the statement",
@@ -771,6 +772,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Match and code bank lines",
     purpose: "Tie each bank line to its entry in the books, or post it to the right account.",
     route: "/banking",
+    video: { name: "code-and-match-3.0.28", duration: 51.3, chapters: [7.7, 17.4, 26, 39.6] },
     steps: [
       {
         action: "Match lines to the ledger",
@@ -875,7 +877,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Reconcile an account to a statement",
     purpose: "Agree a bank account with one statement, line by line, until nothing is left to explain.",
     route: "/banking/reconcile",
-    video: { name: "reconcile-by-hand-3.0.28", duration: 92.3, chapters: [9.1, 19.8, 30.5, 40, 47.9, 56.9, 66.6, 76.7, 84.3] },
+    video: { name: "reconcile-by-hand-3.0.28", duration: 96.6, chapters: [8.9, 19.4, 29.9, 39.2, 52.5, 61.3, 70.8, 80.7, 88.7] },
     steps: [
       {
         action: "See how far each account is reconciled",

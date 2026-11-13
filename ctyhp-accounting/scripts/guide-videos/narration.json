@@ -38,8 +38,12 @@
               "sub": "Step 1 · Create the invoice."
             },
             {
-              "say": "Add a line for each item, then press Save draft. A draft posts nothing.",
-              "sub": "Add a line for each item, then press Save draft. A draft posts nothing."
+              "say": "Pick the customer, then add a line for each item, with its price. The total works itself out.",
+              "sub": "Pick the customer, then add a line for each item, with its price. The total works itself out."
+            },
+            {
+              "say": "Press Save draft. A draft posts nothing.",
+              "sub": "Press Save draft. A draft posts nothing."
             }
           ]
         },
@@ -166,8 +170,12 @@
               "sub": "Step 1 · Write the estimate."
             },
             {
-              "say": "Its lines work as on an invoice. Saving gives it a number, and posts nothing.",
-              "sub": "Its lines work as on an invoice. Saving gives it a number and posts nothing."
+              "say": "Pick the customer, then add each line with its price, as on an invoice.",
+              "sub": "Pick the customer, then add each line with its price, as on an invoice."
+            },
+            {
+              "say": "Saving gives it a number, and posts nothing.",
+              "sub": "Saving gives it a number and posts nothing."
             }
           ]
         },
@@ -208,8 +216,12 @@
               "sub": "Step 4 · Turn a yes into an invoice."
             },
             {
-              "say": "This opens a new invoice, with the customer and the lines already filled in.",
-              "sub": "This opens New invoice, with the customer and the lines already filled in."
+              "say": "From the estimate's menu, choose Turn into an invoice.",
+              "sub": "From the estimate's menu, choose Turn into an invoice."
+            },
+            {
+              "say": "It opens a new invoice, with the customer and the lines already filled in.",
+              "sub": "It opens New invoice, with the customer and the lines already filled in."
             }
           ]
         },
@@ -222,8 +234,12 @@
               "sub": "Step 5 · Create the draft."
             },
             {
-              "say": "Press Save draft. The estimate now reads converted, and locks. The draft posts nothing yet.",
-              "sub": "Press Save draft. The estimate now reads Converted and locks. The draft posts nothing yet."
+              "say": "Check the lines it brought across, then press Save draft.",
+              "sub": "Check the lines it brought across, then press Save draft."
+            },
+            {
+              "say": "The estimate now reads converted, and locks. The draft posts nothing yet.",
+              "sub": "The estimate now reads Converted and locks. The draft posts nothing yet."
             }
           ]
         },
@@ -234,6 +250,10 @@
             {
               "say": "Step six. Issue the invoice.",
               "sub": "Step 6 · Issue the invoice."
+            },
+            {
+              "say": "Open the draft from its row, and press Issue at the foot.",
+              "sub": "Open the draft from its row, and press Issue at the foot."
             },
             {
               "say": "It posts like any other invoice. The estimate itself never posts.",
@@ -451,8 +471,12 @@
               "sub": "Step 4 · Set aside a misread statement line."
             },
             {
-              "say": "Not a transaction leaves it out of the difference. Restore brings it back.",
-              "sub": "Not a transaction leaves it out of the difference. Restore brings it back."
+              "say": "Each statement line says whether the books hold it: paired, or not in the books.",
+              "sub": "Each statement line says whether the books hold it: Paired, or Not in the books."
+            },
+            {
+              "say": "Not a transaction leaves a misread line out of the difference. Restore brings it back.",
+              "sub": "Not a transaction leaves a misread line out of the difference. Restore brings it back."
             }
           ]
         },
@@ -523,6 +547,214 @@
             {
               "say": "An older reconciliation with no file takes one here, if it matches its figures.",
               "sub": "An older reconciliation with no file takes one here, if it matches its figures."
+            }
+          ]
+        }
+      ]
+    },
+    "pay-suppliers": {
+      "card": {
+        "title": "Record what you owe and pay it",
+        "purpose": "Capture supplier bills and expenses, then settle them.",
+        "steps": [
+          "Enter a supplier bill",
+          "Record a direct expense",
+          "Attach the supporting document",
+          "Pay one or many bills",
+          "See what is due",
+          "List unpaid bills and vendor balances"
+        ]
+      },
+      "beats": [
+        {
+          "id": "pay-suppliers-intro",
+          "lines": [
+            {
+              "say": "Record what you owe, and pay it.",
+              "sub": "Record what you owe and pay it."
+            },
+            {
+              "say": "Capture supplier bills and expenses, then settle them.",
+              "sub": "Capture supplier bills and expenses, then settle them."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. Enter a supplier bill.",
+              "sub": "Step 1 · Enter a supplier bill."
+            },
+            {
+              "say": "Pick the vendor, and their usual account fills itself in. Then add their reference, and the lines.",
+              "sub": "Pick the vendor, and their usual account fills itself in. Then add their reference, and the lines."
+            },
+            {
+              "say": "The same vendor and reference can't be entered twice.",
+              "sub": "The same vendor and reference cannot be entered twice."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Record a direct expense.",
+              "sub": "Step 2 · Record a direct expense."
+            },
+            {
+              "say": "For something already paid: pick who was paid, say what it was, and the amount.",
+              "sub": "For something already paid: pick who was paid, say what it was, and the amount."
+            },
+            {
+              "say": "Purchase tax is part of the cost, so there is no separate tax line.",
+              "sub": "Purchase tax is part of the cost, so there is no separate tax line."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Attach the supporting document.",
+              "sub": "Step 3 · Attach the supporting document."
+            },
+            {
+              "say": "The file stays with the entry, privately, and every look at it is logged.",
+              "sub": "The file stays with the entry, privately, and every look at it is logged."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Pay one bill, or many.",
+              "sub": "Step 4 · Pay one or many bills."
+            },
+            {
+              "say": "Choose the vendor and the amount. A payment never exceeds what is still open.",
+              "sub": "Choose the vendor and the amount. A payment never exceeds what is still open."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-5",
+          "step": 5,
+          "lines": [
+            {
+              "say": "Step five. See what is due.",
+              "sub": "Step 5 · See what is due."
+            },
+            {
+              "say": "Accounts Payable Aging shows what each vendor is owed, by how overdue it is.",
+              "sub": "Accounts Payable Aging shows what each vendor is owed, by how overdue it is."
+            }
+          ]
+        },
+        {
+          "id": "pay-suppliers-6",
+          "step": 6,
+          "lines": [
+            {
+              "say": "Step six. List unpaid bills, and vendor balances.",
+              "sub": "Step 6 · List unpaid bills and vendor balances."
+            },
+            {
+              "say": "Both are checked against Accounts Payable, so their totals always agree.",
+              "sub": "Both are checked against Accounts Payable, so their totals always agree."
+            }
+          ]
+        }
+      ]
+    },
+    "code-and-match": {
+      "card": {
+        "title": "Match and code bank lines",
+        "purpose": "Tie each bank line to its entry in the books, or post it to the right account.",
+        "steps": [
+          "Match lines to the ledger",
+          "Code a line the books do not hold",
+          "Move a coded line to another account",
+          "Check for a charge taken twice"
+        ]
+      },
+      "beats": [
+        {
+          "id": "code-and-match-intro",
+          "lines": [
+            {
+              "say": "Match and code bank lines.",
+              "sub": "Match and code bank lines."
+            },
+            {
+              "say": "Tie each bank line to its entry in the books, or post it to the right account.",
+              "sub": "Tie each bank line to its entry in the books, or post it to the right account."
+            }
+          ]
+        },
+        {
+          "id": "code-and-match-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. Match lines to the ledger.",
+              "sub": "Step 1 · Match lines to the ledger."
+            },
+            {
+              "say": "The Match column suggests the entry each line belongs to. Approve it. Until then, nothing changes.",
+              "sub": "The Match column suggests the entry each line belongs to. Approve it. Until then, nothing changes."
+            }
+          ]
+        },
+        {
+          "id": "code-and-match-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Code a line the books do not hold.",
+              "sub": "Step 2 · Code a line the books do not hold."
+            },
+            {
+              "say": "Type a word, and the accounts that answer to it are offered. Choosing one posts the line.",
+              "sub": "Type a word, and the accounts that answer to it are offered. Choosing one posts the line."
+            }
+          ]
+        },
+        {
+          "id": "code-and-match-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Move a coded line to another account.",
+              "sub": "Step 3 · Move a coded line to another account."
+            },
+            {
+              "say": "Find the line, press Recode, and type where it belongs.",
+              "sub": "Find the line, press Recode, and type where it belongs."
+            },
+            {
+              "say": "Recode posts a second entry, that moves the amount to the account you choose.",
+              "sub": "Recode posts a second entry that moves the amount to the account you choose."
+            }
+          ]
+        },
+        {
+          "id": "code-and-match-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Check for a charge taken twice.",
+              "sub": "Step 4 · Check for a charge taken twice."
+            },
+            {
+              "say": "Possible duplicates lists two charges to one payee, for the same amount, within thirty days. You decide what to void.",
+              "sub": "Possible duplicates lists two charges to one payee, for the same amount, within 30 days. You decide what to void."
             }
           ]
         }

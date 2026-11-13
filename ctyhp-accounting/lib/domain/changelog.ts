@@ -50,13 +50,13 @@ export const RELEASES: Release[] = [
   {
     version: "3.0.28",
     date: "2026-11-13",
-    headline: "The four guides used most open with a short narrated video, captions on, with a mark where each step starts.",
+    headline: "The six guides used most open with a short narrated video of each step being done, captions on, with a mark where each step starts.",
     changes: [
       {
         kind: "added",
-        title: "A video at the top of four guides",
+        title: "A video at the top of six guides",
         detail:
-          "Invoice a customer and get paid, Give a customer an estimate, Bring bank lines in, and Reconcile an account to a statement each open with a video of a minute or so: the screens of each step in turn, the button to press ringed in orange, read by one voice with English captions you can turn off. Under the video each step is a button that plays from where it starts, and each step below has Play this step. The videos are recorded from the sample company, Meridian Consulting Group, and nothing in them is saved.",
+          "Invoice a customer and get paid, Give a customer an estimate, Record what you owe and pay it, Bring bank lines in, Match and code bank lines, and Reconcile an account to a statement each open with a video of a minute or so. Each step is done on screen: the customer picked, the line typed and the total changing, the menu opened, the report scrolled to its total, the next screen reached from the menu, with the view closing in on what is being done and the button to press ringed in orange. One voice reads it, with English captions you can turn off. Under the video each step is a button that plays from where it starts, and each step below has Play this step. The videos are recorded from the sample company, Meridian Consulting Group, and nothing in them is saved.",
         route: "/guide",
       },
     ],

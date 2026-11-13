@@ -21,6 +21,12 @@
   #vt-cur { position: fixed; left: 0; top: 0; width: 28px; height: 28px; z-index: 2147483647; transform: translate(-60px, -60px);
             transition-property: transform; transition-timing-function: cubic-bezier(.25,.8,.25,1); filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
   :root:has(#vt-card) #vt-cur { display: none; }
+  #vt-cur .vt-file { position: absolute; left: 22px; top: 20px; display: flex; align-items: center; gap: 7px; white-space: nowrap;
+                     padding: 6px 11px 6px 8px; border-radius: 9px; background: #fff; color: ${INK}; font-size: 13px; font-weight: 600;
+                     border: 1px solid #cbd5e1; box-shadow: 0 10px 24px rgba(15,23,42,.28); animation: vt-pop .3s ease-out; }
+  #vt-cur .vt-file i { width: 18px; height: 22px; border-radius: 3px; background: #0f766e; display: block; position: relative; }
+  #vt-cur .vt-file i::after { content: "CSV"; position: absolute; left: 1px; right: 1px; bottom: 3px; font: 700 6.5px/1 "Segoe UI", sans-serif; color: #fff; text-align: center; font-style: normal; }
+  @keyframes vt-pop { from { transform: translateY(6px) scale(.95); opacity: 0 } to { transform: none; opacity: 1 } }
   .vt-ripple { position: fixed; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 3px solid ${RING};
                background: rgba(245,158,11,.18); z-index: 2147483646; animation: vt-ripple .6s ease-out forwards; }
   @keyframes vt-ripple { from { transform: scale(.35); opacity: 1 } to { transform: scale(3); opacity: 0 } }
@@ -154,6 +160,18 @@
     },
     cursor(x, y, ms = 650) {
       placeCursor(x, y, ms);
+    },
+    /** A file the pointer carries, as if dragged from the desktop; null drops it. */
+    carry(name) {
+      cur.querySelector(".vt-file")?.remove();
+      if (!name) return;
+      const chip = document.createElement("div");
+      chip.className = "vt-file";
+      const icon = document.createElement("i");
+      const label = document.createElement("span");
+      label.textContent = name;
+      chip.append(icon, label);
+      cur.appendChild(chip);
     },
     ripple(x, y) {
       const dot = document.createElement("div");
