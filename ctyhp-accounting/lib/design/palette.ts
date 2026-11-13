@@ -161,6 +161,39 @@ export const PALETTE = {
   green900: "#245134",
   // A selected row under the pointer on a dark card, as Ant Design derived it.
   teal680: "#1f6a61",
+
+  /*
+   * Small print that still reads on every light surface (3.0.30): 5.45:1 on a
+   * card, 4.97:1 on the muted header grey. Between slate500, which falls to
+   * 4.4:1 on the page grey, and slate600, the secondary text it sits under.
+   */
+  slate550: "#5b6b7f",
+
+  /*
+   * Ant Design's own preset tag colours, one or two steps darker (light) or
+   * lighter (dark) than the step 7 a preset tag is written in, which on its
+   * own tint read as low as 2.05:1 (3.0.30). The values are Ant Design's
+   * palette steps, so a tag keeps its hue and only gains contrast.
+   */
+  antCyan8: "#006d75",
+  antGreen8: "#237804",
+  antOrange8: "#ad4e00",
+  antVolcano8: "#ad2102",
+  antYellow9: "#876800",
+  antLime9: "#3f6600",
+  antGold9: "#874d00",
+  antPurpleDark8: "#ab7ae0",
+  antGeekblueDark8: "#7f9ef3",
+  // The steps that already read, kept for the theme where they do.
+  antPurple7: "#531dab",
+  antGeekblue7: "#1d39c4",
+  antCyanDark7: "#33bcb7",
+  antGreenDark7: "#6abe39",
+  antOrangeDark7: "#e89a3c",
+  antVolcanoDark7: "#e87040",
+  antYellowDark7: "#e8d639",
+  antLimeDark7: "#a9d134",
+  antGoldDark7: "#e8b339",
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

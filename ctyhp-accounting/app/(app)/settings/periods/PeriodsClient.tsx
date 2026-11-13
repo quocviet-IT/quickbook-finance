@@ -201,7 +201,7 @@ export default function PeriodsClient({
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <Space wrap>
         <span>Fiscal year:</span>
-        <InputNumber value={year} onChange={(v) => setYear((v as number) ?? year)} />
+        <InputNumber aria-label="Fiscal year" value={year} onChange={(v) => setYear((v as number) ?? year)} />
         <Tag>Fiscal year starts month {fiscalStartMonth}</Tag>
         {canGenerate && (
           <Button type="primary" onClick={generate}>
@@ -264,7 +264,7 @@ export default function PeriodsClient({
       />
       <Card title="Closing checklist" size="small">
         <p>Review these controls before closing a period:</p>
-        <ul>
+        <ul className="accounting-link-list">
           <li>
             <Link href="/reports/ar-aging">
               Accounts Receivable aging reconciles to the Accounts Receivable control account

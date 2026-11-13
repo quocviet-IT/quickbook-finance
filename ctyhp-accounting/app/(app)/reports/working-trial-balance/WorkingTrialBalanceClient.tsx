@@ -193,7 +193,7 @@ export default function WorkingTrialBalanceClient({
 
   const body = (r: WorkingTrialBalance) =>
     r.rows.length === 0 ? (
-      <div className={styles.empty}>
+      <div className={`${styles.empty} accounting-prose`}>
         No entries fall in this period.
         <br />
         Add entries on the <Link href="/journal">Journal screen</Link>, or widen the date range.

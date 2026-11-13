@@ -8,6 +8,7 @@ body.print-report .report-print-area {
   --ob-money-zero: #475569;
   --ob-intent-primary: #0f766e;
   --ob-intent-primarySolid: #0f766e;
+  --ob-intent-onPrimary: #ffffff;
   --ob-intent-success: #15803d;
   --ob-intent-warning: #b45309;
   --ob-intent-danger: #b91c1c;
@@ -16,8 +17,8 @@ body.print-report .report-print-area {
   --ob-text-body: #0f172a;
   --ob-text-strong: #334155;
   --ob-text-secondary: #475569;
-  --ob-text-faint: #64748b;
-  --ob-text-caption: #8c8c8c;
+  --ob-text-faint: #5b6b7f;
+  --ob-text-caption: #5b6b7f;
   --ob-text-onDark: #ffffff;
   --ob-surface-page: #f6f7f9;
   --ob-surface-card: #ffffff;
@@ -134,6 +135,15 @@ body.print-report .report-print-area {
   --ob-code-account: #c4b5fd;
   --ob-code-debit: #a7f3d0;
   --ob-code-credit: #f87171;
+  --ob-tag-cyan: #006d75;
+  --ob-tag-green: #237804;
+  --ob-tag-orange: #ad4e00;
+  --ob-tag-volcano: #ad2102;
+  --ob-tag-yellow: #876800;
+  --ob-tag-lime: #3f6600;
+  --ob-tag-gold: #874d00;
+  --ob-tag-purple: #531dab;
+  --ob-tag-geekblue: #1d39c4;
 }
 
 :root[data-theme="dark"] {
@@ -142,6 +152,7 @@ body.print-report .report-print-area {
   --ob-money-zero: #94a3b8;
   --ob-intent-primary: #2dd4bf;
   --ob-intent-primarySolid: #0f766e;
+  --ob-intent-onPrimary: #0a101c;
   --ob-intent-success: #4ade80;
   --ob-intent-warning: #fbbf24;
   --ob-intent-danger: #f87171;
@@ -268,6 +279,15 @@ body.print-report .report-print-area {
   --ob-code-account: #c4b5fd;
   --ob-code-debit: #a7f3d0;
   --ob-code-credit: #f87171;
+  --ob-tag-cyan: #33bcb7;
+  --ob-tag-green: #6abe39;
+  --ob-tag-orange: #e89a3c;
+  --ob-tag-volcano: #e87040;
+  --ob-tag-yellow: #e8d639;
+  --ob-tag-lime: #a9d134;
+  --ob-tag-gold: #e8b339;
+  --ob-tag-purple: #ab7ae0;
+  --ob-tag-geekblue: #7f9ef3;
 }
 
 html,
@@ -315,6 +335,87 @@ html {
 
 a {
   text-decoration: none;
+}
+
+/*
+ * A link inside a sentence is underlined (3.0.30). Its teal was the only
+ * thing telling it from the words around it, and beside secondary text the
+ * two colours are 1.4:1 apart: a reader who does not see the difference saw
+ * no link at all. A link that stands on its own — a name in a table, the
+ * menu, a button — keeps no underline. `:is()` rather than `:where()` so the
+ * rule outweighs Ant Design's own stylesheet, which loads after this one.
+ */
+:is(p, li, dd, .ant-typography, .ant-alert-title, .ant-alert-description, .ant-empty-description, .accounting-secondary-line, .accounting-prose) a:not(.ant-btn) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/*
+ * Something to press is at least 24px tall (3.0.30, WCAG 2.2 target size).
+ * The small link buttons in table cells — Change, Create rule, Count cash —
+ * set `height: auto` on 12px text and came to 19px, side by side. A minimum
+ * height is not undone by that inline height, so they all take it.
+ */
+.ant-btn.ant-btn-variant-link.ant-btn-sm {
+  min-height: 24px;
+}
+
+/*
+ * A preset tag's letters (3.0.30): Ant Design writes `<Tag color="orange">`
+ * in its step 7, which on the tag's own tint read as low as 2:1. Each tag
+ * takes that step from the app's `tag` tokens instead, light and dark. Two
+ * classes, to outweigh the one-class block (`.ob-light`, `.ob-dark`) in which
+ * Ant Design declares its palette on the same element.
+ */
+.ant-tag.ant-tag-cyan {
+  --ant-cyan-7: var(--ob-tag-cyan);
+}
+
+.ant-tag.ant-tag-green {
+  --ant-green-7: var(--ob-tag-green);
+}
+
+.ant-tag.ant-tag-orange {
+  --ant-orange-7: var(--ob-tag-orange);
+}
+
+.ant-tag.ant-tag-volcano {
+  --ant-volcano-7: var(--ob-tag-volcano);
+}
+
+.ant-tag.ant-tag-yellow {
+  --ant-yellow-7: var(--ob-tag-yellow);
+}
+
+.ant-tag.ant-tag-lime {
+  --ant-lime-7: var(--ob-tag-lime);
+}
+
+.ant-tag.ant-tag-gold {
+  --ant-gold-7: var(--ob-tag-gold);
+}
+
+.ant-tag.ant-tag-purple {
+  --ant-purple-7: var(--ob-tag-purple);
+}
+
+.ant-tag.ant-tag-geekblue {
+  --ant-geekblue-7: var(--ob-tag-geekblue);
+}
+
+/* A list of links, one to a line, each tall enough to press (3.0.30). */
+.accounting-link-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.accounting-link-list a {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
 }
 
 /* Financial data reads best with tabular (monospaced-width) figures so digits

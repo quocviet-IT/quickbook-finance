@@ -22,6 +22,7 @@ import {
 
 export interface CategoriseCellProps {
   transactionId: string;
+  lineLabel?: string; // the line's description, naming its pickers for a screen reader (3.0.30)
   status: string;
   /** Every account money may be posted to, for the search. */
   accounts: AccountRow[];
@@ -68,7 +69,7 @@ function WhyTip({ account, why }: { account: string; why: string }) {
  * already in the ledger.
  */
 export default function CategoriseCell({
-  transactionId,
+  transactionId, lineLabel,
   status,
   accounts,
   posting,
@@ -181,7 +182,7 @@ export default function CategoriseCell({
   /** The account search, for posting a waiting line and for recoding one out of Uncategorized. */
   const accountSelect = (list: typeof options, placeholder: string, onPick: (accountId: string) => void) => (
     <Select
-      showSearch
+      showSearch aria-label={`${placeholder.replace(/…$/, "")}${lineLabel ? ` for ${lineLabel}` : ""}`}
       // Fills its column rather than declaring a minimum wider than one. A
       // 240px minimum inside a 150px column does not widen the column — it
       // spills over the Match column beside it, which is the fault a reader
