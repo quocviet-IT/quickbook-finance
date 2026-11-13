@@ -80,11 +80,11 @@ export default function NewVendorButton({
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="Email">
-            <Input type="email" />
+          <Form.Item name="email" label="Email" rules={[{ type: "email", message: "Enter a valid email" }]}>
+            <Input type="email" autoComplete="email" />
           </Form.Item>
           <Form.Item name="phone" label="Phone">
-            <Input />
+            <Input type="tel" autoComplete="tel" />
           </Form.Item>
           <Form.Item
             name="payment_terms"

@@ -148,6 +148,7 @@ export default function ReconcileHistoryClient({ canBringForward, initialRows, t
     if (!offer.action || bringing) return;
     setBringing(true);
     modal.confirm({
+      autoFocusButton: "cancel",
       title: `${offer.action}?`,
       content: bringHistoryForwardConfirmation(offer.entries, date),
       okText: offer.action,

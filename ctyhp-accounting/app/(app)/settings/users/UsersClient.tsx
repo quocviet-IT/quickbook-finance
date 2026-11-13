@@ -72,11 +72,14 @@ export default function UsersClient({
   function promptReason(title: string, content: string, onReason: (reason: string) => Promise<void>) {
     let reason = "";
     modal.confirm({
+      // The reason is what is asked for, so the cursor starts there.
+      autoFocusButton: null,
       title,
       content: (
         <div>
           <Typography.Paragraph type="secondary">{content}</Typography.Paragraph>
           <textarea
+            autoFocus
             aria-label="Reason"
             rows={3}
             style={{ width: "100%" }}

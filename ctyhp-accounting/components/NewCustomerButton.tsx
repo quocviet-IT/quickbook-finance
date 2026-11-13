@@ -58,8 +58,8 @@ export default function NewCustomerButton({
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Enter a name" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="Email">
-            <Input />
+          <Form.Item name="email" label="Email" rules={[{ type: "email", message: "Enter a valid email" }]}>
+            <Input type="email" autoComplete="email" />
           </Form.Item>
         </Form>
       </Modal>
