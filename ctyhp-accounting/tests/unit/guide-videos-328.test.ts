@@ -16,10 +16,10 @@ import { GUIDE_VIDEO_BUCKET, guideVideoObjects } from "@/lib/services/guide-vide
 const ROOT = process.cwd();
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8").replace(/\r\n/g, "\n");
 const withVideo = GUIDE_FLOWS.filter((flow) => flow.video);
-const FIRST = ["get-paid", "quote-a-price", "bank-lines-in", "reconcile-by-hand"];
+const FIRST = ["get-paid", "quote-a-price", "bank-lines-in", "reconcile-by-hand", "pay-suppliers", "code-and-match"];
 
 describe("the guides with a video (3.0.28)", () => {
-  it("starts with the four guides used most", () => {
+  it("starts with the six guides used most", () => {
     expect(withVideo.map((flow) => flow.id)).toEqual(expect.arrayContaining(FIRST));
   });
 
