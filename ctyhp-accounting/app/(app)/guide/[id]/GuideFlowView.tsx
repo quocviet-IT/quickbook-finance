@@ -1,12 +1,15 @@
 "use client";
 
+import { useRef } from "react";
 import { Button, Image as PreviewImage } from "antd";
-import { ArrowRightOutlined, WarningOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined, PlayCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import PageHeader from "@/components/PageHeader";
 import IntentLink from "@/components/IntentLink";
 import type { GuideFlow } from "@/lib/domain/system-guide";
+import { videoChapterLabel } from "@/lib/domain/guide-help";
 import { screenName } from "@/lib/domain/screen-names";
 import { plural } from "@/lib/format";
+import GuideVideo, { type GuideVideoHandle, type GuideVideoSource } from "./GuideVideo";
 
 /** A caution merged from several keeps each one as a paragraph of its own. */
 function paragraphs(text: string): string[] {
@@ -23,18 +26,25 @@ function paragraphs(text: string): string[] {
  * note sits under Details, and a caution's body under its title, in native
  * <details>: open and shut from the keyboard, announced as such, and found by
  * the browser's own Find even while shut.
+ *
+ * A guide with a video (3.0.28) plays it above the steps, and each step can
+ * play from where it starts in it.
  */
 export default function GuideFlowView({
   flow,
   areaTitle,
   from,
+  video,
 }: {
   flow: GuideFlow;
   areaTitle: string;
   /** The screen whose Help link brought the reader here. */
   from: { route: string; screen: string } | null;
+  /** The guide's video with links to play it; null when it has none, or none could be had. */
+  video: GuideVideoSource | null;
 }) {
   const start = screenName(flow.route);
+  const film = useRef<GuideVideoHandle>(null);
   return (
     <div className="guide-page">
       <PageHeader
@@ -45,6 +55,7 @@ export default function GuideFlowView({
           <span className="guide-card__meta">
             <span className="guide-chip">{plural(flow.steps.length, "step")}</span>
             <span className="guide-chip">Starts on {start}</span>
+            {video ? <span className="guide-chip">Video · {videoChapterLabel(video.duration)}</span> : null}
           </span>
         }
         // A plain button: this app keeps primary actions out of the page header
@@ -61,6 +72,8 @@ export default function GuideFlowView({
 
       <div className="guide-flow">
         <div className="guide-flow__main">
+          {video ? <GuideVideo ref={film} flow={flow} video={video} /> : null}
+
           {flow.cautions?.length ? (
             <section className="system-guide__cautions" aria-label="Before you start">
               <strong>
@@ -109,6 +122,16 @@ export default function GuideFlowView({
                       <span className="guide-control">{step.control}</span>
                       {sameAsScreen ? null : <span>on {screen}</span>}
                       {here ? <span className="guide-here-tag">You were here</span> : null}
+                      {video ? (
+                        <button
+                          type="button"
+                          className="guide-play-step"
+                          aria-label={`Play this step in the video, from ${videoChapterLabel(video.chapters[index] ?? 0)}`}
+                          onClick={() => film.current?.playFrom(index)}
+                        >
+                          <PlayCircleOutlined /> Play this step · {videoChapterLabel(video.chapters[index] ?? 0)}
+                        </button>
+                      ) : null}
                       {step.route ? (
                         // "Go to", not "Open": a screen called Open Invoices read "Open Open Invoices".
                         <IntentLink href={step.route} className="guide-route">

@@ -1,11 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { GUIDE_AREAS } from "@/lib/domain/system-guide";
 import { guideFlowById, guideLanding, retiredGuideTarget } from "@/lib/domain/guide-help";
+import { createSupabaseServerClient } from "@/lib/db/server";
+import { guideVideoLinks } from "@/lib/services/guide-videos";
 import GuideFlowView from "./GuideFlowView";
 
 /**
  * One workflow, on a page of its own (3.0.17). Only this workflow is handed to
- * the browser; the list of all of them stays on /guide.
+ * the browser; the list of all of them stays on /guide. A guide with a video
+ * (3.0.28) is handed short-lived links to it, asked for here as the reader.
  */
 export default async function GuideFlowPage({
   params,
@@ -24,11 +27,13 @@ export default async function GuideFlowPage({
   }
   const from = typeof query.from === "string" ? guideLanding(query.from) : null;
   const area = GUIDE_AREAS.find((candidate) => candidate.id === flow.area);
+  const links = flow.video ? await guideVideoLinks(await createSupabaseServerClient(), flow.video) : null;
   return (
     <GuideFlowView
       flow={flow}
       areaTitle={area?.title ?? "Guide"}
       from={from?.route ? { route: from.route, screen: from.screen ?? "" } : null}
+      video={flow.video && links ? { ...flow.video, ...links } : null}
     />
   );
 }

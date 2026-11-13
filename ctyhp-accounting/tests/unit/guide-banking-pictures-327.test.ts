@@ -40,11 +40,16 @@ describe("Banking's steps have pictures (3.0.27)", () => {
   });
 
   it("makes up the sample company's statements in the script, never reading a real one", () => {
-    const script = read("scripts", "capture-step-shots.mjs");
     // Statements are built in memory from the sample company's own entries and
-    // handed to the file chooser; no statement file is read from disk.
-    expect(script).toMatch(/function statementCsv\(/);
-    expect(script).not.toMatch(/readFileSync\([^)]*\.(csv|pdf|ofx|qfx|qbo|qif)/i);
+    // handed to the file chooser; no statement file is read from disk. Since
+    // 3.0.28 they sit in a module the guide videos share.
+    const statements = read("scripts", "guide-statements.mjs");
+    expect(statements).toMatch(/function statementCsv\(/);
+    const script = read("scripts", "capture-step-shots.mjs");
+    expect(script).toMatch(/from "\.\/guide-statements\.mjs"/);
+    for (const source of [statements, script]) {
+      expect(source).not.toMatch(/readFileSync\([^)]*\.(csv|pdf|ofx|qfx|qbo|qif)/i);
+    }
   });
 });
 

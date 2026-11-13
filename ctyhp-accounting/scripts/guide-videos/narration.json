@@ -1,0 +1,532 @@
+{
+  "about": "What each guide video says, one beat per step plus an opening. `say` is what the voice reads (numbers and short forms spelled the way they should sound); `sub` is the caption, as the screen prints it. tts.py speaks each line on its own; record.mjs holds each beat on screen while its lines are read.",
+  "guides": {
+    "get-paid": {
+      "card": {
+        "title": "Invoice a customer and get paid",
+        "purpose": "Bill a customer for work, then record the money when it arrives, so the receivable clears itself.",
+        "steps": [
+          "Create the invoice",
+          "Send it to the ledger",
+          "Give the customer a copy",
+          "Record the money received",
+          "Check what is still outstanding",
+          "List open invoices and customer balances",
+          "Forecast the next thirteen weeks of cash"
+        ]
+      },
+      "beats": [
+        {
+          "id": "get-paid-intro",
+          "lines": [
+            {
+              "say": "Invoice a customer, and get paid.",
+              "sub": "Invoice a customer and get paid."
+            },
+            {
+              "say": "Bill a customer for the work, then record the money when it arrives, and the receivable clears itself.",
+              "sub": "Bill a customer for the work, then record the money when it arrives, and the receivable clears itself."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. Create the invoice.",
+              "sub": "Step 1 · Create the invoice."
+            },
+            {
+              "say": "Add a line for each item, then press Save draft. A draft posts nothing.",
+              "sub": "Add a line for each item, then press Save draft. A draft posts nothing."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Send it to the ledger.",
+              "sub": "Step 2 · Send it to the ledger."
+            },
+            {
+              "say": "Press Issue, on the draft's row. The invoice gets its number, and posts.",
+              "sub": "Press Issue on the draft's row. The invoice gets its number and posts."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Give the customer a copy.",
+              "sub": "Step 3 · Give the customer a copy."
+            },
+            {
+              "say": "Download P D F prints the issued invoice. A draft prints marked, draft.",
+              "sub": "Download PDF prints the issued invoice. A draft prints marked DRAFT."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Record the money received.",
+              "sub": "Step 4 · Record the money received."
+            },
+            {
+              "say": "Receive payment, and apply it to one or more of the customer's open invoices.",
+              "sub": "Receive payment, and apply it to one or more of the customer's open invoices."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-5",
+          "step": 5,
+          "lines": [
+            {
+              "say": "Step five. Check what is still outstanding.",
+              "sub": "Step 5 · Check what is still outstanding."
+            },
+            {
+              "say": "Accounts Receivable Aging shows what each customer owes, by how overdue it is.",
+              "sub": "Accounts Receivable Aging shows what each customer owes, by how overdue it is."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-6",
+          "step": 6,
+          "lines": [
+            {
+              "say": "Step six. List open invoices, and customer balances.",
+              "sub": "Step 6 · List open invoices and customer balances."
+            },
+            {
+              "say": "Both reports end on the aging total, and say whether it agrees with receivables.",
+              "sub": "Both reports end on the A/R Aging total, and say whether it agrees with receivables."
+            }
+          ]
+        },
+        {
+          "id": "get-paid-7",
+          "step": 7,
+          "lines": [
+            {
+              "say": "Step seven. Forecast the next thirteen weeks of cash.",
+              "sub": "Step 7 · Forecast the next 13 weeks of cash."
+            },
+            {
+              "say": "Today's cash, plus what customers owe, less what you owe suppliers, week by week.",
+              "sub": "Today's cash, plus what customers owe, less what you owe suppliers, week by week."
+            }
+          ]
+        }
+      ]
+    },
+    "quote-a-price": {
+      "card": {
+        "title": "Give a customer an estimate and turn it into an invoice",
+        "purpose": "Promise a price before the sale, then turn it into an invoice when the customer says yes.",
+        "steps": [
+          "Write the estimate",
+          "Give the customer a copy",
+          "Record a no",
+          "Turn a yes into an invoice",
+          "Create the draft",
+          "Issue the invoice",
+          "If the sale falls through after all"
+        ]
+      },
+      "beats": [
+        {
+          "id": "quote-a-price-intro",
+          "lines": [
+            {
+              "say": "Give a customer an estimate, and turn it into an invoice.",
+              "sub": "Give a customer an estimate and turn it into an invoice."
+            },
+            {
+              "say": "Promise a price before the sale, then invoice it when the customer says yes.",
+              "sub": "Promise a price before the sale, then invoice it when the customer says yes."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. Write the estimate.",
+              "sub": "Step 1 · Write the estimate."
+            },
+            {
+              "say": "Its lines work as on an invoice. Saving gives it a number, and posts nothing.",
+              "sub": "Its lines work as on an invoice. Saving gives it a number and posts nothing."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Give the customer a copy.",
+              "sub": "Step 2 · Give the customer a copy."
+            },
+            {
+              "say": "It prints as a quotation, with a valid-until date, and nothing owed.",
+              "sub": "It prints as a quotation, with Valid until and nothing owed."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Record a no.",
+              "sub": "Step 3 · Record a no."
+            },
+            {
+              "say": "Mark it declined. Reopen brings it back, if the customer changes their mind.",
+              "sub": "Mark declined. Reopen brings it back if the customer changes their mind."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Turn a yes into an invoice.",
+              "sub": "Step 4 · Turn a yes into an invoice."
+            },
+            {
+              "say": "This opens a new invoice, with the customer and the lines already filled in.",
+              "sub": "This opens New invoice, with the customer and the lines already filled in."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-5",
+          "step": 5,
+          "lines": [
+            {
+              "say": "Step five. Create the draft.",
+              "sub": "Step 5 · Create the draft."
+            },
+            {
+              "say": "Press Save draft. The estimate now reads converted, and locks. The draft posts nothing yet.",
+              "sub": "Press Save draft. The estimate now reads Converted and locks. The draft posts nothing yet."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-6",
+          "step": 6,
+          "lines": [
+            {
+              "say": "Step six. Issue the invoice.",
+              "sub": "Step 6 · Issue the invoice."
+            },
+            {
+              "say": "It posts like any other invoice. The estimate itself never posts.",
+              "sub": "It posts like any other invoice. The estimate itself never posts."
+            }
+          ]
+        },
+        {
+          "id": "quote-a-price-7",
+          "step": 7,
+          "lines": [
+            {
+              "say": "Step seven. If the sale falls through, after all.",
+              "sub": "Step 7 · If the sale falls through after all."
+            },
+            {
+              "say": "Voiding that invoice opens the estimate again, to reuse it, or to decline it.",
+              "sub": "Voiding that invoice opens the estimate again, to reuse or decline."
+            }
+          ]
+        }
+      ]
+    },
+    "bank-lines-in": {
+      "card": {
+        "title": "Bring bank lines in",
+        "purpose": "Load a statement or a bank feed, and make sure what comes in adds up.",
+        "steps": [
+          "Bring in the statement",
+          "Check that the statement adds up",
+          "Make a statement add up",
+          "Import a statement that does not add up",
+          "Take back a bank-feed sync",
+          "Disconnect a bank feed"
+        ]
+      },
+      "beats": [
+        {
+          "id": "bank-lines-in-intro",
+          "lines": [
+            {
+              "say": "Bring bank lines in.",
+              "sub": "Bring bank lines in."
+            },
+            {
+              "say": "Load a statement, or a bank feed, and make sure what comes in adds up.",
+              "sub": "Load a statement or a bank feed, and make sure what comes in adds up."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. Bring in the statement.",
+              "sub": "Step 1 · Bring in the statement."
+            },
+            {
+              "say": "Import statement takes a P D F, C S V, O F X, Q F X, Q B O, or Q I F file. A line that is already in, is skipped.",
+              "sub": "Import statement takes a PDF, CSV, OFX, QFX, QBO or QIF file. A line already in is skipped."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Check that the statement adds up.",
+              "sub": "Step 2 · Check that the statement adds up."
+            },
+            {
+              "say": "The opening balance, plus the lines, must reach the closing balance, to the cent, before you import.",
+              "sub": "The opening balance plus the lines must reach the closing balance, to the cent, before you import."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Make a statement add up.",
+              "sub": "Step 3 · Make a statement add up."
+            },
+            {
+              "say": "Tick, Not a transaction, beside a line that was misread, or type a balance the file does not print.",
+              "sub": "Tick Not a transaction beside a line that was misread, or type a balance the file does not print."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Import a statement that does not add up.",
+              "sub": "Step 4 · Import a statement that does not add up."
+            },
+            {
+              "say": "Only an administrator can, with Import anyway, and a reason that is kept in the audit log.",
+              "sub": "Only an administrator can, with Import anyway and a reason that is kept in the audit log."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-5",
+          "step": 5,
+          "lines": [
+            {
+              "say": "Step five. Take back a bank feed sync.",
+              "sub": "Step 5 · Take back a bank-feed sync."
+            },
+            {
+              "say": "Under Bank feed syncs, Undo takes back the newest sync that brought lines in, with a reason.",
+              "sub": "Under Bank feed syncs, Undo takes back the newest sync that brought lines in, with a reason."
+            }
+          ]
+        },
+        {
+          "id": "bank-lines-in-6",
+          "step": 6,
+          "lines": [
+            {
+              "say": "Step six. Disconnect a bank feed.",
+              "sub": "Step 6 · Disconnect a bank feed."
+            },
+            {
+              "say": "This removes the connection at Plaid. The lines already brought in, stay.",
+              "sub": "This removes the connection at Plaid. The lines already brought in stay."
+            }
+          ]
+        }
+      ]
+    },
+    "reconcile-by-hand": {
+      "card": {
+        "title": "Reconcile an account to a statement",
+        "purpose": "Agree a bank account with one statement, line by line, until nothing is left to explain.",
+        "steps": [
+          "See how far each account is reconciled",
+          "Reconcile to a statement balance",
+          "Read the difference",
+          "Set aside a misread statement line",
+          "Add the lines the books are missing",
+          "Add a line held back from the others",
+          "Start a reconciliation again",
+          "View the statement file",
+          "Attach the statement"
+        ]
+      },
+      "beats": [
+        {
+          "id": "reconcile-by-hand-intro",
+          "lines": [
+            {
+              "say": "Reconcile an account to a statement.",
+              "sub": "Reconcile an account to a statement."
+            },
+            {
+              "say": "Agree a bank account with one statement, line by line, until nothing is left to explain.",
+              "sub": "Agree a bank account with one statement, line by line, until nothing is left to explain."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-1",
+          "step": 1,
+          "lines": [
+            {
+              "say": "Step one. See how far each account is reconciled.",
+              "sub": "Step 1 · See how far each account is reconciled."
+            },
+            {
+              "say": "Each account shows the last statement it agreed with, colored by its age: green, amber, or red.",
+              "sub": "Each account shows the last statement it agreed with, colored by its age: green, amber or red."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-2",
+          "step": 2,
+          "lines": [
+            {
+              "say": "Step two. Reconcile to a statement balance.",
+              "sub": "Step 2 · Reconcile to a statement balance."
+            },
+            {
+              "say": "Start a new reconciliation. Complete needs a difference of zero, or an adjustment somebody signs for.",
+              "sub": "Start a New reconciliation. Complete needs a difference of zero, or an adjustment somebody signs for."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-3",
+          "step": 3,
+          "lines": [
+            {
+              "say": "Step three. Read the difference.",
+              "sub": "Step 3 · Read the difference."
+            },
+            {
+              "say": "It is shown in its parts. When one line is the size of what is left, it is named. Check that one first.",
+              "sub": "It is shown in its parts. When one line is the size of what is left, it is named: check that one first."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-4",
+          "step": 4,
+          "lines": [
+            {
+              "say": "Step four. Set aside a misread statement line.",
+              "sub": "Step 4 · Set aside a misread statement line."
+            },
+            {
+              "say": "Not a transaction leaves it out of the difference. Restore brings it back.",
+              "sub": "Not a transaction leaves it out of the difference. Restore brings it back."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-5",
+          "step": 5,
+          "lines": [
+            {
+              "say": "Step five. Add the lines the books are missing.",
+              "sub": "Step 5 · Add the lines the books are missing."
+            },
+            {
+              "say": "Choose each line's account, then add them. Each one posts an entry, already ticked.",
+              "sub": "Choose each line's account, then add them. Each one posts an entry, already ticked."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-6",
+          "step": 6,
+          "lines": [
+            {
+              "say": "Step six. Add a line held back from the others.",
+              "sub": "Step 6 · Add a line held back from the others."
+            },
+            {
+              "say": "A line that looks extra, or already booked, waits for you. Add anyway posts that one alone.",
+              "sub": "A line that looks extra, or already booked, waits for you. Add anyway posts that one alone."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-7",
+          "step": 7,
+          "lines": [
+            {
+              "say": "Step seven. Start a reconciliation again.",
+              "sub": "Step 7 · Start a reconciliation again."
+            },
+            {
+              "say": "Discard removes the reconciliation, and its ticks. The statement file and the entries stay.",
+              "sub": "Discard removes the reconciliation and its ticks. The statement file and the entries stay."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-8",
+          "step": 8,
+          "lines": [
+            {
+              "say": "Step eight. View the statement file.",
+              "sub": "Step 8 · View the statement file."
+            },
+            {
+              "say": "The statement, just as the bank gave it, shown inside One Book.",
+              "sub": "The statement, just as the bank gave it, shown inside OneBook."
+            }
+          ]
+        },
+        {
+          "id": "reconcile-by-hand-9",
+          "step": 9,
+          "lines": [
+            {
+              "say": "Step nine. Attach the statement.",
+              "sub": "Step 9 · Attach the statement."
+            },
+            {
+              "say": "An older reconciliation with no file takes one here, if it matches its figures.",
+              "sub": "An older reconciliation with no file takes one here, if it matches its figures."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

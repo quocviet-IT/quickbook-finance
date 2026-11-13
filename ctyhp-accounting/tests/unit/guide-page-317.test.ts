@@ -106,7 +106,9 @@ describe("what the guide pages say (3.0.17)", () => {
       expect(meta.join(" "), flow.id).not.toMatch(/\//);
       expect(meta[0]).toMatch(/^\d+ steps?$/);
     }
-    expect(guideCardMeta(GUIDE_FLOWS.find((flow) => flow.id === "get-paid")!)).toEqual(["7 steps", "Starts on Invoices"]);
+    // Since 3.0.28 a guide with a video says so, and how long it runs.
+    expect(guideCardMeta(GUIDE_FLOWS.find((flow) => flow.id === "get-paid")!)).toEqual(["7 steps", "Starts on Invoices", "Video · 1:09"]);
+    expect(guideCardMeta(GUIDE_FLOWS.find((flow) => flow.id === "pay-suppliers")!)).toEqual(["6 steps", "Starts on Bills"]);
   });
 
   it("says where each step happens", () => {

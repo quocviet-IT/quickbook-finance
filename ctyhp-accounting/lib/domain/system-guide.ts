@@ -88,6 +88,23 @@ export const GUIDE_AREAS: readonly GuideArea[] = [
   { id: "controls", title: "Controls & support", blurb: "Who may do what, and how to tell us something is wrong." },
 ];
 
+/**
+ * A guide's narrated video (3.0.28): recorded from the sample company by
+ * scripts/guide-videos and kept in Supabase Storage, not in the repo.
+ */
+export interface GuideVideo {
+  /**
+   * Its name in the bucket, without an extension: `<name>.mp4` and its English
+   * captions `<name>.en.vtt`. The guide's id and the release it was recorded
+   * for, so a new take is a new file and never one a browser has cached.
+   */
+  name: string;
+  /** Its length, in seconds. */
+  duration: number;
+  /** Where each step starts, in seconds: one per step, in order. */
+  chapters: number[];
+}
+
 export interface GuideFlow {
   id: string;
   /** The heading it is listed under (2.51). */
@@ -100,6 +117,8 @@ export interface GuideFlow {
   /** Read before step one. */
   cautions?: GuideCaution[];
   steps: GuideStep[];
+  /** A narrated video of the whole guide (3.0.28), for the guides used most. */
+  video?: GuideVideo;
 }
 
 import { APP_VERSION } from "./changelog";
@@ -198,6 +217,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
       "Bill a customer for work, then record the money when it arrives, so the " +
       "receivable clears itself.",
     route: "/invoices",
+    video: { name: "get-paid-3.0.28", duration: 69.1, chapters: [8.6, 16.3, 24.1, 32.4, 40.5, 49.5, 59.3] },
     steps: [
       {
         action: "Create the invoice",
@@ -274,6 +294,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Give a customer an estimate and turn it into an invoice",
     purpose: "Promise a price before the sale, then turn it into an invoice when the customer says yes.",
     route: "/estimates",
+    video: { name: "quote-a-price-3.0.28", duration: 65.7, chapters: [9, 16.7, 24.3, 31.4, 39.3, 48.2, 56] },
     steps: [
       {
         action: "Write the estimate",
@@ -658,6 +679,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Bring bank lines in",
     purpose: "Load a statement or a bank feed, and make sure what comes in adds up.",
     route: "/banking",
+    video: { name: "bank-lines-in-3.0.28", duration: 66.4, chapters: [7.8, 20.7, 30, 39.4, 49.3, 58.9] },
     steps: [
       {
         action: "Bring in the statement",
@@ -853,6 +875,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
     title: "Reconcile an account to a statement",
     purpose: "Agree a bank account with one statement, line by line, until nothing is left to explain.",
     route: "/banking/reconcile",
+    video: { name: "reconcile-by-hand-3.0.28", duration: 92.3, chapters: [9.1, 19.8, 30.5, 40, 47.9, 56.9, 66.6, 76.7, 84.3] },
     steps: [
       {
         action: "See how far each account is reconciled",

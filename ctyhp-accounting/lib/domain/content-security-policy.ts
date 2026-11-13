@@ -20,6 +20,8 @@
  *                              and the uploads the browser makes itself
  *                              (attachments, feedback, statement files);
  *                              Plaid Link; data:/blob: for the screenshot.
+ *   media-src                  the guide's videos and their captions (3.0.28),
+ *                              played from a short-lived Supabase Storage link.
  *   frame-src                  Plaid Link opens in a frame from its CDN.
  *   worker-src 'self' blob:    the pdf.js worker; a blob worker as fallback.
  *   frame-ancestors 'none'     no page is meant to be framed (as X-Frame-Options).
@@ -65,6 +67,8 @@ export function contentSecurityPolicy({ nonce, supabaseUrl, development }: Polic
     ["img-src", ["'self'", "data:", "blob:"]],
     ["font-src", ["'self'", "data:"]],
     ["connect-src", ["'self'", ...supabaseOrigins(supabaseUrl), PLAID_API, "data:", "blob:"]],
+    // Only the https origin: a film is never streamed over the websocket.
+    ["media-src", ["'self'", ...supabaseOrigins(supabaseUrl).slice(0, 1)]],
     ["frame-src", [PLAID_SCRIPT]],
     ["worker-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],
