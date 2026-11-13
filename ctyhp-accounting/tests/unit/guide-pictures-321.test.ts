@@ -18,8 +18,8 @@ const steps = GUIDE_FLOWS.flatMap((flow) =>
   flow.steps.map((step, index) => ({ flow, step, label: `${flow.id} step ${index + 1}` })),
 );
 
-/** Steps still without a picture, all of them Banking's. Only ever goes down, to zero once Banking has its pictures. */
-const WAITING_FOR_BANK_DATA = 30;
+/** Steps still without a picture. Only ever goes down: zero since 3.0.27, when Banking's thirty got theirs. */
+const WAITING_FOR_BANK_DATA = 0;
 
 describe("a picture for every step (3.0.21)", () => {
   it("gives every step outside Banking a picture", () => {

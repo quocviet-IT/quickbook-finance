@@ -671,6 +671,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Bank Transactions from another source — made from the books, from a bank feed or from another file — " +
           "is listed apart and skipped; tick it to import it as well. The same dialog imports a statement into " +
           "a reconciliation.",
+        screenshot: { src: "/guide/steps/bank-lines-in-1.webp", alt: "Banking's Import statement button, ringed in orange" },
       },
       {
         action: "Check that the statement adds up",
@@ -687,6 +688,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "and a check image or a summary table can be misread. A scanned PDF or a photo of a statement has no " +
           "text of its own: choose Read with OCR and your company's OCR server reads it, then check the lines " +
           "against the statement before importing.",
+        screenshot: { src: "/guide/steps/bank-lines-in-2.webp", alt: "The import dialog's check that the opening and the lines reach the closing balance, ringed in orange" },
       },
       {
         action: "Make a statement add up",
@@ -700,6 +702,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "statement. When the account's last completed reconciliation closed the day before the statement " +
           "starts, its closing is taken as the opening; when the statement's first day is not known, Use $X " +
           "takes it. A balance is never taken from the books.",
+        screenshot: { src: "/guide/steps/bank-lines-in-3.webp", alt: "The import dialog's Not a transaction tick box beside each line, ringed in orange" },
       },
       {
         action: "Import a statement that does not add up",
@@ -712,6 +715,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "with the import and in the audit log. Everyone else reads that an administrator can import it " +
           "anyway. A statement missing a balance cannot be imported anyway, and one that does not add up is " +
           "never attached to a reconciliation.",
+        screenshot: { src: "/guide/steps/bank-lines-in-4.webp", alt: "A statement out by $4,200.00, with its Import anyway… button ringed in orange" },
       },
       {
         action: "Take back a bank-feed sync",
@@ -724,6 +728,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "sync is held while a line it added is matched, coded or ignored. The next sync does not bring the lines " +
           "back; to fetch them again, disconnect the bank and connect it again. A sync that failed part-way is the " +
           "exception: the next sync fetches its changes again. Undo asks for a reason.",
+        screenshot: { src: "/guide/steps/bank-lines-in-5.webp", alt: "The Undo button of the newest sync that brought lines in, under Bank feed syncs, ringed in orange" },
       },
       {
         action: "Disconnect a bank feed",
@@ -734,6 +739,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Removes the connection at Plaid, then here. The lines already in Bank Transactions stay, and the account " +
           "can be connected again. If Plaid does not confirm the removal, nothing changes unless you tick " +
           "Disconnect in OneBook only. Disconnect asks for a reason.",
+        screenshot: { src: "/guide/steps/bank-lines-in-6.webp", alt: "The Disconnect link beside a connected bank feed, ringed in orange" },
       },
     ],
   },
@@ -748,6 +754,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         action: "Match lines to the ledger",
         summary: "Approve a one-to-one suggestion in the Match column; until then nothing changes.",
         control: "Approve",
+        screenshot: { src: "/guide/steps/code-and-match-1.webp", alt: "A suggested match's Approve button in the Match column, ringed in orange" },
       },
       {
         action: "Code a line the books do not hold",
@@ -761,6 +768,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "one posts the line: the bank on one side, that account on the other, and the line " +
           "becomes matched. A line already in the books shows the account its entry posted to " +
           "instead of asking again, and Change voids the entry and hands the line back.",
+        screenshot: { src: "/guide/steps/code-and-match-2.webp", alt: "A waiting line's Category box, Find account, ringed in orange" },
       },
       {
         action: "Move a coded line to another account",
@@ -774,6 +782,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "reconciliation it is in, stay as they were. Undo recode takes it back, in a signed-off month too. A line in a " +
           "signed-off month cannot be taken back with Change: recode it instead. A recoded line offers Undo recode, not " +
           "Change. A line split across accounts is corrected with a journal entry.",
+        screenshot: { src: "/guide/steps/code-and-match-3.webp", alt: "A coded line's Recode link in the Category column, ringed in orange" },
       },
       {
         action: "Check for a charge taken twice",
@@ -787,6 +796,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "opens the entry; void it yourself if the bank took the money twice, since nothing is removed for you. Dismiss " +
           "asks for a reason and the pair is not offered again. A line on a completed reconciliation is never the one " +
           "offered for review.",
+        screenshot: { src: "/guide/steps/code-and-match-4.webp", alt: "The Banking overview's Possible duplicates filter, ringed in orange" },
       },
     ],
   },
@@ -808,6 +818,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Add loan, with the words your bank prints for its payments or its last four digits, and " +
           "such a line is offered as a card or loan payment before any rule or history. A line two " +
           "entries claim gets no suggestion.",
+        screenshot: { src: "/guide/steps/cards-loans-companies-1.webp", alt: "The Add card button on Banking › Rules, ringed in orange" },
       },
       {
         action: "Post a loan payment as principal and interest",
@@ -819,6 +830,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "or its fixed amount — shown with how it was reached. Change it to the lender's figure; the " +
           "principal is what is left. One entry posts the principal to the loan, the interest to its " +
           "expense account and the payment from the bank, and Change takes it back.",
+        screenshot: { src: "/guide/steps/cards-loans-companies-2.webp", alt: "A loan payment's Split… link in the Category column, ringed in orange" },
       },
       {
         action: "Tell OneBook which companies are your own",
@@ -831,6 +843,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "carries what it owes or is owed; a line naming it, in or out, is offered to that account before any " +
           "rule or history. The table shows who owes whom today. The other company's books are not written — " +
           "record its side there.",
+        screenshot: { src: "/guide/steps/cards-loans-companies-3.webp", alt: "The Add related company button on Banking › Rules, ringed in orange" },
       },
     ],
   },
@@ -854,6 +867,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "says how many entries are waiting on a statement: start with the oldest statement you have. When an entry " +
           "ticked on a completed reconciliation is voided afterwards, the line says the reconciliation no longer " +
           "agrees, and Exceptions lists it under Reconciliations that no longer agree.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-1.webp", alt: "The chosen account's reconciliation standing on Reconcile, ringed in orange" },
       },
       {
         action: "Reconcile to a statement balance",
@@ -868,6 +882,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "it: tick the one the bank paid. Complete then matches, in Bank Transactions, each bank line to the " +
           "book line its statement line paired with; a bank line already matched to another entry, ignored, or " +
           "of the opposite sign is left as it was, and the message says how many to check there.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-2.webp", alt: "Reconcile's New reconciliation button, ringed in orange" },
       },
       {
         action: "Read the difference",
@@ -879,6 +894,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "from the statement's opening; On the statement, not in the books; Ticked here, not on the statement; " +
           "and Left to explain. When exactly one line is the size of what is left, it is named: check that one " +
           "first.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-3.webp", alt: "Left to explain, in the reconciliation's difference explained, ringed in orange" },
       },
       {
         action: "Set aside a misread statement line",
@@ -889,6 +905,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "Beside a statement line the books do not have — a line the PDF was misread into. It leaves the line out " +
           "of Add missing lines and out of the difference; its line stays in Bank Transactions, to exclude there " +
           "if it is not real. Restore brings it back. A line paired with the books cannot be set aside.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-4.webp", alt: "A statement line's Not a transaction link, ringed in orange" },
       },
       {
         action: "Add the lines the books are missing",
@@ -902,6 +919,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "button posts one entry for each line with an account, dated as the bank has it, then pairs and ticks " +
           "them; Complete stays yours. Or code them one by one in Bank Transactions and click Match again; no tick " +
           "is ever removed.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-5.webp", alt: "The button that adds the lines the books are missing, ringed in orange" },
       },
       {
         action: "Add a line held back from the others",
@@ -915,6 +933,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "amount the books already hold, with the same check number or within the matching window, names the " +
           "entry it looks like. Choose its account, and Add anyway posts that one line alone, because two " +
           "identical lines on one day can both be real.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-6.webp", alt: "A held-back line's Add anyway button, ringed in orange" },
       },
       {
         action: "Start a reconciliation again",
@@ -925,6 +944,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "For a reconciliation in progress. It asks for a reason, removes the reconciliation, its ticks and the statement lines kept " +
           "with it, and returns to Reconcile. The statement file and its bank lines stay, and any entries added to the books " +
           "from it stay in the books. A reconciliation that posted an adjustment cannot be discarded.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-7.webp", alt: "The Discard this reconciliation button, ringed in orange" },
       },
       {
         action: "View the statement file",
@@ -936,6 +956,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "A reconciliation shows Statement file with View and Download, and its report names the file and the " +
           "first 12 characters of its SHA-256. View shows it inside OneBook — a PDF drawn page by page, a CSV as " +
           "a table, a bank download as text — without the browser ever opening the file.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-8.webp", alt: "The statement file's View link, ringed in orange" },
       },
       {
         action: "Attach the statement",
@@ -948,6 +969,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "statement: the same closing balance and, when it kept the statement's lines, the same lines, those " +
           "ticked Not a transaction left out on both sides. Otherwise nothing " +
           "is kept and the message says what differs; the reconciliation's figures never change.",
+        screenshot: { src: "/guide/steps/reconcile-by-hand-9.webp", alt: "Attach the statement, beside No statement file, ringed in orange" },
       },
     ],
   },
@@ -974,6 +996,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "finish. On an account never reconciled, the earlier lines are brought forward first when the books " +
           "agree with the first statement's opening balance. Each month signed matches its bank lines in Bank " +
           "Transactions, as Complete does.",
+        screenshot: { src: "/guide/steps/reconcile-from-files-1.webp", alt: "Reconcile's From statement files button, ringed in orange" },
       },
       {
         action: "Bring an account's history forward",
@@ -987,6 +1010,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "off in one brought-forward reconciliation and starts this one at the statement's opening. Nothing is " +
           "posted. Otherwise it says how much the books are out by. It needs the statement file kept with the " +
           "reconciliation.",
+        screenshot: { src: "/guide/steps/reconcile-from-files-2.webp", alt: "The Bring the history forward button on an account never reconciled, ringed in orange" },
       },
       {
         action: "See every account's unreconciled lines",
@@ -1001,6 +1025,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "When they match, Bring forward N entries signs them off and posts nothing; when they do not, the page " +
           "says how much they are out by. A reconciliation in progress that ends on or before the date must be " +
           "finished or discarded first.",
+        screenshot: { src: "/guide/steps/reconcile-from-files-3.webp", alt: "Reconcile's Reconcile history link, ringed in orange" },
       },
     ],
   },
@@ -1022,6 +1047,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "not payments: a statement's Balance column read as amounts, because a real payment does not track the " +
           "balance of the account it is paid from. Show me the workings lists each entry beside what the account " +
           "came to that day with the group taken out, and the difference; click a date to see the entry.",
+        screenshot: { src: "/guide/steps/check-reconciliations-1.webp", alt: "The Show me the workings button on a card of entries that look like the balance, ringed in orange" },
       },
       {
         action: "Remove a balance posted as payments",
@@ -1038,6 +1064,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "period), one already reversed, or one that belongs to a document such as an invoice, bill or payment " +
           "(void the document). Needs the Post manual journals permission, and Delete bank lines when an entry " +
           "was coded from Bank Transactions.",
+        screenshot: { src: "/guide/steps/check-reconciliations-2.webp", alt: "The card's Remove these 3 entries button, ringed in orange" },
       },
       {
         action: "See what drags an account below zero",
@@ -1052,11 +1079,13 @@ export const GUIDE_FLOWS: GuideFlow[] = [
           "card lists the largest payments not yet on a statement; reconcile the next statement and whatever the " +
           "bank has never seen is left standing on its own. An account nobody has reconciled is flagged only while " +
           "it is below zero now.",
+        screenshot: { src: "/guide/steps/check-reconciliations-3.webp", alt: "The payments not yet on a statement, under an account that reads below zero, ringed in orange" },
       },
       {
         action: "Reopen a completed reconciliation",
         summary: "Needs permission and a reason, and the reopen is audited.",
         control: "Reopen",
+        screenshot: { src: "/guide/steps/check-reconciliations-4.webp", alt: "A completed reconciliation's Reopen button, ringed in orange" },
       },
       {
         action: "Check that signed-off reconciliations still agree",
@@ -1066,6 +1095,7 @@ export const GUIDE_FLOWS: GuideFlow[] = [
         note:
           "A reconciliation stops agreeing when an entry it ticked is voided. The report says which ones, by how " +
           "much, and opens each.",
+        screenshot: { src: "/guide/steps/check-reconciliations-5.webp", alt: "The Reconciliation Report's title, ringed in orange" },
       },
     ],
   },

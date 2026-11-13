@@ -24,6 +24,19 @@
  *   are never written to disk.
  * - The bar across the top of the page, which carries the signed-in email, is
  *   left out of every frame but one, and that one is cropped to its left end.
+ *
+ * Banking (3.0.27): its steps need bank accounts, statements and reconciliations
+ * in a given state. `ensureBanking` makes them in Meridian through Banking's own
+ * screens, from statements made up in this file to agree with Meridian's books
+ * (`statementCsv`); each month opens where the one before closed. The bank feed
+ * comes from Plaid's test service, which only the deployed app has set up, so
+ * run Banking against it:
+ *
+ *   npm run guide:step-shots -- https://ctyhp-accounting.vercel.app --only=bank-lines-in
+ *
+ * Three pictures need a statement's balance posted as payments on Checking:
+ * the three entries are posted just before them and removed right after with
+ * Reconcile's own Remove these entries, which reverses each on its date.
  */
 
 import { mkdirSync } from "node:fs";
@@ -203,11 +216,11 @@ async function open(route) {
   await page.addStyleTag({ content: ".assistant-launcher, nextjs-portal { visibility: hidden !important; }" });
 }
 
-/** An Ant Design select: open it, type, and choose the option that reads `text`. */
-async function pick(field, text) {
+/** An Ant Design select: open it, type, and choose the option that reads `choice` (by default, what was typed). */
+async function pick(field, text, choice = text) {
   await field.click();
   await page.keyboard.type(text, { delay: 20 });
-  const option = page.locator(".ant-select-dropdown:visible .ant-select-item-option").filter({ hasText: text }).first();
+  const option = page.locator(".ant-select-dropdown:visible .ant-select-item-option").filter({ hasText: choice }).first();
   await option.waitFor();
   await option.click();
 }
@@ -404,6 +417,577 @@ async function ensurePeriods() {
   }
 }
 
+// --- Banking: statements made up for the sample company ------------------------
+// Meridian's books hold entries on Checking from January to March 2026 and no
+// bank statement at all. These statements are made up to agree with those
+// entries, with the lines only a bank would have added (a monthly fee, a charge
+// taken twice, a loan payment the books missed), and are handed to the file
+// chooser from memory: no statement file is ever read from disk.
+
+const BANKING_GUIDES = new Set([
+  "bank-lines-in",
+  "code-and-match",
+  "cards-loans-companies",
+  "reconcile-by-hand",
+  "reconcile-from-files",
+  "check-reconciliations",
+]);
+const BANK = "First National Bank";
+const BANK_ACCOUNTS = {
+  checking: { code: "1010", kind: "Checking", masked: "****4417" },
+  savings: { code: "1020", kind: "Savings", masked: "****8820" },
+  card: { code: "2050", kind: "Credit card", masked: "****1093" },
+};
+
+const cents = (amount) => Math.round(amount * 100);
+/** Where a statement closes; each month opens where the one before it closed, so the months join up. */
+const closingOf = ({ opening, lines }) => (cents(opening) + lines.reduce((sum, [, , amount]) => sum + cents(amount), 0)) / 100;
+
+/** Each line is [date, description, amount], money in positive, as a bank download prints it. */
+const CHECKING_JANUARY = {
+  // Opened on New Year's Day with the deposit the books record as their opening balance.
+  opening: 0,
+  lines: [
+    ["2026-01-01", "OPENING DEPOSIT", 30000],
+    ["2026-01-08", "METRO REALTY PARTNERS RENT", -4200],
+    ["2026-01-12", "DEPOSIT NORTHWIND ANALYTICS RCV-1001", 32000],
+    ["2026-01-15", "PAYROLL SEMI-MONTHLY", -15725],
+    ["2026-01-28", "PACIFIC POWER AUTOPAY", -540],
+  ],
+};
+const CHECKING_FEBRUARY = {
+  opening: closingOf(CHECKING_JANUARY),
+  lines: [
+    ["2026-02-02", "ADOBE *CREATIVE CLOUD", -54.99],
+    ["2026-02-06", "METRO REALTY PARTNERS RENT", -4200],
+    ["2026-02-10", "FIBERLINK COMMUNICATIONS", -260],
+    // Taken twice: the books hold one, so the second is held back as already booked.
+    ["2026-02-11", "FIBERLINK COMMUNICATIONS", -260],
+    ["2026-02-14", "PAYROLL SEMI-MONTHLY", -15725],
+    // The books missed February's instalment: offered as a loan payment, to split.
+    ["2026-02-16", "FIRST NATIONAL LOAN PMT", -1650],
+    ["2026-02-24", "DEPOSIT HARBOR LOGISTICS RCV-1002", 12000],
+    ["2026-02-27", "APEX INSURANCE PREMIUM", -7200],
+    ["2026-02-28", "MONTHLY SERVICE FEE", -25],
+  ],
+};
+const CHECKING_MARCH = {
+  opening: closingOf(CHECKING_FEBRUARY),
+  lines: [
+    ["2026-03-02", "ADOBE *CREATIVE CLOUD", -54.99],
+    ["2026-03-02", "METRO REALTY PARTNERS RENT", -4200],
+    // Charged twice in two days: the Banking overview's possible duplicate.
+    ["2026-03-04", "ADOBE *CREATIVE CLOUD", -54.99],
+    ["2026-03-05", "COUNTER DEPOSIT", 9800],
+    ["2026-03-09", "CHECK 2210 STERLING & CO CPAS", -3500],
+    ["2026-03-13", "PAYROLL SEMI-MONTHLY", -15725],
+    ["2026-03-16", "FIRST NATIONAL LOAN PMT", -1680],
+    ["2026-03-20", "OFFICE DEPOT #1123", -86.4],
+    ["2026-03-27", "ACCOUNT SERVICE CHARGES", -75],
+    ["2026-03-30", "DEPOSIT BLUERIDGE FOODS RCV-1003", 16800],
+    ["2026-03-31", "OWNER DISTRIBUTION", -5000],
+    ["2026-03-31", "IRS USATAXPYMT", -8325],
+  ],
+};
+/** Only ever previewed in the import dialog, never imported. */
+const CHECKING_APRIL = {
+  opening: closingOf(CHECKING_MARCH),
+  lines: [
+    ["2026-04-01", "ADOBE *CREATIVE CLOUD", -54.99],
+    ["2026-04-03", "METRO REALTY PARTNERS RENT", -4200],
+    ["2026-04-10", "FIBERLINK COMMUNICATIONS", -260],
+    ["2026-04-14", "PAYROLL SEMI-MONTHLY", -15725],
+    ["2026-04-16", "FIRST NATIONAL LOAN PMT", -1650],
+    ["2026-04-22", "DEPOSIT NORTHWIND ANALYTICS", 18500],
+    ["2026-04-30", "MONTHLY SERVICE FEE", -25],
+  ],
+};
+/** Savings has never been reconciled; the books reach this statement's opening exactly. */
+const SAVINGS_MARCH = {
+  opening: 25085,
+  lines: [["2026-03-31", "INTEREST PAYMENT", 86.2]],
+};
+
+const usDate = (iso) => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`;
+
+/**
+ * A bank download: date, description, amount and the running balance. `leaveOut`
+ * drops one line from the file while its balance still counts, which is a
+ * statement that does not add up.
+ */
+function statementCsv({ opening, lines }, { leaveOut = -1 } = {}) {
+  let balance = cents(opening);
+  const rows = ["Date,Description,Amount,Balance"];
+  lines.forEach(([date, description, amount], index) => {
+    balance += cents(amount);
+    if (index === leaveOut) return;
+    rows.push([usDate(date), `"${description}"`, amount.toFixed(2), (balance / 100).toFixed(2)].join(","));
+  });
+  return { csv: `${rows.join("\n")}\n`, closing: balance / 100 };
+}
+
+const statementFile = (name, statement, options) => ({
+  name,
+  mimeType: "text/csv",
+  buffer: Buffer.from(statementCsv(statement, options).csv, "utf8"),
+});
+
+/** The bank accounts and reconciliations the Banking recipes point at, filled in by ensureBanking. */
+const ids = {};
+
+async function bankAccountFor(code) {
+  const { data: gl, error } = await books.from("acc_account").select("id").eq("account_code", code).single();
+  if (error) throw new Error(`account ${code}: ${error.message}`);
+  const { data } = await books.from("acc_bank_account").select("id").eq("account_id", gl.id).maybeSingle();
+  return data?.id ?? null;
+}
+
+async function reconciliationOf(bankAccountId, endingDate, status) {
+  let query = books
+    .from("acc_statement_reconciliation")
+    .select("id,status,statement_file_id")
+    .eq("bank_account_id", bankAccountId)
+    .eq("statement_ending_date", endingDate);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
+  if (error) throw new Error(error.message);
+  return data?.[0] ?? null;
+}
+
+async function until(check, what, timeout = 60_000) {
+  const end = Date.now() + timeout;
+  for (;;) {
+    const value = await check();
+    if (value) return value;
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await page.waitForTimeout(1_000);
+  }
+}
+
+/** A date picker takes the date as every screen prints it. */
+async function typeDate(field, iso) {
+  await field.click();
+  await field.fill(usDate(iso));
+  await field.press("Enter");
+}
+
+/** Opens Import statement from `trigger`, hands it the file, and waits until the statement has been read. */
+async function readStatement(trigger, file) {
+  await trigger.click();
+  const dialog = page.getByRole("dialog").last();
+  await dialog.locator('input[type="file"]').setInputFiles(file);
+  await dialog.locator(".ant-alert").first().waitFor({ timeout: 60_000 });
+  await settle();
+  return dialog;
+}
+
+async function importStatement(trigger, file) {
+  const dialog = await readStatement(trigger, file);
+  const ok = dialog.getByRole("button", { name: /^Import \d+ lines?$/ });
+  await until(async () => ok.isEnabled(), "Import to be offered");
+  await ok.click();
+  await dialog.waitFor({ state: "hidden", timeout: 120_000 });
+  await settle();
+}
+
+async function ensureBankAccounts() {
+  for (const [key, spec] of Object.entries(BANK_ACCOUNTS)) {
+    let id = await bankAccountFor(spec.code);
+    if (!id) {
+      await open("/banking");
+      await page.getByRole("button", { name: /Add (bank )?account/ }).first().click();
+      const dialog = page.getByRole("dialog").filter({ hasText: "Add bank account" });
+      await pick(dialog.getByLabel("What kind of account is this?"), spec.kind);
+      await pickIfEmpty(dialog.getByLabel("General Ledger account"), spec.code);
+      await dialog.getByLabel(spec.kind === "Credit card" ? "Card issuer" : "Bank name").fill(BANK);
+      await dialog.getByLabel("Account number (masked)").fill(spec.masked);
+      await dialog.getByRole("button", { name: "Create" }).click();
+      id = await until(() => bankAccountFor(spec.code), `${spec.kind} in Banking`);
+      created.push(`${spec.kind} (${spec.code}) added to Banking`);
+    }
+    ids[key] = id;
+  }
+}
+
+/** January reconciled from its statement file, the way Reconcile from statement files does it. */
+async function ensureCheckingJanuary() {
+  let january = await reconciliationOf(ids.checking, "2026-01-31", "completed");
+  if (!january) {
+    await open(`/banking/reconcile/from-files?account=${ids.checking}`);
+    await page.locator('input[type="file"]').first().setInputFiles(statementFile("checking-2026-01.csv", CHECKING_JANUARY));
+    const preview = page.getByRole("button", { name: /^Preview/ });
+    await until(async () => preview.isEnabled(), "Preview to be offered");
+    await preview.click();
+    const sign = page.getByRole("button", { name: /^Sign off/ });
+    await sign.waitFor({ timeout: 120_000 });
+    await sign.click();
+    january = await until(() => reconciliationOf(ids.checking, "2026-01-31", "completed"), "January signed off", 120_000);
+    created.push("Checking's January reconciled from its statement file");
+  }
+  ids.january = january.id;
+}
+
+/** A reconciliation started for `ending`, with `statement` imported into it unless it is to stay without a file. */
+async function ensureReconciliation(bankKey, ending, balance, statement, fileName) {
+  let rec = await reconciliationOf(ids[bankKey], ending, "in_progress");
+  if (!rec) {
+    await open(`/banking/reconcile?account=${ids[bankKey]}`);
+    await page.getByRole("button", { name: /New reconciliation/ }).first().click();
+    const dialog = page.getByRole("dialog").filter({ hasText: "New reconciliation" });
+    await typeDate(dialog.getByLabel("Statement ending date"), ending);
+    await dialog.locator(".ant-input-number input").fill(String(balance));
+    await dialog.getByRole("button", { name: "OK" }).click();
+    rec = await until(() => reconciliationOf(ids[bankKey], ending, "in_progress"), `the ${ending} reconciliation`);
+    created.push(`a reconciliation of ${BANK_ACCOUNTS[bankKey].kind} to ${ending}`);
+  }
+  if (statement && !rec.statement_file_id) {
+    await open(`/banking/reconcile/${rec.id}`);
+    await importStatement(page.getByRole("button", { name: /Import statement/ }).first(), statementFile(fileName, statement));
+    rec = await until(async () => {
+      const kept = await reconciliationOf(ids[bankKey], ending, "in_progress");
+      return kept?.statement_file_id ? kept : null;
+    }, `the ${ending} statement file to be kept`);
+    created.push(`${fileName} imported into it`);
+  }
+  return rec.id;
+}
+
+async function ensureCheckingMarch() {
+  const march = await count("acc_bank_transaction", (q) =>
+    q.eq("bank_account_id", ids.checking).gte("txn_date", "2026-03-01").lte("txn_date", "2026-03-31"),
+  );
+  if (!march) {
+    await open(`/banking?account=${ids.checking}`);
+    await importStatement(page.getByRole("button", { name: /Import statement/ }).first(), statementFile("checking-2026-03.csv", CHECKING_MARCH));
+    created.push("Checking's March statement imported into Bank Transactions");
+  }
+  // March opens where February closed: its first balance says so.
+  const [date, , amount] = CHECKING_MARCH.lines[0];
+  const { data: first } = await books
+    .from("acc_bank_transaction")
+    .select("running_balance_minor")
+    .eq("bank_account_id", ids.checking)
+    .eq("txn_date", date)
+    .not("running_balance_minor", "is", null)
+    .order("running_balance_minor", { ascending: false })
+    .limit(1);
+  const expected = cents(CHECKING_MARCH.opening) + cents(amount);
+  if (first?.[0] && first[0].running_balance_minor !== expected) {
+    throw new Error(`March's balances do not follow February's closing: ${first[0].running_balance_minor} against ${expected}`);
+  }
+}
+
+/** The subscription coded from Bank Transactions, so its lines offer Recode and the overview sees it charged twice. */
+async function ensureCodedSubscription() {
+  const waiting = () =>
+    count("acc_bank_transaction", (q) =>
+      q.eq("bank_account_id", ids.checking).eq("status", "unmatched").ilike("description", "ADOBE%").lte("txn_date", "2026-03-31"),
+    );
+  if (!(await waiting())) return;
+  await open(`/banking?account=${ids.checking}`);
+  await page.getByLabel("Search bank transactions by description or reference").fill("ADOBE");
+  await settle();
+  for (let left = await waiting(); left > 0; left = await waiting()) {
+    const cell = page.getByRole("row").filter({ hasText: "ADOBE" }).locator(".ant-select").filter({ hasText: "Find account" }).first();
+    // The search reads words, not codes; 6100 Office is a heading, so it offers Office Supplies.
+    await pick(cell, "office", /^6110\s*—\s*Office Supplies/);
+    await until(async () => (await waiting()) < left, "the subscription to be coded");
+    await settle();
+  }
+  created.push("the Adobe subscription coded to Office Supplies");
+}
+
+/**
+ * FiberLink took February's bill twice. Ledger matching offered the books' one
+ * entry to the second charge, which would leave that line spoken for; it is
+ * rejected, so the entry goes to the first and the second waits on Reconcile,
+ * held back as already booked.
+ */
+async function ensureSecondChargeFree() {
+  const { data: second } = await books
+    .from("acc_bank_transaction")
+    .select("id")
+    .eq("bank_account_id", ids.checking)
+    .eq("txn_date", "2026-02-11")
+    .ilike("description", "FIBERLINK%")
+    .limit(1);
+  const line = second?.[0];
+  if (!line) throw new Error("February's second FiberLink charge is not in Bank Transactions");
+  if (!(await count("acc_reconciliation", (q) => q.eq("bank_transaction_id", line.id).eq("status", "suggested")))) return;
+  await open(`/banking?account=${ids.checking}`);
+  await page.getByLabel("Search bank transactions by description or reference").fill("FIBERLINK");
+  await settle();
+  await page.getByRole("row").filter({ hasText: "02/11/2026" }).getByRole("button", { name: "Reject", exact: true }).click();
+  await until(async () => !(await count("acc_reconciliation", (q) => q.eq("bank_transaction_id", line.id).eq("status", "suggested"))), "the suggestion to be rejected");
+  await page.getByRole("button", { name: /Find ledger matches/ }).click();
+  await settle();
+  created.push("the books' FiberLink entry offered to February's first charge, not its second");
+}
+
+async function ensureLoan() {
+  if (await count("acc_repayment_account", (q) => q.eq("kind", "loan"))) return;
+  await open("/banking/rules");
+  await page.getByRole("button", { name: /Add loan/ }).first().click();
+  const dialog = page.getByRole("dialog").filter({ hasText: "Add loan" });
+  await pick(dialog.getByLabel("Loan account"), "2500");
+  await dialog.getByLabel("Words your bank prints for these payments").fill("first national loan");
+  await pickIfEmpty(dialog.getByLabel("Interest posts to"), "8100");
+  await dialog.getByText("A rate a year").click();
+  await dialog.getByLabel("Rate a year", { exact: true }).fill("9");
+  await dialog.getByRole("button", { name: "Add loan" }).click();
+  await dialog.waitFor({ state: "hidden" });
+  created.push("First National's term loan on Banking › Rules");
+}
+
+/**
+ * A bank feed on the card, from Plaid's test service: its lines are Plaid's sample
+ * data. Only the deployed app has Plaid set up, so this runs against it; the
+ * feed is left connected, so Undo and Disconnect stay there to be pictured again.
+ */
+/** Plaid's test credit card that has transactions (named "Plaid Diamond 12.5% APR Interest Credit Card" in 11/2026). */
+const PLAID_TEST_CARD_MASK = "3333";
+
+async function ensureFeed() {
+  const active = async () => {
+    const { data, error } = await books
+      .from("acc_bank_feed_account")
+      .select("bank_account_id,account_name,account_mask")
+      .eq("is_active", true)
+      .limit(1);
+    if (error) throw new Error(error.message);
+    return data?.[0] ?? null;
+  };
+  // A feed on another of Plaid's test cards (the business one has no transactions) is disconnected, with the reason, and connected again.
+  const wrong = await active();
+  if (wrong && wrong.account_mask !== PLAID_TEST_CARD_MASK) {
+    await open(`/banking?account=${wrong.bank_account_id}`);
+    await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+    const dialog = page.getByRole("dialog").last();
+    await dialog.locator("textarea").fill("Connected to Plaid's business test card, which has no transactions; connected again to its everyday test card.");
+    await dialog.getByRole("button", { name: "Disconnect", exact: true }).click();
+    await until(async () => !(await active()), "the business test card to be disconnected");
+    created.push(`${wrong.account_name} disconnected`);
+  }
+  const feeds = [await active()].filter(Boolean);
+  if (feeds?.[0]) {
+    ids.feed = feeds[0].bank_account_id;
+    await ensureFeedSynced();
+    return;
+  }
+  await open(`/banking?account=${ids.card}`);
+  const connect = page.getByRole("button", { name: /Connect bank/ });
+  if (await connect.isDisabled()) throw new Error("Connect bank is off here: run against the deployed app, where Plaid's test service is set up");
+  // Pressed before Plaid's script has loaded, it only says to try again in a moment.
+  const frame = page.locator('iframe[id^="plaid-link-iframe"]');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await connect.click();
+    if (await frame.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false)) break;
+  }
+  const plaid = page.frameLocator('iframe[id^="plaid-link-iframe"]');
+  const mapping = page.getByRole("dialog").filter({ hasText: "Connect and synchronize" });
+  const visible = async (locator) => locator.first().isVisible().catch(() => false);
+  // Plaid's own screens, in whatever order its test service shows them.
+  let loggedIn = false;
+  for (let step = 0; step < 30 && !(await visible(mapping)); step++) {
+    await page.waitForTimeout(1_500);
+    if (failuresDir) await page.screenshot({ path: join(failuresDir, `plaid-${String(step).padStart(2, "0")}.png`) }).catch(() => undefined);
+    // Plaid's test bank takes user_good / pass_good; its fields are named by floating labels.
+    const username = plaid.getByRole("textbox", { name: /user ?name/i });
+    if (!loggedIn && (await visible(username))) {
+      await username.first().fill("user_good");
+      await plaid.locator('input[type="password"]').first().fill("pass_good");
+      await plaid.getByRole("button", { name: /^Submit$/i }).first().click();
+      // Its pane stays in the page, hidden, after the bank has let the test user in.
+      loggedIn = true;
+      continue;
+    }
+    // A phone number, to log in faster or to save the connection to a Plaid account: never.
+    const skip = plaid.getByRole("button", { name: /without phone|without saving|as a guest|as guest|not now|skip/i });
+    if (await visible(skip)) {
+      console.log(`  plaid: ${await skip.first().innerText().catch(() => "?")}`);
+      await skip.first().click({ force: true });
+      continue;
+    }
+    // Searched for, first: a tile of popular banks can sit under Plaid's own "Sandbox mode" banner.
+    // Each of the bank's choosing steps is taken once: a pane left behind can still read as visible.
+    const search = plaid.locator('input[type="search"], input[placeholder*="Search" i]');
+    if (!loggedIn && (await visible(search)) && !(await search.first().inputValue().catch(() => "x"))) {
+      await search.first().fill("First Platypus");
+      continue;
+    }
+    // A search result reads "First Platypus Bank · Multiple available".
+    const result = plaid.getByText("Multiple available", { exact: true });
+    if (!loggedIn && (await visible(result))) {
+      await result.first().click();
+      continue;
+    }
+    // Then the bank itself, not its OAuth variants, in its list of associated institutions.
+    const bank = plaid.getByRole("button", { name: /First Platypus Bank$/ });
+    if (!loggedIn && (await visible(plaid.getByText(/associated institutions/))) && (await visible(bank))) {
+      await bank.first().click();
+      continue;
+    }
+    const next = plaid.getByRole("button", { name: /^(Continue|Get started|Agree and continue|I agree|Done|Finish)$/i });
+    if (await visible(next)) {
+      console.log(`  plaid: ${await next.first().innerText().catch(() => "?")}`);
+      await next.first().click({ force: true });
+    }
+  }
+  await mapping.waitFor({ timeout: 10_000 });
+  // Known by its last four digits: Plaid renames its test accounts from time to time.
+  const card = mapping
+    .locator("div")
+    .filter({ has: page.locator("strong", { hasText: new RegExp(`${PLAID_TEST_CARD_MASK}$`) }) })
+    .filter({ has: page.locator(".ant-select") })
+    .last();
+  await pick(card.locator(".ant-select").first(), "2050");
+  await mapping.getByRole("button", { name: "Connect and synchronize" }).click();
+  ids.feed = await until(async () => {
+    const { data } = await books.from("acc_bank_feed_account").select("bank_account_id").eq("is_active", true).limit(1);
+    return data?.[0]?.bank_account_id ?? null;
+  }, "the bank feed to be connected", 120_000);
+  created.push("a Plaid test-service feed on the credit card");
+  await ensureFeedSynced();
+}
+
+/** A sync that brought lines in, so Bank feed syncs lists it with Undo. Plaid's test service can take a while to have them. */
+async function ensureFeedSynced() {
+  const brought = () => count("acc_bank_feed_sync_run", (q) => q.eq("status", "succeeded").gt("added_count", 0).is("undone_at", null));
+  if (await brought()) return;
+  for (let attempt = 0; attempt < 5 && !(await brought()); attempt++) {
+    await open(`/banking?account=${ids.feed}`);
+    await page.getByRole("button", { name: /Sync now/ }).click();
+    await settle();
+    if (!(await brought())) await page.waitForTimeout(20_000);
+  }
+  if (!(await brought())) throw new Error("Plaid's test service sent no lines for the card");
+  created.push("its lines synced");
+}
+
+async function ensureBanking() {
+  await ensureBankAccounts();
+  await ensureCheckingJanuary();
+  ids.february = await ensureReconciliation(
+    "checking",
+    "2026-02-28",
+    statementCsv(CHECKING_FEBRUARY).closing,
+    CHECKING_FEBRUARY,
+    "checking-2026-02.csv",
+  );
+  await ensureCheckingMarch();
+  await ensureCodedSubscription();
+  await ensureSecondChargeFree();
+  await ensureLoan();
+  ids.savingsMarch = await ensureReconciliation(
+    "savings",
+    "2026-03-31",
+    statementCsv(SAVINGS_MARCH).closing,
+    SAVINGS_MARCH,
+    "savings-2026-03.csv",
+  );
+  // Started by hand from the card's January statement, which is not attached yet.
+  ids.cardJanuary = await ensureReconciliation("card", "2026-01-31", 4160, null, null);
+  await ensureFeed();
+}
+
+// --- Banking: a balance posted as payments, made and removed for three pictures --
+// Three entries whose amounts are what Checking itself came to on their dates:
+// a statement's Balance column read as amounts. Reconcile flags them, and the
+// account reads below zero; once pictured, they are removed with the card's own
+// button, which reverses each on its date.
+
+const GHOST = "Statement balance carried forward";
+const GHOST_DATES = ["2026-02-27", "2026-03-13", "2026-03-31"];
+
+async function checkingThrough(date) {
+  const { data: gl } = await books.from("acc_account").select("id").eq("account_code", BANK_ACCOUNTS.checking.code).single();
+  const { data, error } = await books
+    .from("acc_journal_line")
+    .select("debit_minor,credit_minor,acc_journal_entry!inner(entry_date,status)")
+    .eq("account_id", gl.id)
+    .eq("acc_journal_entry.status", "posted")
+    .lte("acc_journal_entry.entry_date", date);
+  if (error) throw new Error(error.message);
+  return data.reduce((sum, line) => sum + line.debit_minor - line.credit_minor, 0);
+}
+
+async function ghostCardShowing() {
+  await open(`/banking/reconcile?account=${ids.checking}`);
+  return page
+    .getByRole("button", { name: "Show me the workings" })
+    .waitFor({ timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function ghostEntryNumbers() {
+  const { data, error } = await books.from("acc_journal_entry").select("entry_number").eq("description", GHOST);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((entry) => entry.entry_number);
+}
+
+/** Takes entries back by number with the Journal's own Reverse, each on its own date. */
+async function reverseEntries(numbers, reason) {
+  for (const number of numbers) {
+    const { data: entry, error } = await books.from("acc_journal_entry").select("id").eq("entry_number", number).single();
+    if (error) throw new Error(`${number}: ${error.message}`);
+    await open(`/journal?entry=${entry.id}`);
+    await page.getByRole("row").filter({ hasText: number }).first().getByRole("button", { name: "Reverse", exact: true }).click();
+    const confirm = page.locator(".ant-modal-confirm").filter({ hasText: `Reverse ${number}?` });
+    await confirm.getByPlaceholder("Reason for reversal").fill(reason);
+    await confirm.getByRole("button", { name: "Reverse", exact: true }).click();
+    await confirm.waitFor({ state: "hidden", timeout: 60_000 });
+    created.push(`${number} taken back`);
+  }
+}
+
+async function ensureGhostGroup() {
+  if (await ghostCardShowing()) return;
+  const before = new Set(await ghostEntryNumbers());
+  // The journal entry dialog is filled at the width it was built for, whatever the picture's.
+  const size = page.viewportSize();
+  await page.setViewportSize(VIEWPORT);
+  try {
+    // Each amount is the balance of everything else, so it is read before any of the three is posted.
+    const amounts = [];
+    for (const date of GHOST_DATES) amounts.push(await checkingThrough(date));
+    for (const [index, date] of GHOST_DATES.entries()) {
+      const amount = (amounts[index] / 100).toFixed(2);
+      await open("/journal");
+      await page.getByRole("button", { name: /New journal entry/ }).first().click();
+      const dialog = page.getByRole("dialog").filter({ hasText: "New journal entry" });
+      await typeDate(dialog.getByLabel("Date", { exact: true }), date);
+      await dialog.getByLabel("Description").fill(GHOST);
+      const accounts = dialog.locator(".ant-select");
+      await pick(accounts.nth(0), "6990");
+      await dialog.getByPlaceholder("Debit").nth(0).fill(amount);
+      await pick(accounts.nth(1), "1010");
+      await dialog.getByPlaceholder("Credit").nth(1).fill(amount);
+      await dialog.getByRole("button", { name: "OK" }).click();
+      await dialog.waitFor({ state: "hidden" });
+    }
+    if (!(await ghostCardShowing())) throw new Error("Reconcile did not flag the balance posted as payments");
+  } catch (error) {
+    // Never left part-way: whatever of the three was posted is taken back before the failure is reported.
+    const posted = (await ghostEntryNumbers()).filter((number) => !before.has(number));
+    await reverseEntries(posted, "Posted part-way while setting up the guide's pictures; taken back.");
+    throw error;
+  } finally {
+    await page.setViewportSize(size);
+  }
+  created.push(`three entries of Checking's balance posted as payments (to be removed)`);
+}
+
+async function removeGhostGroup() {
+  if (!(await ghostCardShowing())) return;
+  // Not anchored: an Ant Design button's name begins with its icon's.
+  await page.getByRole("button", { name: /Remove these \d+ entries/ }).click();
+  await page.getByLabel("Reason for removing these entries").fill("A statement's Balance column was read as payments; set up and removed for the guide's pictures.");
+  await page.getByRole("button", { name: /Confirm — remove all/ }).click();
+  await page.getByRole("button", { name: "Show me the workings" }).waitFor({ state: "hidden", timeout: 60_000 });
+  created.push("…and removed again with Remove these entries");
+}
+
 // --- Framing ------------------------------------------------------------------
 
 function union(boxes) {
@@ -480,12 +1064,32 @@ async function keepFailure(name) {
   await page.screenshot({ path: join(failuresDir, `${name}.png`) }).catch(() => undefined);
 }
 
+/**
+ * A narrower window, for a screen whose cards and rows span the page: framed at
+ * 1280 they come out too wide to read at 640. At 1024 the same card is 768 wide.
+ */
+const NARROW = { width: 1024, height: VIEWPORT.height };
+
 async function capture(recipe) {
-  await open(recipe.route);
+  // `narrow: true` is 1024 wide; a number is a width of its own, for a table that wraps its words at 1024.
+  const viewport = recipe.narrow ? (typeof recipe.narrow === "number" ? { ...NARROW, width: recipe.narrow } : NARROW) : VIEWPORT;
+  await page.setViewportSize(viewport);
+  try {
+    await captureIn(recipe, viewport);
+  } finally {
+    if (recipe.narrow) await page.setViewportSize(VIEWPORT);
+  }
+}
+
+async function captureIn(recipe, viewport) {
+  // Banking's routes name an account or a reconciliation, known once ensureBanking has run.
+  await open(typeof recipe.route === "function" ? recipe.route() : recipe.route);
   if (recipe.prepare) await recipe.prepare();
   const target = recipe.target().first();
   await target.waitFor({ state: "visible" });
-  await target.scrollIntoViewIfNeeded();
+  // A control near the foot of the window is brought to its middle, so the frame can reach below it.
+  if (recipe.center) await target.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  else await target.scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
   // Every screen, not only the settings ones: an invoice's history names who created it.
   await page.evaluate(scrub, swaps);
@@ -501,11 +1105,11 @@ async function capture(recipe) {
     ? {
         ...recipe.frame,
         left: Math.max(0, Math.round(inside.x)),
-        right: Math.min(VIEWPORT.width, Math.round(inside.x + inside.width)),
+        right: Math.min(viewport.width, Math.round(inside.x + inside.width)),
         top: Math.max(0, Math.round(inside.y)),
-        bottom: Math.min(VIEWPORT.height, Math.round(inside.y + inside.height)),
+        bottom: Math.min(viewport.height, Math.round(inside.y + inside.height)),
       }
-    : recipe.frame;
+    : { right: viewport.width, ...recipe.frame };
   const clip = frameAround(union([box, ...extras.filter(Boolean)]), frame);
   const png = await page.screenshot({ clip });
   await sharp(png).webp({ quality: 82, effort: 6 }).toFile(join(outDir, `${recipe.shot}.webp`));
@@ -777,6 +1381,259 @@ const RECIPES = [
     target: () => button(/^Adjust inventory by/),
   },
 
+  // Bring bank lines in
+  {
+    shot: "bank-lines-in-1",
+    route: () => `/banking?account=${ids.checking}`,
+    target: () => button(/Import statement/),
+  },
+  {
+    shot: "bank-lines-in-2",
+    within: () => page.getByRole("dialog").last(),
+    route: () => `/banking?account=${ids.checking}`,
+    prepare: async () => {
+      await readStatement(button(/Import statement/).first(), statementFile("checking-2026-04.csv", CHECKING_APRIL));
+    },
+    target: () => page.getByRole("dialog").last().locator(".ant-alert-success"),
+    frame: { height: 300 },
+    after: async () => page.keyboard.press("Escape"),
+  },
+  {
+    shot: "bank-lines-in-3",
+    within: () => page.getByRole("dialog").last(),
+    route: () => `/banking?account=${ids.checking}`,
+    prepare: async () => {
+      await readStatement(button(/Import statement/).first(), statementFile("checking-2026-04.csv", CHECKING_APRIL));
+    },
+    target: () => page.getByRole("dialog").last().getByRole("checkbox", { name: /^Not a transaction/ }),
+    include: () => [page.getByRole("dialog").last().getByRole("columnheader", { name: "Not a transaction" })],
+    frame: { height: 300 },
+    after: async () => page.keyboard.press("Escape"),
+  },
+  {
+    shot: "bank-lines-in-4",
+    within: () => page.getByRole("dialog").last(),
+    route: () => `/banking?account=${ids.checking}`,
+    prepare: async () => {
+      // The rent line left out of the file while its balance stays: out by $4,200.00.
+      await readStatement(button(/Import statement/).first(), statementFile("checking-2026-04.csv", CHECKING_APRIL, { leaveOut: 1 }));
+    },
+    target: () => page.getByRole("dialog").last().getByRole("button", { name: "Import anyway…" }),
+    include: () => [page.getByRole("dialog").last().locator(".ant-alert-error")],
+    frame: { height: 300 },
+    after: async () => page.keyboard.press("Escape"),
+  },
+  {
+    shot: "bank-lines-in-5",
+    route: () => `/banking?account=${ids.feed}`,
+    // The newest sync that changed something; a sync that only skipped lines offers no Undo.
+    target: () => page.getByRole("button", { name: "Undo", exact: true, disabled: false }),
+    include: () => [page.getByText("Bank feed syncs", { exact: true })],
+    narrow: true,
+  },
+  {
+    shot: "bank-lines-in-6",
+    route: () => `/banking?account=${ids.feed}`,
+    target: () => button("Disconnect"),
+    include: () => [page.getByText("First Platypus Bank", { exact: true })],
+  },
+
+  // Match and code bank lines
+  {
+    shot: "code-and-match-1",
+    route: () => `/banking?account=${ids.checking}`,
+    target: () => button("Approve"),
+    include: () => [page.getByRole("columnheader", { name: "Match" })],
+  },
+  {
+    shot: "code-and-match-2",
+    route: () => `/banking?account=${ids.checking}`,
+    target: () => page.getByRole("row").filter({ hasText: "OFFICE DEPOT" }).locator(".ant-select"),
+    // The line's own description, rather than the column's heading far above it.
+    include: () => [page.getByText("OFFICE DEPOT #1123", { exact: true })],
+  },
+  {
+    shot: "code-and-match-3",
+    route: () => `/banking?account=${ids.checking}`,
+    prepare: async () => {
+      // Coded lines are matched, so the status filter has to let them show.
+      await page.getByLabel("Search bank transactions by description or reference").fill("ADOBE");
+      await page.getByLabel("Filter bank transactions by status").click();
+      await page.locator(".ant-select-dropdown:visible .ant-select-item-option").filter({ hasText: /^All/ }).first().click();
+      await settle();
+    },
+    target: () => button("Recode"),
+    include: () => [
+      page.getByRole("row").filter({ has: page.getByRole("button", { name: "Recode" }) }).first().getByText("ADOBE *CREATIVE CLOUD", { exact: true }),
+    ],
+  },
+  {
+    shot: "code-and-match-4",
+    route: "/banking/overview",
+    prepare: async () => {
+      await page.locator(".ant-segmented-item").filter({ hasText: "Possible duplicates" }).click();
+      await settle();
+    },
+    target: () => page.locator(".ant-segmented-item").filter({ hasText: "Possible duplicates" }),
+    include: () => [page.getByText(/^Charged twice in/)],
+  },
+
+  // Set up cards, loans and related companies
+  { shot: "cards-loans-companies-1", route: "/banking/rules", target: () => button(/Add card/) },
+  {
+    shot: "cards-loans-companies-2",
+    route: () => `/banking?account=${ids.checking}`,
+    target: () => button("Split…"),
+    include: () => [
+      page.getByRole("row").filter({ has: page.getByRole("button", { name: "Split…" }) }).first().getByText("FIRST NATIONAL LOAN PMT", { exact: true }),
+    ],
+  },
+  { shot: "cards-loans-companies-3", route: "/banking/rules", target: () => button(/Add related company/) },
+
+  // Reconcile an account to a statement
+  {
+    shot: "reconcile-by-hand-1",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    target: () => page.locator('[aria-label="Reconciliation standing"]'),
+    include: () => [page.getByLabel("Bank account", { exact: true })],
+    narrow: true,
+  },
+  {
+    shot: "reconcile-by-hand-2",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    target: () => button(/New reconciliation/),
+  },
+  {
+    shot: "reconcile-by-hand-3",
+    route: () => `/banking/reconcile/${ids.february}`,
+    target: () => page.getByText("Left to explain", { exact: true }),
+    include: () => [page.locator(".ant-alert-warning").filter({ hasText: "Left to explain" })],
+    narrow: true,
+  },
+  {
+    shot: "reconcile-by-hand-4",
+    route: () => `/banking/reconcile/${ids.february}`,
+    target: () => page.getByRole("row").filter({ hasText: "MONTHLY SERVICE FEE" }).getByRole("button", { name: "Not a transaction" }),
+    // Its amount and "Not in the books" beside it: the whole row is too wide to read at 640.
+    include: () => [
+      page.getByRole("row").filter({ has: page.getByRole("button", { name: "Not a transaction" }) }).filter({ hasText: "MONTHLY SERVICE FEE" }).getByText("Not in the books"),
+    ],
+    center: true,
+  },
+  {
+    shot: "reconcile-by-hand-5",
+    route: () => `/banking/reconcile/${ids.february}`,
+    // The fee's account chosen in the box, as a reader would, so the button counts it; nothing is posted.
+    prepare: async () => {
+      const box = page.locator(".ant-alert").filter({ hasText: /The bank shows \d+ things? your books do not/ });
+      await pick(box.getByRole("row").filter({ hasText: "MONTHLY SERVICE FEE" }).locator(".ant-select").first(), "bank", /6400/);
+      await page.mouse.move(VIEWPORT.width / 2, 8);
+    },
+    target: () => button(/^Add \d+ to the books$/),
+    include: () => [page.getByText(/^The bank shows \d+ things? your books do not/)],
+    frame: { height: 320 },
+    // At 1024 its Description column wraps a word a letter at a time.
+    narrow: 1180,
+  },
+  {
+    shot: "reconcile-by-hand-6",
+    route: () => `/banking/reconcile/${ids.february}`,
+    // The second FiberLink charge's account chosen, so Add anyway is offered; nothing is posted.
+    prepare: async () => {
+      const box = page.locator(".ant-alert").filter({ hasText: /The bank shows \d+ things? your books do not/ });
+      await pick(box.locator("li").filter({ hasText: "FIBERLINK" }).locator(".ant-select").first(), "internet", /6120/);
+      await page.mouse.move(VIEWPORT.width / 2, 8);
+    },
+    target: () => button("Add anyway"),
+    include: () => [page.getByText("Held back from Add all:")],
+    narrow: true,
+  },
+  {
+    shot: "reconcile-by-hand-7",
+    route: () => `/banking/reconcile/${ids.february}`,
+    target: () => button("Discard this reconciliation"),
+  },
+  {
+    shot: "reconcile-by-hand-8",
+    route: () => `/banking/reconcile/${ids.february}`,
+    target: () => page.getByRole("link", { name: "View", exact: true }),
+    include: () => [page.getByText(/^Statement file/)],
+  },
+  {
+    shot: "reconcile-by-hand-9",
+    route: () => `/banking/reconcile/${ids.cardJanuary}`,
+    target: () => button("Attach the statement"),
+    include: () => [page.getByText("No statement file")],
+  },
+
+  // Reconcile from statement files
+  {
+    shot: "reconcile-from-files-1",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    target: () => button(/From statement files/),
+  },
+  {
+    shot: "reconcile-from-files-2",
+    route: () => `/banking/reconcile/${ids.savingsMarch}`,
+    target: () => button("Bring the history forward"),
+    include: () => [page.locator(".ant-alert-info").filter({ has: page.getByRole("button", { name: "Bring the history forward" }) })],
+    narrow: true,
+  },
+  {
+    shot: "reconcile-from-files-3",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    target: () => page.getByRole("link", { name: "Reconcile history" }),
+  },
+
+  // Check and correct reconciled accounts: the first three need a balance posted as payments
+  {
+    shot: "check-reconciliations-1",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    prepare: async () => {
+      await ensureGhostGroup();
+      await page.getByRole("button", { name: "Show me the workings" }).waitFor();
+    },
+    target: () => button(/Show me the workings/),
+    include: () => [page.getByText(/entries here look like the statement's balance/)],
+    frame: { height: 320 },
+    narrow: true,
+  },
+  {
+    shot: "check-reconciliations-2",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    prepare: async () => {
+      await ensureGhostGroup();
+      await page.getByRole("button", { name: /Remove these \d+ entries/ }).waitFor();
+    },
+    target: () => button(/Remove these \d+ entries/),
+    include: () => [page.getByText(/entries here look like the statement's balance/)],
+    frame: { height: 320 },
+    narrow: true,
+  },
+  {
+    shot: "check-reconciliations-3",
+    route: () => `/banking/reconcile?account=${ids.checking}`,
+    prepare: async () => {
+      await ensureGhostGroup();
+      await page.getByText(/payments not yet on a statement/).waitFor();
+    },
+    target: () => page.getByText(/payments not yet on a statement/),
+    include: () => [page.getByText(/reads below zero/)],
+    frame: { height: 360 },
+    narrow: true,
+    after: removeGhostGroup,
+  },
+  {
+    shot: "check-reconciliations-4",
+    route: () => `/banking/reconcile/${ids.january}`,
+    target: () => button("Reopen"),
+  },
+  {
+    shot: "check-reconciliations-5",
+    route: "/reports/reconciliations",
+    target: () => heading("Reconciliation Report"),
+  },
+
   // Close an accounting period
   { shot: "period-close-1", route: "/reports?report=trial", target: () => page.locator(".ant-select").filter({ hasText: "Trial Balance" }) },
   { shot: "period-close-2", route: "/accounts", target: () => page.getByLabel(/^As of/).first() },
@@ -923,8 +1780,18 @@ try {
       await keepFailure(ensure.name);
     }
   }
+  const wanted = (recipe) => !only.size || only.has(recipe.shot.replace(/-\d+$/, "")) || only.has(recipe.shot);
+  const bankingWanted = RECIPES.some((recipe) => wanted(recipe) && BANKING_GUIDES.has(recipe.shot.replace(/-\d+$/, "")));
+  if (bankingWanted) {
+    try {
+      await ensureBanking();
+    } catch (error) {
+      problems.push(`ensureBanking: ${error.message.split("\n")[0]}`);
+      await keepFailure("ensureBanking");
+    }
+  }
   for (const recipe of RECIPES) {
-    if (only.size && !only.has(recipe.shot.replace(/-\d+$/, "")) && !only.has(recipe.shot)) continue;
+    if (!wanted(recipe)) continue;
     try {
       await capture(recipe);
       console.log(`  shot  ${recipe.shot}`);
@@ -934,6 +1801,13 @@ try {
       await keepFailure(recipe.shot);
       await page.keyboard.press("Escape").catch(() => undefined);
     }
+  }
+  // Whatever stopped a run part-way, Checking is not left with a balance posted as payments.
+  if (bankingWanted && ids.checking) {
+    await removeGhostGroup().catch(async (error) => {
+      problems.push(`removeGhostGroup: ${error.message.split("\n")[0]}`);
+      await keepFailure("removeGhostGroup");
+    });
   }
 } finally {
   await browser.close();
