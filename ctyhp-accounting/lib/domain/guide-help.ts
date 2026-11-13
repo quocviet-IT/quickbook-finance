@@ -74,11 +74,20 @@ export function stepScreen(flow: GuideFlow, step: GuideStep): string {
   return step.everyScreen ? "every screen" : screenName(step.route ?? flow.route);
 }
 
+/** A moment in a guide's video, as a player prints it: "0:07", "1:23". */
+export function videoChapterLabel(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
 /**
- * What a workflow's card says under its purpose: "7 steps", "Starts on Invoices".
- * It said "Pictures" too while only the two import guides had them; since 3.0.21
- * nearly every guide does, so it no longer tells one card from another.
+ * What a workflow's card says under its purpose: "7 steps", "Starts on Invoices",
+ * and "Video · 1:23" for a guide that has one (3.0.28). It said "Pictures" too
+ * while only the two import guides had them; since 3.0.21 nearly every guide
+ * does, so it no longer tells one card from another. A video does, for now.
  */
 export function guideCardMeta(flow: GuideFlow): string[] {
-  return [plural(flow.steps.length, "step"), `Starts on ${screenName(flow.route)}`];
+  const meta = [plural(flow.steps.length, "step"), `Starts on ${screenName(flow.route)}`];
+  if (flow.video) meta.push(`Video · ${videoChapterLabel(flow.video.duration)}`);
+  return meta;
 }

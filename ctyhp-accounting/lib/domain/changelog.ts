@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.28",
+    date: "2026-11-13",
+    headline: "The four guides used most open with a short narrated video, captions on, with a mark where each step starts.",
+    changes: [
+      {
+        kind: "added",
+        title: "A video at the top of four guides",
+        detail:
+          "Invoice a customer and get paid, Give a customer an estimate, Bring bank lines in, and Reconcile an account to a statement each open with a video of a minute or so: the screens of each step in turn, the button to press ringed in orange, read by one voice with English captions you can turn off. Under the video each step is a button that plays from where it starts, and each step below has Play this step. The videos are recorded from the sample company, Meridian Consulting Group, and nothing in them is saved.",
+        route: "/guide",
+      },
+    ],
+  },
+  {
     version: "3.0.27",
     date: "2026-11-12",
     headline: "Banking's thirty guide steps show a picture of their screen too, so every step in the guide now has one.",

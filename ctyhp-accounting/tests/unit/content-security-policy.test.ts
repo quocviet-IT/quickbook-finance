@@ -48,6 +48,13 @@ describe("contentSecurityPolicy", () => {
     expect(production["worker-src"]).toEqual(["'self'", "blob:"]);
   });
 
+  it("plays the guide's videos and their captions from this project's Supabase, and nowhere else (3.0.28)", () => {
+    // A <video> and its <track> are media; without media-src they fall back to default-src 'self'.
+    expect(production["media-src"]).toEqual(["'self'", "https://example.supabase.co"]);
+    const without = directives(contentSecurityPolicy({ nonce: "n", supabaseUrl: undefined, development: false }));
+    expect(without["media-src"]).toEqual(["'self'"]);
+  });
+
   it("adds 'unsafe-eval' in development only", () => {
     const dev = directives(contentSecurityPolicy({ nonce: "n", supabaseUrl: undefined, development: true }));
     expect(dev["script-src"]).toContain("'unsafe-eval'");

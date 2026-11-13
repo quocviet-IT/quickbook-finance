@@ -4580,6 +4580,115 @@ body:has(.ant-drawer-open) .assistant-launcher {
   color: var(--ob-text-caption);
 }
 
+/* A guide's narrated video (3.0.28), above its steps: the film at the width of
+   the steps, and under it one button per step that plays from where it starts. */
+.guide-video {
+  margin: 0 0 20px;
+  border: 1px solid var(--ob-panel-border);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+  overflow: hidden;
+}
+.guide-video__film {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--ob-surface-muted);
+}
+.guide-video__chapters {
+  display: grid;
+  /* Two columns beside the rail, so a step's name is read whole rather than cut short. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2px 8px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  border-top: 1px solid var(--ob-panel-line);
+}
+.guide-video__chapter {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ob-text-body);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.guide-video__chapter:hover {
+  background: var(--ob-surface-subtle);
+}
+.guide-video__chapter:focus-visible {
+  outline: 2px solid var(--ob-accent-ring);
+  outline-offset: 1px;
+}
+.guide-video__chapter--playing {
+  background: var(--ob-accent-wash);
+  color: var(--ob-text-strong);
+  font-weight: 600;
+}
+.guide-video__n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ob-surface-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.guide-video__chapter--playing .guide-video__n {
+  background: var(--ob-intent-primary);
+  color: var(--ob-text-on);
+}
+.guide-video__action {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.guide-video__at {
+  color: var(--ob-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.guide-video__failed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--ob-panel-border);
+  border-radius: 8px;
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+}
+.guide-play-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ob-intent-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.guide-play-step:hover {
+  text-decoration: underline;
+}
+.guide-play-step:focus-visible {
+  outline: 2px solid var(--ob-accent-ring);
+  outline-offset: 2px;
+}
+
 /* The entity a statement belongs to, above its title. One Book holds one
    company's books; naming it on the page is what stops a printout being filed
    against the wrong company. */
