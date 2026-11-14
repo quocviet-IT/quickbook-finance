@@ -194,6 +194,14 @@ export const PALETTE = {
   antYellowDark7: "#e8d639",
   antLimeDark7: "#a9d134",
   antGoldDark7: "#e8b339",
+
+  /*
+   * The Dashboard's second chart colour (3.0.38): expenses and money out,
+   * beside the teal of income and money in. A deep navy on a light card, and
+   * a pale one on a dark card, so the pair reads apart in both themes.
+   */
+  navy700: "#27446e",
+  navy300: "#8fa8d6",
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

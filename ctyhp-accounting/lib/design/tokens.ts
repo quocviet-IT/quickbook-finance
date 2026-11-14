@@ -264,6 +264,12 @@ export const TOKENS = {
     other: PALETTE.slate400,
     income: PALETTE.teal700,
     expense: PALETTE.orange700,
+    /**
+     * The Dashboard's second series (3.0.38): expenses and money out beside
+     * income and money in, so one page reads in two chart colours, with red
+     * and amber left to mean overdue and due soon.
+     */
+    secondary: PALETTE.navy700,
     net: PALETTE.blue700,
     receivable: PALETTE.teal700,
     payable: PALETTE.violet600,
@@ -481,6 +487,7 @@ export const DARK_TOKENS: { [G in keyof Tokens]: { [K in keyof Tokens[G]]: strin
     other: PALETTE.mist400,
     income: PALETTE.teal400,
     expense: PALETTE.orange400,
+    secondary: PALETTE.navy300,
     net: PALETTE.blue400,
     receivable: PALETTE.teal400,
     payable: PALETTE.violet400,
