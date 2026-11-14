@@ -96,6 +96,15 @@ export interface StatementDialogInput {
    * the way every screen reads the role; the database decides again.
    */
   canOverride: boolean;
+  /**
+   * Banking › Import statement (3.0.36): a line already here from this
+   * statement, or skipped as already here from another source or account, is
+   * not imported again, so the button counts only the new lines, the dialog
+   * says how many are already here before anything is sent, and a statement
+   * with nothing new is not offered. A reconciliation imports the statement to
+   * pair its lines with the books, already here or not, and leaves this off.
+   */
+  onlyNewLines?: boolean;
 }
 
 /** How the proof panel reads: the statement adds up, is out, or lacks a balance. */
@@ -148,6 +157,13 @@ export interface StatementDialogView {
   repeats: RepeatGroup[];
   /** Importing, while the server has not yet said which lines are already here: nothing can be sent. */
   checking: boolean;
+  /**
+   * With onlyNewLines (3.0.36): said before the import when some lines of the
+   * statement are already in this account's Bank Transactions from an earlier
+   * import of it — how many, or that every line is and nothing is new. Null
+   * otherwise.
+   */
+  alreadyHere: { text: string; nothingNew: boolean } | null;
   /** The import's button: "Import 42 lines", one click when the statement adds up. */
   okLabel: string;
   okDisabled: boolean;
@@ -196,6 +212,7 @@ export function statementDialogView(
   ].sort((a, b) => a - b);
   const repeats = check ? describeRepeats(input.lines, marks.aside, check.present, skip, money) : [];
   const checking = importing && input.lines.length > 0 && input.check === null;
+  const fresh = importing && input.onlyNewLines && check ? newLines(input.lines.length, aside, check.present, skip) : null;
 
   const onOffer = proof.prior.status === "offered" || proof.prior.status === "taken";
   return {
@@ -217,8 +234,67 @@ export function statementDialogView(
     otherAccountSkipped: heldSkipped.length,
     repeats,
     checking,
-    okLabel: input.lines.length ? importLinesLabel(proof.lineCount) : "Import",
-    okDisabled: proof.lineCount === 0 || !proof.proves || checking || elsewhere !== null,
+    alreadyHere: fresh && fresh.alreadyHere > 0 ? alreadyHereNotice(fresh, input.accounts?.here) : null,
+    okLabel: !input.lines.length
+      ? "Import"
+      : fresh && fresh.count < proof.lineCount
+        ? newLinesLabel(fresh.count)
+        : importLinesLabel(proof.lineCount),
+    okDisabled: proof.lineCount === 0 || !proof.proves || checking || elsewhere !== null || fresh?.count === 0,
+  };
+}
+
+/**
+ * Of the lines that count (none ticked Not a transaction), how many are new to
+ * this account, and how many are already here from this statement (3.0.36).
+ * A line skipped as already here from another source or account is not new
+ * either, but it is said in its own alert, so it is not counted as already here.
+ */
+export function newLines(
+  lineCount: number,
+  aside: ReadonlySet<number>,
+  present: Iterable<number>,
+  skip: Iterable<number>,
+): { count: number; alreadyHere: number; counted: number } {
+  const here = new Set(present);
+  const skipped = new Set(skip);
+  let count = 0;
+  let alreadyHere = 0;
+  let counted = 0;
+  for (let index = 0; index < lineCount; index++) {
+    if (aside.has(index)) continue;
+    counted += 1;
+    if (here.has(index)) alreadyHere += 1;
+    else if (!skipped.has(index)) count += 1;
+  }
+  return { count, alreadyHere, counted };
+}
+
+/** The button when some lines are not new: "Import 2 new lines", or "Nothing new to import". */
+export function newLinesLabel(count: number): string {
+  if (count === 0) return "Nothing new to import";
+  return `Import ${count.toLocaleString("en-US")} new ${count === 1 ? "line" : "lines"}`;
+}
+
+/** Said before the import: how much of this statement is already here (3.0.36). */
+export function alreadyHereNotice(
+  fresh: { count: number; alreadyHere: number; counted: number },
+  here: string | undefined,
+): { text: string; nothingNew: boolean } {
+  const account = here ?? "this bank account";
+  if (fresh.count === 0) {
+    return {
+      nothingNew: true,
+      text:
+        fresh.alreadyHere === fresh.counted
+          ? `Every line of this statement is already in Bank Transactions for ${account}, from an earlier import of it. There is nothing new to import.`
+          : `The lines of this statement are already in Bank Transactions for ${account}. There is nothing new to import.`,
+    };
+  }
+  const n = fresh.alreadyHere;
+  return {
+    nothingNew: false,
+    text: `${n.toLocaleString("en-US")} of ${fresh.counted.toLocaleString("en-US")} lines ${n === 1 ? "is" : "are"} already in Bank Transactions for ${account}, from an earlier import of this statement, and ${n === 1 ? "is" : "are"} not imported again.`,
   };
 }
 

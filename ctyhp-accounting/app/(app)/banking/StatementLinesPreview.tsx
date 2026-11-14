@@ -38,7 +38,8 @@ interface Props {
   /** Indexes ticked Not a transaction. */
   aside: ReadonlySet<number>;
   onAside: (index: number, aside: boolean) => void;
-  view: Pick<StatementDialogView, "repeats" | "otherSource" | "otherAccounts" | "elsewhere" | "skip">;
+  view: Pick<StatementDialogView, "repeats" | "otherSource" | "otherAccounts" | "elsewhere" | "skip"> &
+    Partial<Pick<StatementDialogView, "alreadyHere">>;
   /** Ticks a line already here — from another source, or under another bank account — back, to import it as well, or skips it again. */
   onBack: (index: number, back: boolean) => void;
   money: (minor: number) => string;
@@ -65,6 +66,10 @@ export default function StatementLinesPreview({ lines, aside, onAside, view, onB
   );
   return (
     <div className={styles.panel}>
+      {view.alreadyHere ? (
+        // Said before anything is sent (3.0.36): the server would import none of these lines again.
+        <Alert type={view.alreadyHere.nothingNew ? "warning" : "info"} showIcon title={view.alreadyHere.text} />
+      ) : null}
       {view.repeats.length ? (
         <ul className={styles.list}>
           {view.repeats.map((group) => (

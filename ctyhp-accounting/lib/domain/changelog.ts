@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.36",
+    date: "2026-11-14",
+    headline: "A month already reconciled is not reconciled a second time, and Import statement says what is already here before it imports.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A second reconciliation for a month already reconciled is refused",
+        detail:
+          "New reconciliation could be started for an ending date the account was already reconciled to, and with nothing ticked its difference read $0.00, so it could be completed: the same month signed off twice. It moved no money, but it is now refused. New reconciliation greys out the dates on or before the last completed reconciliation and says where the account is reconciled to, and a reconciliation that ends on or before another completed one cannot be completed. To change a reconciled month, reopen its reconciliation, as before.",
+        route: "/banking/reconcile",
+      },
+      {
+        kind: "changed",
+        title: "Import statement counts only the lines that are new",
+        detail:
+          "Importing a statement already imported into the account offered \"Import 4 lines\", then imported none and said so afterwards. The dialog now says before the import how many lines are already in Bank Transactions for the account, the button counts only the new ones (\"Import 2 new lines\"), and a statement with nothing new reads \"Nothing new to import\" and cannot be sent. Importing a statement into a reconciliation is unchanged: there it pairs the lines with the books, whether or not they are already here.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.35",
     date: "2026-11-14",
     headline: "Bank Transactions and General Ledger have a Columns button: move and resize columns with buttons, from the keyboard too, as well as by dragging.",
