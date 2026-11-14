@@ -8,6 +8,7 @@ import { flexColumn } from "@/components/ui/columns";
 import { ColumnHeaderCell, type ColumnHeaderCellProps } from "@/components/ui/ColumnHeaderCell";
 import { useColumnDrag } from "@/components/ui/useColumnDrag";
 import { useColumnResize } from "@/components/ui/useColumnResize";
+import ColumnsDialog from "@/components/ui/ColumnsDialog";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate } from "@/lib/format";
 import {
@@ -127,13 +128,13 @@ export default function BankTransactionsTable({
   // exactly the shipped order, and lives only in this component's state —
   // section 8 of the change request settled that a reorder does not survive
   // a reload or a fresh login.
-  const { order: columnOrder, headerCellProps } = useColumnDrag<BankColumnKey>(BANK_COLUMN_KEYS);
+  const { order: columnOrder, headerCellProps, move, reset: resetOrder } = useColumnDrag<BankColumnKey>(BANK_COLUMN_KEYS);
 
   // RQ-01-REV: this reader's own column widths. Unlike the order above these
   // do survive a reload — a bookkeeper narrows Description because their
   // descriptions are always long, and making them do it again every morning
   // would be the same wasted effort the video was reporting.
-  const { widths, resizeHandleProps, guardHeaderDrag } = useColumnResize<BankColumnKey>(
+  const { widths, resizeHandleProps, guardHeaderDrag, step, reset: resetWidths } = useColumnResize<BankColumnKey>(
     BANK_MEASURED_WIDTHS,
     BANK_WIDTH_STORAGE_KEY,
     BANK_MIN_WIDTHS,
@@ -314,6 +315,16 @@ export default function BankTransactionsTable({
 
   return (
     <>
+      {/* The same moves and widths without dragging (3.0.35, UI audit A9). */}
+      <div className="accounting-table-tools">
+        <ColumnsDialog
+          table="Bank Transactions"
+          columns={columnOrder.map((key) => ({ key, label: String(dataColumnsByKey.get(key)?.title ?? key), movable: true, resizable: key !== BANK_LAST_ELASTIC_KEY }))}
+          onMove={move}
+          onStep={step}
+          onReset={() => { resetOrder(); resetWidths(); }}
+        />
+      </div>
       {/* RQ-03 batch-action bar: only ever shown once a row is checked, and
           only offered to a reader who can write — matching every other
           write-gated control on this table. */}

@@ -22,6 +22,7 @@ import { generalLedgerAction } from "./actions";
 import type { GeneralLedger, GeneralLedgerRow } from "@/lib/services/journal";
 import { ColumnHeaderCell } from "@/components/ui/ColumnHeaderCell";
 import { useColumnResize } from "@/components/ui/useColumnResize";
+import ColumnsDialog from "@/components/ui/ColumnsDialog";
 import {
   GENERAL_LEDGER_BUDGET,
   GENERAL_LEDGER_DEFAULT_WIDTHS,
@@ -34,6 +35,15 @@ import { secondaryLine } from "@/components/ui/columns";
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
 const GENERAL_LEDGER_DEFAULT_PAGE_SIZE = 50;
+
+/** The columns with a resize handle, as their headings read: the Columns dialog lists these (3.0.35). */
+const GENERAL_LEDGER_RESIZABLE: readonly [GeneralLedgerColumnKey, string][] = [
+  ["date", "Date"],
+  ["entry", "Entry"],
+  ["debit", "Debit"],
+  ["credit", "Credit"],
+  ["running", "Running"],
+];
 
 interface Account {
   id: string;
@@ -118,7 +128,7 @@ export default function GeneralLedgerClient({
   // one they asked for — a wire description ran to several hundred characters
   // in a column that had no width of its own, so it got whatever room was
   // left after the six fixed ones.
-  const { widths, resizeHandleProps } = useColumnResize<GeneralLedgerColumnKey>(
+  const { widths, resizeHandleProps, step: stepWidth, reset: resetWidths } = useColumnResize<GeneralLedgerColumnKey>(
     GENERAL_LEDGER_DEFAULT_WIDTHS,
     GENERAL_LEDGER_WIDTH_STORAGE_KEY,
     {},
@@ -273,6 +283,13 @@ export default function GeneralLedgerClient({
             Clear filters
           </Button>
         ) : null}
+        {/* The column widths without dragging (3.0.35, UI audit A9). */}
+        <ColumnsDialog
+          table="General Ledger"
+          columns={GENERAL_LEDGER_RESIZABLE.map(([key, label]) => ({ key, label, movable: false, resizable: true }))}
+          onStep={stepWidth}
+          onReset={resetWidths}
+        />
       </Space>
     </div>
   );

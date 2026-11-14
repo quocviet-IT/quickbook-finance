@@ -60,3 +60,15 @@ export function reorderColumns<K extends string>(
   next.splice(to, 0, moved);
   return next;
 }
+
+/**
+ * One column one place along, for the Columns dialog (3.0.35, UI audit A9):
+ * the same reorder as a drag, without dragging. A column already at that end
+ * stays where it is. Returns a fresh array either way, as reorderColumns does.
+ */
+export function moveColumn<K extends string>(order: readonly K[], key: K, step: -1 | 1): K[] {
+  const from = order.indexOf(key);
+  const to = from + step;
+  if (from === -1 || to < 0 || to >= order.length) return [...order];
+  return reorderColumns(order, key, order[to]);
+}

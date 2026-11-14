@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.35",
+    date: "2026-11-14",
+    headline: "Bank Transactions and General Ledger have a Columns button: move and resize columns with buttons, from the keyboard too, as well as by dragging.",
+    changes: [
+      {
+        kind: "added",
+        title: "A Columns button to arrange columns without dragging",
+        detail:
+          "On Bank Transactions you can drag a column heading to move it and drag its edge to make it wider or narrower, and on General Ledger you can resize. That took a mouse held steady. Now each table has a Columns button that opens the columns in order, each with Move left and Move right (Bank Transactions) and Narrower and Wider, one step a press, usable with the keyboard and read out by a screen reader. Reset columns puts them back as they came. Dragging still works as before.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.34",
     date: "2026-11-14",
     headline: "On Permissions, switches no longer save as they move: change what you need, look it over, then Save changes.",
