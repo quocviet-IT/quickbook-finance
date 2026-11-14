@@ -978,6 +978,12 @@ export const rolePermissionSchema = z.object({
 });
 export type RolePermissionInput = z.infer<typeof rolePermissionSchema>;
 
+/** The permission matrix's changes, saved together (3.0.34). Four roles by every permission is the most there can be. */
+export const rolePermissionsSchema = z
+  .array(rolePermissionSchema)
+  .min(1, "There is nothing to save")
+  .max(400, "Too many changes at once");
+
 export const approvalPolicySchema = z.object({
   action_key: z.string().trim().min(1),
   enabled: z.boolean(),
