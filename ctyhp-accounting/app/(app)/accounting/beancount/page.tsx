@@ -6,6 +6,9 @@ import { beancountFileName } from "@/lib/domain/beancount";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { readBeancountSummary, type BeancountSummary } from "@/lib/services/beancount";
 import BeancountClient from "./BeancountClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/accounting/beancount");
 
 export const dynamic = "force-dynamic";
 

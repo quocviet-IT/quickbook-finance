@@ -6,6 +6,9 @@ import { listBills, listVendors } from "@/lib/services/payables";
 import { listCurrencies } from "@/lib/services/reference";
 import { hasPermission } from "@/lib/services/access";
 import FixedAssetsClient from "./FixedAssetsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/fixed-assets");
 
 export const dynamic = "force-dynamic";
 

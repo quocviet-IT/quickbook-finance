@@ -8,6 +8,9 @@ import { listActors } from "@/lib/services/access";
 import BankingSurface from "@/components/banking-surface/BankingSurface";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getBankingSurface } from "@/lib/services/banking-surface";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking/overview");
 
 export const dynamic = "force-dynamic";
 

@@ -8,6 +8,9 @@ import { listCreditMemos } from "@/lib/services/credits";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import CreditMemosClient from "./CreditMemosClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/credit-memos");
 
 export const dynamic = "force-dynamic";
 

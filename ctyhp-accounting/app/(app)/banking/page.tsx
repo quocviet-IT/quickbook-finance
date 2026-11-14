@@ -10,6 +10,9 @@ import PageHeader from "@/components/PageHeader";
 import BankingClient from "./BankingClient";
 import { isServerActionRender } from "@/lib/services/request-kind";
 import { readOpeningBankingView } from "./banking-view";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking");
 
 export const dynamic = "force-dynamic";
 

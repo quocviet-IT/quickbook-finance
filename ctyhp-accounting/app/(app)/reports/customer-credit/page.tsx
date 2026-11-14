@@ -4,6 +4,9 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import CustomerCreditClient from "./CustomerCreditClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/customer-credit");
 
 export const dynamic = "force-dynamic";
 

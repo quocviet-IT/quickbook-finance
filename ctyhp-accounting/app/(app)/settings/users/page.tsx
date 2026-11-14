@@ -6,6 +6,9 @@ import { getSessionUser, holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import { Alert } from "antd";
 import UsersClient from "./UsersClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/users");
 
 export const dynamic = "force-dynamic";
 

@@ -11,6 +11,9 @@ import { listAccounts } from "@/lib/services/accounts";
 import { todayInTimeZone } from "@/lib/services/dashboard";
 import { postedEntryDateSpan } from "@/lib/services/exceptions";
 import ReportsClient from "./ReportsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports");
 
 export const dynamic = "force-dynamic";
 

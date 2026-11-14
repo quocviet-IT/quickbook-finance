@@ -6,6 +6,9 @@ import PageHeader from "@/components/PageHeader";
 import CompaniesClient, { type CompanyBooks, type CompanyRow } from "./CompaniesClient";
 import type { CompanyRequestView } from "./actions";
 import { requireSettingsAccess } from "@/lib/db/settings-access";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/companies");
 
 export const dynamic = "force-dynamic";
 // `after` keeps provisioning running past the response this page's action

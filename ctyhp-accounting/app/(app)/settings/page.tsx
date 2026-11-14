@@ -2,6 +2,9 @@ import PageHeader from "@/components/PageHeader";
 import SettingsHubClient from "./SettingsHubClient";
 import { settingsGateFor, settingsHubForAccess } from "@/lib/domain/navigation";
 import { currentAccess } from "@/lib/db/settings-access";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings");
 
 export const dynamic = "force-dynamic";
 

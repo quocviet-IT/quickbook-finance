@@ -17,6 +17,9 @@ import PageHeader from "@/components/PageHeader";
 import InvoicesClient from "./InvoicesClient";
 import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
 import { defaultIn } from "@/lib/domain/posting-defaults";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/invoices");
 
 export const dynamic = "force-dynamic";
 

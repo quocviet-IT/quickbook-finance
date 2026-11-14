@@ -9,6 +9,9 @@ import { hasPermission } from "@/lib/services/access";
 import { companyClock } from "@/lib/services/report-context";
 import PageHeader from "@/components/PageHeader";
 import ItemsClient from "./ItemsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/items");
 
 export const dynamic = "force-dynamic";
 

@@ -8,6 +8,17 @@ import { buildOpenItemStatement, parseStatementAsOf } from "@/lib/domain/open-it
 import type { DocumentCompany } from "@/lib/domain/invoice-document";
 import PageHeader from "@/components/PageHeader";
 import OpenItemStatementClient from "./OpenItemStatementClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+import { customerTitle } from "@/lib/services/page-titles";
+
+/** The tab names the record (3.0.32); see lib/services/page-titles.ts. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return recordMetadata(null, "/customers");
+  const title = await customerTitle(await createSupabaseServerClient(), id);
+  return recordMetadata(title ? `Statement for ${title}` : "Statement", "/customers");
+}
 
 export const dynamic = "force-dynamic";
 

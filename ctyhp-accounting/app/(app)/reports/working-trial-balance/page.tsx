@@ -8,6 +8,9 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import WorkingTrialBalanceClient from "./WorkingTrialBalanceClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/working-trial-balance");
 
 export const dynamic = "force-dynamic";
 

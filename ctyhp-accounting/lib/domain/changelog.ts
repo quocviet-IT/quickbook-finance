@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.32",
+    date: "2026-11-14",
+    headline: "Each browser tab says which screen it is, Invoices · One Book, and a customer's or purchase order's tab names it.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Browser tabs are named after their screen",
+        detail:
+          "Every tab used to say One Book, so with Invoices, Customers and a report open side by side they could not be told apart, and a screen reader announced the same words on every page. Each tab now names its screen in the words of the menu, such as Invoices · One Book or Balance Sheet · One Book. A record's page names the record first: a customer's name, a purchase order's or stock count's number, the account and date of a reconciliation, the title of a guide or a statement file.",
+        route: "/invoices",
+      },
+    ],
+  },
+  {
     version: "3.0.31",
     date: "2026-11-14",
     headline: "The side menu and the Report Center's cards are no longer underlined.",

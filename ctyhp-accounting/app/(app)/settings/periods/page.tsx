@@ -4,6 +4,9 @@ import { canWrite, getUserRole, holdsPermission, isAdmin } from "@/lib/auth";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import PageHeader from "@/components/PageHeader";
 import PeriodsClient from "./PeriodsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/periods");
 
 export const dynamic = "force-dynamic";
 

@@ -4,6 +4,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import { reportPageContext } from "@/lib/services/report-context";
 import OpenDocumentsReport from "@/components/reports/OpenDocumentsReport";
 import { openInvoicesAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/open-invoices");
 
 export const dynamic = "force-dynamic";
 

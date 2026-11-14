@@ -8,6 +8,17 @@ import { listItems } from "@/lib/services/items";
 import { getUserRole, canWrite, holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrderDetailClient from "./PurchaseOrderDetailClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+import { purchaseOrderTitle } from "@/lib/services/page-titles";
+
+/** The tab names the record (3.0.32); see lib/services/page-titles.ts. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return recordMetadata(null, "/purchase-orders");
+  const title = await purchaseOrderTitle(await createSupabaseServerClient(), id);
+  return recordMetadata(title, "/purchase-orders");
+}
 
 export const dynamic = "force-dynamic";
 

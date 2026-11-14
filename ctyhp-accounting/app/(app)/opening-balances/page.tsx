@@ -4,6 +4,9 @@ import { listCurrencies } from "@/lib/services/reference";
 import { listAccounts } from "@/lib/services/accounts";
 import PageHeader from "@/components/PageHeader";
 import OpeningBalancesClient from "./OpeningBalancesClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/opening-balances");
 
 export const dynamic = "force-dynamic";
 

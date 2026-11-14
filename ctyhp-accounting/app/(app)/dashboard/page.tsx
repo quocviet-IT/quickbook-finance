@@ -6,6 +6,9 @@ import { Suspense } from "react";
 import NeedsAttention from "@/components/dashboard/NeedsAttention";
 import DashboardClient from "./DashboardClient";
 import NeedsSection from "./NeedsSection";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/dashboard");
 
 export const dynamic = "force-dynamic";
 

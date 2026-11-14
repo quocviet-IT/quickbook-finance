@@ -3,6 +3,9 @@ import PageHeader from "@/components/PageHeader";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { listActors } from "@/lib/services/access";
 import AuditClient from "./AuditClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/audit");
 
 export const dynamic = "force-dynamic";
 

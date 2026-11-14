@@ -13,6 +13,9 @@ import PageHeader from "@/components/PageHeader";
 import SalesReceiptsClient from "./SalesReceiptsClient";
 import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
 import { defaultIn } from "@/lib/domain/posting-defaults";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/sales-receipts");
 
 export const dynamic = "force-dynamic";
 

@@ -6,6 +6,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import { reportPageContext } from "@/lib/services/report-context";
 import PageHeader from "@/components/PageHeader";
 import CashFlowClient from "./CashFlowClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/cash-flow");
 
 export const dynamic = "force-dynamic";
 

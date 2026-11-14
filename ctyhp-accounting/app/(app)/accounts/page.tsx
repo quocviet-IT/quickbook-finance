@@ -8,6 +8,9 @@ import { getUserRole, canWrite } from "@/lib/auth";
 import { summarizeClassificationPlan } from "@/lib/services/account-classification";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import AccountsClient from "./AccountsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/accounts");
 
 export const dynamic = "force-dynamic";
 

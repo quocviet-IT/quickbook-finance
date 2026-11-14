@@ -4,6 +4,9 @@ import { reportPageContext } from "@/lib/services/report-context";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import GeneralLedgerClient from "./GeneralLedgerClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/general-ledger");
 
 export const dynamic = "force-dynamic";
 

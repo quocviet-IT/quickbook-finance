@@ -15,6 +15,17 @@ import PageHeader from "@/components/PageHeader";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import ReconcileWorkspaceClient from "./ReconcileWorkspaceClient";
 import { readReconcileWorkspace } from "./workspace-view";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+import { reconciliationTitle } from "@/lib/services/page-titles";
+
+/** The tab names the record (3.0.32); see lib/services/page-titles.ts. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return recordMetadata(null, "/banking/reconcile");
+  const title = await reconciliationTitle(await createSupabaseServerClient(), id);
+  return recordMetadata(title, "/banking/reconcile");
+}
 
 export const dynamic = "force-dynamic";
 

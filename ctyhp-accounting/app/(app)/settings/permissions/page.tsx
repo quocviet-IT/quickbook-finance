@@ -4,6 +4,9 @@ import { getPermissionMatrix } from "@/lib/services/access";
 import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PermissionMatrixClient from "./PermissionMatrixClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/permissions");
 
 export const dynamic = "force-dynamic";
 

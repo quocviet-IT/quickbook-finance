@@ -6,6 +6,9 @@ import { getUserRole, canWrite, isAdmin } from "@/lib/auth";
 import { companyClock } from "@/lib/services/report-context";
 import PageHeader from "@/components/PageHeader";
 import SalesTaxClient from "./SalesTaxClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/sales-tax");
 
 export const dynamic = "force-dynamic";
 

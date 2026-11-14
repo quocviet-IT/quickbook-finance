@@ -5,6 +5,9 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import Report1099Client from "./Report1099Client";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/1099");
 
 export const dynamic = "force-dynamic";
 

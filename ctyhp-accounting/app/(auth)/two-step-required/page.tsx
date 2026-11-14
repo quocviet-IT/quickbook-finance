@@ -3,6 +3,9 @@ import { currentUser, owesSecondStepNow, resolveActiveCompany } from "@/lib/db/c
 import { twoStepStanding } from "@/lib/db/two-step";
 import { CODE_STEP_PATH } from "@/lib/domain/two-step";
 import TwoStepRequiredClient from "./TwoStepRequiredClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Set up two-step sign-in" };
 
 export const dynamic = "force-dynamic";
 

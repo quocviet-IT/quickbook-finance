@@ -7,6 +7,17 @@ import { listActors } from "@/lib/services/access";
 import { reportPageContext } from "@/lib/services/report-context";
 import { getBookValue, getEntryNumber, getPostingContext, getStockCount } from "@/lib/services/stock-count";
 import StockCountDetailClient from "../StockCountDetailClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+import { stockCountTitle } from "@/lib/services/page-titles";
+
+/** The tab names the record (3.0.32); see lib/services/page-titles.ts. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return recordMetadata(null, "/inventory/stock-count");
+  const title = await stockCountTitle(await createSupabaseServerClient(), id);
+  return recordMetadata(title, "/inventory/stock-count");
+}
 
 export const dynamic = "force-dynamic";
 

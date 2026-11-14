@@ -5,6 +5,9 @@ import { fiscalYearForDate } from "@/lib/domain/fiscal";
 import { reportPageContext } from "@/lib/services/report-context";
 import CloseLogClient from "./CloseLogClient";
 import { closeLogAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/close-log");
 
 export const dynamic = "force-dynamic";
 

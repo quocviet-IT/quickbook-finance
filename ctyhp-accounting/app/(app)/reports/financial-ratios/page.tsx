@@ -4,6 +4,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import { reportPageContext } from "@/lib/services/report-context";
 import FinancialRatiosClient from "./FinancialRatiosClient";
 import { financialRatiosAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/financial-ratios");
 
 export const dynamic = "force-dynamic";
 

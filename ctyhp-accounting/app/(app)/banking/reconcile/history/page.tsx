@@ -8,6 +8,9 @@ import PageHeader from "@/components/PageHeader";
 import { getReconciliationHistoryWithStandings } from "@/lib/services/reconcile-history";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import ReconcileHistoryClient from "./ReconcileHistoryClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking/reconcile/history");
 
 export const dynamic = "force-dynamic";
 

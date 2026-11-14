@@ -6,6 +6,9 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { canWrite } from "@/lib/domain/roles";
 import { listSavedReports } from "@/lib/services/saved-reports";
 import SavedReportsClient from "./SavedReportsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/saved");
 
 export const dynamic = "force-dynamic";
 

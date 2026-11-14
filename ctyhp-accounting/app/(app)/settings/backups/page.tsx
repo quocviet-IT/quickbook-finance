@@ -3,6 +3,9 @@ import { requireSettingsAccess, currentAccess } from "@/lib/db/settings-access";
 import { isPlatformAdmin } from "@/lib/db/company";
 import { listBackupsAction } from "./actions";
 import BackupsClient from "./BackupsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/backups");
 
 export const dynamic = "force-dynamic";
 

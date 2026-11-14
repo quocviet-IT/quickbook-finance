@@ -4,6 +4,14 @@ import { guideFlowById, guideLanding, retiredGuideTarget } from "@/lib/domain/gu
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { guideVideoLinks } from "@/lib/services/guide-videos";
 import GuideFlowView from "./GuideFlowView";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+
+/** The guide's own title in the tab (3.0.32). Read from the guide's data, no database. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return recordMetadata(guideFlowById(id)?.title ?? null, "/guide");
+}
 
 /**
  * One workflow, on a page of its own (3.0.17). Only this workflow is handed to

@@ -6,6 +6,9 @@ import { hasPermission } from "@/lib/services/access";
 import { getUserRole, canWrite } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import VendorsClient from "./VendorsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/vendors");
 
 export const dynamic = "force-dynamic";
 

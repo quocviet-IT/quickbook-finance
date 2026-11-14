@@ -1,4 +1,7 @@
 import LoginClient from "./LoginClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 /**
  * Sign in. `?step=code` is where the app layout sends a session that owes its
