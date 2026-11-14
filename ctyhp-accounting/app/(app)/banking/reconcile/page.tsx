@@ -9,6 +9,9 @@ import { isServerActionRender } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import ReconcileListClient from "./ReconcileListClient";
 import { readReconcileAccount } from "./account-view";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking/reconcile");
 
 export const dynamic = "force-dynamic";
 

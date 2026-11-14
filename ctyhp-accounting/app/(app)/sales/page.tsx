@@ -8,6 +8,9 @@ import { listActors } from "@/lib/services/access";
 import SalesSurface from "@/components/sales-surface/SalesSurface";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getSalesSurface } from "@/lib/services/sales-surface";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/sales");
 
 export const dynamic = "force-dynamic";
 

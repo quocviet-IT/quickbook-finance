@@ -6,6 +6,9 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import ArAgingClient from "./ArAgingClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/ar-aging");
 
 export const dynamic = "force-dynamic";
 

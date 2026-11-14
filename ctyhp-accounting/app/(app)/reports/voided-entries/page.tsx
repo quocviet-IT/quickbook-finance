@@ -5,6 +5,9 @@ import { hasPermission } from "@/lib/services/access";
 import { reportPageContext } from "@/lib/services/report-context";
 import VoidedEntriesClient from "./VoidedEntriesClient";
 import { voidedEntriesAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/voided-entries");
 
 export const dynamic = "force-dynamic";
 

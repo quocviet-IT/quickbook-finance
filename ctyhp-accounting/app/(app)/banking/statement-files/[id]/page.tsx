@@ -3,6 +3,17 @@ import { createSupabaseServerClient } from "@/lib/db/server";
 import { getSavedReport, SavedReportNotFoundError, type SavedReportRow } from "@/lib/services/saved-reports";
 import PageHeader from "@/components/PageHeader";
 import StatementFileClient from "./StatementFileClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+import type { Metadata } from "next";
+import { savedReportTitle } from "@/lib/services/page-titles";
+
+/** The tab names the record (3.0.32); see lib/services/page-titles.ts. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return recordMetadata(null, "Statement file");
+  const title = await savedReportTitle(await createSupabaseServerClient(), id);
+  return recordMetadata(title, "Statement file");
+}
 
 export const dynamic = "force-dynamic";
 

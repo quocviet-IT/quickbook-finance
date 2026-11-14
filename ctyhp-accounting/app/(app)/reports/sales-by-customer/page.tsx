@@ -4,6 +4,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import { reportPageContext } from "@/lib/services/report-context";
 import PartyActivityReport from "@/components/reports/PartyActivityReport";
 import { salesByCustomerAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/sales-by-customer");
 
 export const dynamic = "force-dynamic";
 

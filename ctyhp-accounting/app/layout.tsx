@@ -24,7 +24,8 @@ import "./globals.css";
 import "antd/dist/antd.css";
 
 export const metadata: Metadata = {
-  title: "One Book",
+  // Each page names itself (lib/domain/page-title.ts, 3.0.32): "Invoices · One Book".
+  title: { default: "One Book", template: "%s · One Book" },
   description: "One Book accounting operations webapp",
 };
 

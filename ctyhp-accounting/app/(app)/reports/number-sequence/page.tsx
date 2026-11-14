@@ -5,6 +5,9 @@ import { resolveActiveCompany } from "@/lib/db/company";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import NumberSequenceClient from "./NumberSequenceClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/number-sequence");
 
 export const dynamic = "force-dynamic";
 

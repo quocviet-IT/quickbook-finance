@@ -8,6 +8,9 @@ import { canShowNavItem } from "@/lib/domain/navigation";
 import { reportPageContext } from "@/lib/services/report-context";
 import ChangeLogClient from "./ChangeLogClient";
 import { changeLogAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/change-log");
 
 export const dynamic = "force-dynamic";
 

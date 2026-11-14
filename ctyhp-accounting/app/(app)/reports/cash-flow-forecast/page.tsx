@@ -4,6 +4,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import CashForecastReport from "@/components/reports/CashForecastReport";
 import { reportPageContext } from "@/lib/services/report-context";
 import { cashForecastAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/cash-flow-forecast");
 
 export const dynamic = "force-dynamic";
 

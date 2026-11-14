@@ -8,6 +8,9 @@ import { listFinancialAnalyses } from "@/lib/services/financial-analysis";
 import { listCurrencies } from "@/lib/services/reference";
 import { reportPageContext } from "@/lib/services/report-context";
 import AnalysisClient from "./AnalysisClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/analysis");
 
 export const dynamic = "force-dynamic";
 

@@ -8,6 +8,9 @@ import { JOURNAL_DEFAULT_PAGE_SIZE } from "@/lib/domain/journal-paging";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import JournalClient from "./JournalClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/journal");
 
 export const dynamic = "force-dynamic";
 

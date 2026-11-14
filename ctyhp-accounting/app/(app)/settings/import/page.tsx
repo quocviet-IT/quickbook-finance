@@ -5,6 +5,9 @@ import { listAccounts } from "@/lib/services/accounts";
 import PageHeader from "@/components/PageHeader";
 import ImportClient from "./ImportClient";
 import { requireSettingsAccess } from "@/lib/db/settings-access";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/import");
 
 export const dynamic = "force-dynamic";
 

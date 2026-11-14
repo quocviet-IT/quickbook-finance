@@ -18,6 +18,9 @@ import MatchWindowPreference from "./MatchWindowPreference";
 import RelatedCompaniesSection, { type RelatedListRow } from "./RelatedCompaniesSection";
 import RepaymentsSection, { type RepaymentListRow } from "./RepaymentsSection";
 import RulesClient, { type RuleListRow } from "./RulesClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking/rules");
 
 export const dynamic = "force-dynamic";
 

@@ -3,6 +3,9 @@ import { twoStepStanding } from "@/lib/db/two-step";
 import { verifiedAppFactors } from "@/lib/domain/two-step";
 import PageHeader from "@/components/PageHeader";
 import TwoStepClient from "./TwoStepClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/account/two-step");
 
 export const dynamic = "force-dynamic";
 

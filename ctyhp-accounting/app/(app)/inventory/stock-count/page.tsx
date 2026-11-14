@@ -6,6 +6,9 @@ import { listActors } from "@/lib/services/access";
 import { reportPageContext } from "@/lib/services/report-context";
 import { listStockCountSummaries } from "@/lib/services/stock-count";
 import StockCountListClient, { type CountListRow } from "./StockCountListClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/inventory/stock-count");
 
 export const dynamic = "force-dynamic";
 

@@ -6,6 +6,9 @@ import { reportPageContext } from "@/lib/services/report-context";
 import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import PageHeader from "@/components/PageHeader";
 import GlPostingClient from "./GlPostingClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/gl-posting");
 
 export const dynamic = "force-dynamic";
 

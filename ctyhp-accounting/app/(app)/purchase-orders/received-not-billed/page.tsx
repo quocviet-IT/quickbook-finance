@@ -3,6 +3,9 @@ import { getReceivedNotBilled } from "@/lib/services/purchasing";
 import { listCurrencies } from "@/lib/services/reference";
 import PageHeader from "@/components/PageHeader";
 import ReceivedNotBilledClient from "./ReceivedNotBilledClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/purchase-orders/received-not-billed");
 
 export const dynamic = "force-dynamic";
 

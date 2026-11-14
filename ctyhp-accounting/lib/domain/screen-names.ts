@@ -26,6 +26,7 @@ const OTHER_SCREENS: Readonly<Record<string, string>> = {
   "/banking/reconcile/history": "Reconcile history",
   "/purchase-orders/received-not-billed": "Received Not Billed",
   "/account/two-step": "Two-step sign-in",
+  "/banking/reconcile/from-files": "Reconcile from statement files",
 };
 
 const NAMES: ReadonlyMap<string, string> = (() => {

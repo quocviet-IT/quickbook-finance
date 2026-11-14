@@ -12,6 +12,9 @@ import type { RunContext } from "@/lib/domain/statement-run";
 import { statementFileAccount } from "@/lib/domain/statement-evidence";
 import PageHeader from "@/components/PageHeader";
 import FromFilesClient from "./FromFilesClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/banking/reconcile/from-files");
 
 export const dynamic = "force-dynamic";
 

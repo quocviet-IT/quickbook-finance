@@ -5,6 +5,9 @@ import { getSessionUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import ApprovalsClient from "./ApprovalsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/approvals");
 
 export const dynamic = "force-dynamic";
 

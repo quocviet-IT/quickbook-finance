@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { guideLanding } from "@/lib/domain/guide-help";
 import GuideHome, { type GuideTab } from "./GuideHome";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/guide");
 
 /**
  * The guide (3.0.17): every workflow, what changed in each release, and what

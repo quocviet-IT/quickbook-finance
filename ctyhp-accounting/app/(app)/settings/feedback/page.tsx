@@ -7,6 +7,9 @@ import {
 } from "@/lib/services/feedback";
 import FeedbackTriageClient from "./FeedbackTriageClient";
 import MyReportsClient from "./MyReportsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/feedback");
 
 export const dynamic = "force-dynamic";
 

@@ -10,6 +10,9 @@ import {
 import { listCurrencies } from "@/lib/services/reference";
 import { reportPageContext } from "@/lib/services/report-context";
 import FixedAssetReportClient from "./FixedAssetReportClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/fixed-assets");
 
 export const dynamic = "force-dynamic";
 

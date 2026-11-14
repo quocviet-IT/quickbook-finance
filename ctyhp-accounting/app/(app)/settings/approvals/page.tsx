@@ -5,6 +5,9 @@ import { listCurrencies } from "@/lib/services/reference";
 import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import ApprovalPoliciesClient from "./ApprovalPoliciesClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/approvals");
 
 export const dynamic = "force-dynamic";
 

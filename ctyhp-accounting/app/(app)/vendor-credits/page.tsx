@@ -7,6 +7,9 @@ import { listVendorCredits } from "@/lib/services/credits";
 import { firstPaintRead } from "@/lib/services/request-kind";
 import PageHeader from "@/components/PageHeader";
 import VendorCreditsClient from "./VendorCreditsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/vendor-credits");
 
 export const dynamic = "force-dynamic";
 

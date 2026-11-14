@@ -14,6 +14,9 @@ import EstimatesClient from "./EstimatesClient";
 import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
 import { defaultIn } from "@/lib/domain/posting-defaults";
 import type { EstimateListEntry } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/estimates");
 
 export const dynamic = "force-dynamic";
 

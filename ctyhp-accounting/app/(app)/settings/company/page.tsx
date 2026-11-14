@@ -8,6 +8,9 @@ import { listAccounts } from "@/lib/services/accounts";
 import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
 import PageHeader from "@/components/PageHeader";
 import CompanySettingsClient from "./CompanySettingsClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/company");
 
 export const dynamic = "force-dynamic";
 

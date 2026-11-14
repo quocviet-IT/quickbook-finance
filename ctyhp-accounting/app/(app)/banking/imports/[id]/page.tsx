@@ -4,6 +4,10 @@ import { canWrite, getUserRole } from "@/lib/auth";
 import { loadImportReview } from "@/lib/services/statement-review";
 import PageHeader from "@/components/PageHeader";
 import ReviewImportClient from "./ReviewImportClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+
+/** A fixed name: one import looks like another until it is opened (3.0.32). */
+export const metadata = recordMetadata("Review import", "/banking/transactions");
 
 export const dynamic = "force-dynamic";
 

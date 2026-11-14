@@ -7,6 +7,9 @@ import { listVendors } from "@/lib/services/payables";
 import { listTaxCodes } from "@/lib/services/reference";
 import { listRecurringRuns, listRecurringTemplates } from "@/lib/services/recurring";
 import RecurringClient from "./RecurringClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/recurring");
 
 export const dynamic = "force-dynamic";
 

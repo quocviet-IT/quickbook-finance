@@ -4,6 +4,9 @@ import { getPurchasingConfig } from "@/lib/services/purchasing";
 import { holdsPermission } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import PurchasingConfigClient from "./PurchasingConfigClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/purchasing");
 
 export const dynamic = "force-dynamic";
 

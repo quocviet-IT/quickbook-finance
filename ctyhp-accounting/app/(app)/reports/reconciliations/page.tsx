@@ -4,6 +4,9 @@ import ReportEntityBadge from "@/components/reports/ReportEntityBadge";
 import { reportPageContext } from "@/lib/services/report-context";
 import ReconciliationsClient from "./ReconciliationsClient";
 import { reconciliationsAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/reconciliations");
 
 export const dynamic = "force-dynamic";
 

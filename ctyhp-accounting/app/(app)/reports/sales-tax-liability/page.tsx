@@ -8,6 +8,9 @@ import { listTaxCodes } from "@/lib/services/reference";
 import { reportPageContext } from "@/lib/services/report-context";
 import SalesTaxLiabilityClient from "./SalesTaxLiabilityClient";
 import { salesTaxLiabilityAction } from "./actions";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/sales-tax-liability");
 
 export const dynamic = "force-dynamic";
 

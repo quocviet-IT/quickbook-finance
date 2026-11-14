@@ -8,6 +8,9 @@ import { listActors } from "@/lib/services/access";
 import InventorySurface from "@/components/inventory-surface/InventorySurface";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getInventorySurface } from "@/lib/services/inventory-surface";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/inventory");
 
 export const dynamic = "force-dynamic";
 

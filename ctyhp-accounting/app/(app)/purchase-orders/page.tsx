@@ -8,6 +8,9 @@ import { getUserRole, canWrite } from "@/lib/auth";
 import { hasPermission } from "@/lib/services/access";
 import PageHeader from "@/components/PageHeader";
 import PurchaseOrdersClient from "./PurchaseOrdersClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/purchase-orders");
 
 export const dynamic = "force-dynamic";
 

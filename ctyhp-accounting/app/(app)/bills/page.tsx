@@ -10,6 +10,9 @@ import { billablePurchaseOrders } from "@/lib/domain/purchasing";
 import PageHeader from "@/components/PageHeader";
 import BillsClient from "./BillsClient";
 import { postingDefaultsOrNone } from "@/lib/services/posting-defaults";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/bills");
 
 export const dynamic = "force-dynamic";
 

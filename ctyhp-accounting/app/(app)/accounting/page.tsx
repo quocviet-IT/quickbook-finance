@@ -6,6 +6,9 @@ import { listActors } from "@/lib/services/access";
 import AccountingDashboard from "@/components/accounting-dashboard/AccountingDashboard";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import { getAccountingDashboard } from "@/lib/services/accounting-dashboard";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/accounting");
 
 export const dynamic = "force-dynamic";
 

@@ -6,6 +6,9 @@ import { LOAD_FAILED, isRealIsoDate } from "@/lib/domain/balance-comparison";
 import { loadBalanceComparison, type BalanceComparisonData } from "@/lib/services/balance-comparison";
 import { reportPageContext } from "@/lib/services/report-context";
 import BalanceComparisonClient from "./BalanceComparisonClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/reports/balance-comparison");
 
 export const dynamic = "force-dynamic";
 

@@ -4,6 +4,9 @@ import { requireSettingsPermission } from "@/lib/db/settings-access";
 import { isPlatformAdmin } from "@/lib/db/company";
 import { Alert } from "antd";
 import RestoreClient, { type RestoreSnapshot } from "./RestoreClient";
+import { recordMetadata } from "@/lib/domain/page-title";
+
+export const metadata = recordMetadata("Restore as new company", "/settings/backups");
 
 export const dynamic = "force-dynamic";
 // Provisioning alone builds 75 tables in ~20 seconds, and the load and the

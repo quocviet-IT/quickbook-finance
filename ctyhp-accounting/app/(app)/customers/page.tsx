@@ -6,6 +6,9 @@ import { listUsStates } from "@/lib/services/reference";
 import { getUserRole, canWrite } from "@/lib/auth";
 import PageHeader from "@/components/PageHeader";
 import CustomersClient from "./CustomersClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/customers");
 
 export const dynamic = "force-dynamic";
 

@@ -5,6 +5,9 @@ import { requireSettingsAccess } from "@/lib/db/settings-access";
 import { getWorkPolicy } from "@/lib/services/work-policy";
 import { listCurrencies } from "@/lib/services/reference";
 import WorkPolicyClient from "./WorkPolicyClient";
+import { pageMetadata } from "@/lib/domain/page-title";
+
+export const metadata = pageMetadata("/settings/work-policy");
 
 export const dynamic = "force-dynamic";
 
