@@ -632,10 +632,6 @@
   margin-bottom: -14px;
 }
 
-.rows:first-child {
-  margin-top: -14px;
-}
-
 .needRow {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) auto;
@@ -762,10 +758,6 @@
   margin-bottom: -14px;
 }
 
-.tableFlush:first-child {
-  margin-top: -14px;
-}
-
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -787,6 +779,10 @@
   color: var(--ob-text-secondary);
   font-size: 13px;
   font-weight: 600;
+}
+
+.table tbody th {
+  font-weight: 400;
 }
 
 .table tbody tr:last-child > * {
@@ -839,7 +835,7 @@
   padding-right: 16px;
 }
 
-.accountNumber {
+.aside {
   margin-left: 6px;
   font-size: 12px;
   color: var(--ob-text-secondary);
