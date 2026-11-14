@@ -342,10 +342,18 @@ a {
  * thing telling it from the words around it, and beside secondary text the
  * two colours are 1.4:1 apart: a reader who does not see the difference saw
  * no link at all. A link that stands on its own — a name in a table, the
- * menu, a button — keeps no underline. `:is()` rather than `:where()` so the
- * rule outweighs Ant Design's own stylesheet, which loads after this one.
+ * menu, a card's title, a button — keeps no underline. `:is()` rather than
+ * `:where()` so the rule outweighs Ant Design's own stylesheet, which loads
+ * after this one.
+ *
+ * Only containers that hold sentences (3.0.31). 3.0.30 also named `li` and
+ * `.ant-typography`, and those reach far past running text: every item of the
+ * side menu is an `li`, and a report card's title is a Typography title. The
+ * whole menu and every card on the Report Center came out underlined. A
+ * paragraph whose link should be underlined is a `p`, an alert, an empty
+ * state, a table's second line, or marked `accounting-prose`.
  */
-:is(p, li, dd, .ant-typography, .ant-alert-title, .ant-alert-description, .ant-empty-description, .accounting-secondary-line, .accounting-prose) a:not(.ant-btn) {
+:is(p, .ant-alert-title, .ant-alert-description, .ant-empty-description, .accounting-secondary-line, .accounting-prose) a:not(.ant-btn) {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;

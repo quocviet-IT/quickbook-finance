@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.31",
+    date: "2026-11-14",
+    headline: "The side menu and the Report Center's cards are no longer underlined.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Underlines only on links inside a sentence",
+        detail:
+          "3.0.30 underlined links inside a sentence, but it also caught every item of the side menu and the title of every card on the Report Center, which are links that stand on their own. They are back to how they were. A link in a sentence, such as the journal entry under a bill or Set the work policy, stays underlined.",
+        route: "/reports",
+      },
+    ],
+  },
+  {
     version: "3.0.30",
     date: "2026-11-13",
     headline: "Easier to read in both themes: the dark theme's buttons, every placeholder and small print, the coloured tags, and links inside a sentence.",
