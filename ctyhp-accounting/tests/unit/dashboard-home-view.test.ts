@@ -10,6 +10,7 @@ import {
   homeTabOf,
   HOME_TABS,
   lastPostedIndex,
+  ledgerDifference,
   missingMonthsSentence,
   netIncomeLabel,
   otherCurrencies,
@@ -18,6 +19,7 @@ import {
   percentChange,
   receivablesLine,
   stepsDone,
+  tiesToLedger,
 } from "@/components/dashboard-home/view";
 import type { HomeBank, HomeBankAccount, HomeMonth, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import { formatMoney } from "@/lib/format";
@@ -110,8 +112,8 @@ describe("the note above the figures", () => {
 });
 
 describe("the lines under the four figures", () => {
-  const receivables = { valueMinor: 6_431_000, series: [], overdueMinor: 1_875_000, overdueInvoices: 4 };
-  const payables = { valueMinor: 2_748_000, series: [], overdueMinor: 0, overdueBills: 0, dueSoonMinor: 420_000, dueSoonBills: 2 };
+  const receivables = { valueMinor: 6_431_000, ledgerMinor: 6_431_000, series: [], overdueMinor: 1_875_000, overdueInvoices: 4 };
+  const payables = { valueMinor: 2_748_000, ledgerMinor: 2_748_000, series: [], overdueMinor: 0, overdueBills: 0, dueSoonMinor: 420_000, dueSoonBills: 2 };
 
   it("leads with what is overdue, in red, then the count", () => {
     expect(receivablesLine(receivables, money)).toEqual({ tone: "danger", lead: "$18,750.00 overdue", rest: " · 4 invoices" });
@@ -122,9 +124,34 @@ describe("the lines under the four figures", () => {
   });
 
   it("says nothing is open, rather than nothing overdue, when nothing is", () => {
-    expect(receivablesLine({ ...receivables, valueMinor: 0, overdueMinor: 0 }, money).lead).toBe("No open invoices");
-    expect(payablesLine({ ...payables, valueMinor: 0, dueSoonMinor: 0 }, money).lead).toBe("No open bills");
+    expect(receivablesLine({ ...receivables, valueMinor: 0, ledgerMinor: 0, overdueMinor: 0 }, money).lead).toBe("No open invoices");
+    expect(payablesLine({ ...payables, valueMinor: 0, ledgerMinor: 0, dueSoonMinor: 0 }, money).lead).toBe("No open bills");
     expect(payablesLine({ ...payables, dueSoonMinor: 0 }, money).lead).toBe("Nothing due in 7 days");
+  });
+
+  it("says what the ledger shows when the open documents do not add up to it", () => {
+    // Books entered as journal entries: a balance in the ledger and no invoice behind it.
+    const noInvoices = { ...receivables, valueMinor: 0, ledgerMinor: 25_000_000, overdueMinor: 0, overdueInvoices: 0 };
+    expect(tiesToLedger(noInvoices)).toBe(false);
+    expect(receivablesLine(noInvoices, money)).toEqual({ tone: "warning", lead: "Ledger shows $250,000.00", rest: "" });
+    expect(payablesLine({ ...payables, ledgerMinor: 3_000_000, dueSoonMinor: 0 }, money)).toEqual({
+      tone: "warning",
+      lead: "Ledger shows $30,000.00",
+      rest: "",
+    });
+    // Something overdue is still said first.
+    expect(receivablesLine({ ...receivables, ledgerMinor: 7_000_000 }, money).lead).toBe("$18,750.00 overdue");
+    expect(tiesToLedger(receivables)).toBe(true);
+  });
+
+  it("puts the difference from the ledger in a sentence, and says nothing when there is none", () => {
+    expect(ledgerDifference("Accounts Receivable", 0, 25_000_000, money)).toBe(
+      "Accounts Receivable in the ledger is $250,000.00, $250,000.00 more than what is listed here.",
+    );
+    expect(ledgerDifference("Accounts Payable", 2_748_000, 2_500_000, money)).toBe(
+      "Accounts Payable in the ledger is $25,000.00, $2,480.00 less than what is listed here.",
+    );
+    expect(ledgerDifference("Accounts Payable", 2_748_000, 2_748_000, money)).toBeNull();
   });
 
   it("names the month of the net income figure", () => {

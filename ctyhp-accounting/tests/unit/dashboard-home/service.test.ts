@@ -255,6 +255,9 @@ describe("getDashboardHome", () => {
     // The ledger's month-end balances: receivables debit positive, payables shown positive.
     expect(figures.receivables.series).toEqual([12_000_00, 14_000_00, 16_000_00, 18_000_00, 20_000_00, 20_000_00]);
     expect(figures.payables.series).toEqual([8_000_00, 9_000_00, 10_000_00, 11_000_00, 12_000_00, 12_000_00]);
+    // The control accounts' balances today, from the read both aging reports share: here the open documents add up to them.
+    expect([figures.receivables.ledgerMinor, receivables.ledgerMinor]).toEqual([20_000_00, 20_000_00]);
+    expect([figures.payables.ledgerMinor, payables.ledgerMinor]).toEqual([12_000_00, 12_000_00]);
   });
 
   it("sums only base-currency payments and counts the others apart", async () => {

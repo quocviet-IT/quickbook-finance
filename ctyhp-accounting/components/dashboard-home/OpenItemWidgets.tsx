@@ -6,7 +6,7 @@ import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import { formatDate, formatMoney, plural } from "@/lib/format";
 import { stackShares } from "./charts/geometry";
 import styles from "./dashboard-home.module.css";
-import { billDueLook, daysLate, otherCurrencies } from "./view";
+import { billDueLook, daysLate, ledgerDifference, otherCurrencies } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
 type Money = (minor: number) => string;
@@ -23,12 +23,15 @@ const DUE_SOON = tokenVar("intent.warning");
  */
 function OpenSideSummary({
   side,
+  ledger,
   noun,
   laterLabel,
   laterColor,
   money,
 }: {
   side: HomeOpenSide;
+  /** The control account's name and balance, said when the open documents do not add up to it. */
+  ledger: { account: string; minor: number };
   /** "invoice" or "bill" */
   noun: string;
   laterLabel: string;
@@ -36,6 +39,7 @@ function OpenSideSummary({
   money: Money;
 }) {
   const [overdueShare, soonShare, laterShare] = stackShares([side.overdueMinor, side.dueSoonMinor, side.laterMinor]);
+  const ledgerNote = ledgerDifference(ledger.account, side.totalMinor, ledger.minor, money);
   const parts = [
     { key: "overdue", label: "Overdue", color: OVERDUE, minor: side.overdueMinor, count: side.overdueDocuments, share: overdueShare },
     { key: "soon", label: "Due in 7 days", color: DUE_SOON, minor: side.dueSoonMinor, count: side.dueSoonDocuments, share: soonShare },
@@ -49,6 +53,7 @@ function OpenSideSummary({
         {side.creditsMinor < 0 ? (
           <span className={styles.heroSub}>After {money(-side.creditsMinor)} in credits and unapplied payments</span>
         ) : null}
+        {ledgerNote ? <span className={`${styles.heroSub} ${styles.warning}`}>{ledgerNote}</span> : null}
       </div>
       <div
         className={styles.stack}
@@ -126,7 +131,14 @@ export function InvoicesWidget({
     <Widget title="Invoices" footer={footer}>
       <div className={styles.split}>
         <div className={styles.splitMain}>
-          <OpenSideSummary side={data} noun="invoice" laterLabel="Not due yet" laterColor={tokenVar("series.income")} money={money} />
+          <OpenSideSummary
+            side={data}
+            ledger={{ account: "Accounts Receivable", minor: data.ledgerMinor }}
+            noun="invoice"
+            laterLabel="Not due yet"
+            laterColor={tokenVar("series.income")}
+            money={money}
+          />
           <p className={styles.caption}>
             <b>{money(received.baseMinor)}</b> received in the last 30 days
             {otherCurrencies(received.otherCurrencyCount)}
@@ -216,7 +228,14 @@ export function BillsWidget({
     <Widget title="Bills" footer={footer}>
       <div className={styles.split}>
         <div className={styles.splitMain}>
-          <OpenSideSummary side={data} noun="bill" laterLabel="Due later" laterColor={tokenVar("series.secondary")} money={money} />
+          <OpenSideSummary
+            side={data}
+            ledger={{ account: "Accounts Payable", minor: data.ledgerMinor }}
+            noun="bill"
+            laterLabel="Due later"
+            laterColor={tokenVar("series.secondary")}
+            money={money}
+          />
           <p className={styles.caption}>
             <b>{money(paid.baseMinor)}</b> paid in the last 30 days
             {otherCurrencies(paid.otherCurrencyCount)}

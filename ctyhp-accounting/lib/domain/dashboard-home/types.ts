@@ -50,11 +50,18 @@ export interface HomeFigures {
     /** "vs same days in Oct" */
     compareLabel: string;
   };
-  /** valueMinor is the A/R aging total; series are ledger month-end balances (debit positive). */
-  receivables: { valueMinor: number; series: number[]; overdueMinor: number; overdueInvoices: number };
+  /**
+   * valueMinor is the A/R aging total; series are ledger month-end balances (debit positive).
+   * ledgerMinor is the Accounts Receivable control balance as of asOf: it differs from
+   * valueMinor when the open documents do not add up to the ledger (entries posted
+   * straight to the account, or today's exchange rate).
+   */
+  receivables: { valueMinor: number; ledgerMinor: number; series: number[]; overdueMinor: number; overdueInvoices: number };
   /** valueMinor is the A/P aging total; series are ledger month-end balances, shown positive (credit minus debit). */
   payables: {
     valueMinor: number;
+    /** The Accounts Payable control balance as of asOf, shown positive; differs from valueMinor when the open documents do not add up to the ledger. */
+    ledgerMinor: number;
     series: number[];
     overdueMinor: number;
     overdueBills: number;
@@ -164,6 +171,8 @@ export interface HomeOwesLongest {
 }
 
 export interface HomeReceivables extends HomeOpenSide {
+  /** The Accounts Receivable control balance as of asOf; equals totalMinor when the aging report ties to the ledger. */
+  ledgerMinor: number;
   /** Customer payments dated in the 30 days through asOf, not void. Only base-currency payments are summed. */
   receivedLast30: { baseMinor: number; count: number; otherCurrencyCount: number };
   /** Balance of the undeposited-funds accounts; null when there is none, or when the ledger could not be read. */
@@ -182,6 +191,8 @@ export interface HomeNextBill {
 }
 
 export interface HomePayables extends HomeOpenSide {
+  /** The Accounts Payable control balance as of asOf, shown positive; equals totalMinor when the aging report ties to the ledger. */
+  ledgerMinor: number;
   /** Bill payments dated in the 30 days through asOf, not void. Only base-currency payments are summed. */
   paidLast30: { baseMinor: number; count: number; otherCurrencyCount: number };
   /** At most 5, soonest due first (late bills come first). */

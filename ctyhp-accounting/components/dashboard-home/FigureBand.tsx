@@ -7,7 +7,7 @@ import type { HomeFigures, HomeStatus } from "@/lib/domain/dashboard-home/types"
 import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import Sparkline from "./charts/Sparkline";
 import styles from "./dashboard-home.module.css";
-import { lastPostedDay, lastPostedIndex, netIncomeLabel, payablesLine, receivablesLine, type FigureLine } from "./view";
+import { lastPostedDay, lastPostedIndex, netIncomeLabel, payablesLine, receivablesLine, tiesToLedger, type FigureLine } from "./view";
 import { Delta, Unavailable } from "./Widget";
 
 const INCOME = tokenVar("series.income");
@@ -131,14 +131,15 @@ export default function FigureBand({
           value={money(data.receivables.valueMinor)}
           line={<Line line={receivablesLine(data.receivables, money)} />}
           href="/reports/ar-aging"
-          spark={<Sparkline values={data.receivables.series} posted={posted} color={QUIET} />}
+          // The six months are the ledger's: beside a figure that does not tie to it they would tell another story.
+          spark={tiesToLedger(data.receivables) ? <Sparkline values={data.receivables.series} posted={posted} color={QUIET} /> : null}
         />
         <Figure
           label="You owe"
           value={money(data.payables.valueMinor)}
           line={<Line line={payablesLine(data.payables, money)} />}
           href="/reports/ap-aging"
-          spark={<Sparkline values={data.payables.series} posted={posted} color={QUIET} />}
+          spark={tiesToLedger(data.payables) ? <Sparkline values={data.payables.series} posted={posted} color={QUIET} /> : null}
         />
       </div>
     </div>

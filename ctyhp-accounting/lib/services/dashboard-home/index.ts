@@ -434,12 +434,14 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
       },
       receivables: {
         valueMinor: arSide.totalMinor,
+        ledgerMinor: ar.controlBalanceMinor,
         series: b.receivables.slice(shownFrom),
         overdueMinor: arSide.overdueMinor,
         overdueInvoices: arSide.overdueDocuments,
       },
       payables: {
         valueMinor: apSide.totalMinor,
+        ledgerMinor: ap.controlBalanceMinor,
         series: b.payables.slice(shownFrom),
         overdueMinor: apSide.overdueMinor,
         overdueBills: apSide.overdueDocuments,
@@ -499,6 +501,7 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     const [ar, receivedLast30, undepositedMinor] = await Promise.all([receivablesAging, received, undeposited]);
     return {
       ...splitOpenSide(ar.rows, asOf, "invoice"),
+      ledgerMinor: ar.controlBalanceMinor,
       receivedLast30,
       undepositedMinor,
       owesLongest: owesLongest(ar.rows, asOf, 5),
@@ -507,7 +510,12 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
 
   const payables = async (): Promise<HomePayables> => {
     const [ap, paidLast30] = await Promise.all([payablesAging, paid]);
-    return { ...splitOpenSide(ap.rows, asOf, "bill"), paidLast30, nextBills: nextBills(ap.rows, asOf, 5) };
+    return {
+      ...splitOpenSide(ap.rows, asOf, "bill"),
+      ledgerMinor: ap.controlBalanceMinor,
+      paidLast30,
+      nextBills: nextBills(ap.rows, asOf, 5),
+    };
   };
 
   const bank = async (): Promise<HomeBank> => {

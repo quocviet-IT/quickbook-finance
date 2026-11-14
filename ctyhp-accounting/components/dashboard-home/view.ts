@@ -114,10 +114,36 @@ export interface FigureLine {
   rest: string;
 }
 
+/** True when the open documents add up to the control account: the figure and the ledger then say the same thing. */
+export function tiesToLedger(figure: { valueMinor: number; ledgerMinor: number }): boolean {
+  return figure.valueMinor === figure.ledgerMinor;
+}
+
+/**
+ * "Ledger shows $X": said under a figure whose open documents do not add up
+ * to its control account, so nobody takes the smaller story for the whole one.
+ * Something overdue is said first; this comes before the quiet lines.
+ */
+function ledgerLine(figure: { valueMinor: number; ledgerMinor: number }, money: Money): FigureLine | null {
+  return tiesToLedger(figure) ? null : { tone: "warning", lead: `Ledger shows ${money(figure.ledgerMinor)}`, rest: "" };
+}
+
+/**
+ * The sentence the Invoices and Bills cards print when the ledger and the
+ * open documents disagree; null when they agree.
+ */
+export function ledgerDifference(account: string, totalMinor: number, ledgerMinor: number, money: Money): string | null {
+  if (totalMinor === ledgerMinor) return null;
+  const difference = ledgerMinor - totalMinor;
+  return `${account} in the ledger is ${money(ledgerMinor)}, ${money(Math.abs(difference))} ${difference > 0 ? "more" : "less"} than what is listed here.`;
+}
+
 export function receivablesLine(figure: HomeFigures["receivables"], money: Money): FigureLine {
   if (figure.overdueMinor > 0) {
     return { tone: "danger", lead: `${money(figure.overdueMinor)} overdue`, rest: ` · ${plural(figure.overdueInvoices, "invoice")}` };
   }
+  const ledger = ledgerLine(figure, money);
+  if (ledger) return ledger;
   return { tone: null, lead: figure.valueMinor === 0 ? "No open invoices" : "Nothing overdue", rest: "" };
 }
 
@@ -128,6 +154,8 @@ export function payablesLine(figure: HomeFigures["payables"], money: Money): Fig
   if (figure.dueSoonMinor > 0) {
     return { tone: "warning", lead: `${money(figure.dueSoonMinor)} due in 7 days`, rest: ` · ${plural(figure.dueSoonBills, "bill")}` };
   }
+  const ledger = ledgerLine(figure, money);
+  if (ledger) return ledger;
   return { tone: null, lead: figure.valueMinor === 0 ? "No open bills" : "Nothing due in 7 days", rest: "" };
 }
 
