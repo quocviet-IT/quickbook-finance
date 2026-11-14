@@ -31,8 +31,10 @@ function Figure({
     <IntentLink href={href} className={styles.kpi}>
       <span className={styles.kpiGrid}>
         <span className={styles.kpiLabel}>{label}</span>
-        <span className={styles.kpiValue}>{value}</span>
-        <span className={styles.kpiSpark}>{spark}</span>
+        <span className={styles.kpiRow}>
+          <span className={styles.kpiValue}>{value}</span>
+          <span className={styles.kpiSpark}>{spark}</span>
+        </span>
         <span className={styles.kpiLine}>{line}</span>
       </span>
     </IntentLink>

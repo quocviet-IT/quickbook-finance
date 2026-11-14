@@ -113,24 +113,29 @@
 }
 
 .kpiGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "label label"
-    "value spark"
-    "line line";
-  align-items: end;
-  gap: 2px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .kpiLabel {
-  grid-area: label;
   font-size: 13px;
   color: var(--ob-text-secondary);
 }
 
+/*
+ * The value and its sparkline share a line while both fit, and the sparkline
+ * drops under the value when they do not: a long figure never runs into it.
+ */
+.kpiRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
 .kpiValue {
-  grid-area: value;
   font-size: 24px;
   font-weight: 600;
   line-height: 1.3;
@@ -140,35 +145,21 @@
 }
 
 .kpiSpark {
-  grid-area: spark;
+  flex: none;
   margin-bottom: 4px;
 }
 
 .kpiLine {
-  grid-area: line;
   font-size: 13px;
   line-height: 18px;
   color: var(--ob-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-/* A figure too narrow for its value and its sparkline side by side: one under the other. */
-@container kpi (max-width: 250px) {
-  .kpiGrid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "label"
-      "value"
-      "spark"
-      "line";
-  }
-
+/* Two to a row on a phone: a smaller figure, so a seven-digit amount still fits. */
+@container kpi (max-width: 200px) {
   .kpiValue {
-    font-size: 20px;
-  }
-
-  .kpiSpark {
-    margin: 2px 0;
+    font-size: 19px;
   }
 }
 
@@ -296,7 +287,7 @@
   gap: 8px;
   min-height: 44px;
   padding: 6px 16px;
-  border-top: 1px solid var(--ob-border-subtle);
+  border-top: 1px solid var(--ob-border-default);
   font-size: 13px;
 }
 
@@ -634,7 +625,7 @@
 
 .needRow {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(36px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 0 12px;
   min-height: 52px;
@@ -775,6 +766,10 @@
 
 .table thead th {
   height: 36px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  line-height: 16px;
+  white-space: normal;
   background: var(--ob-surface-muted);
   color: var(--ob-text-secondary);
   font-size: 13px;
@@ -809,6 +804,13 @@
 .table .wrap {
   white-space: normal;
   min-width: 180px;
+}
+
+/* A name: it wraps rather than widen the table past its card. */
+.table .name {
+  min-width: 120px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .table .totalRow > * {
@@ -924,7 +926,7 @@
 }
 
 /* Too narrow for three across: one under another. */
-@container (max-width: 300px) {
+@container (max-width: 330px) {
   .figs {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;

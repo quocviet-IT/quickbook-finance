@@ -154,7 +154,7 @@ export function InvoicesWidget({
               ) : (
                 data.owesLongest.map((row) => (
                   <tr key={row.customerId}>
-                    <td>
+                    <td className={styles.name}>
                       <TextLink href={`/customers/${row.customerId}`}>{row.name}</TextLink>
                     </td>
                     <td className={styles.muted}>{daysLate(row.daysLate)}</td>
@@ -247,7 +247,7 @@ export function BillsWidget({
                   return (
                     <tr key={`${bill.vendorName}-${bill.billNumber ?? ""}-${i}`}>
                       <td>{formatDate(bill.dueDate)}</td>
-                      <td>
+                      <td className={styles.name}>
                         {bill.vendorName}
                         {bill.billNumber ? <span className={styles.aside}>{bill.billNumber}</span> : null}
                       </td>
@@ -306,7 +306,7 @@ export function PaymentsWidget({ payments }: { payments: SectionEnvelope<HomePay
             {data.map((payment) => (
               <tr key={payment.id}>
                 <td className={styles.muted}>{formatDate(payment.date)}</td>
-                <td>{payment.customerName}</td>
+                <td className={styles.name}>{payment.customerName}</td>
                 <td className={styles.num}>{formatMoney(payment.amountMinor, payment.currencyCode, payment.decimals)}</td>
               </tr>
             ))}

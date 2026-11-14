@@ -16,7 +16,7 @@ function AccountRow({ account, money }: { account: HomeBankAccount; money: Money
   const amount = (minor: number) => (account.isCard ? cardBalance(minor, money) : money(minor));
   return (
     <tr>
-      <td>
+      <td className={styles.name}>
         <TextLink href={account.href}>{account.name}</TextLink>
         {account.masked ? <span className={styles.aside}>{account.masked}</span> : null}
       </td>
@@ -111,7 +111,7 @@ export function BankAccountsWidget({
             ))}
             {otherCash ? (
               <tr>
-                <td>
+                <td className={styles.name}>
                   Cash not in a bank account
                   <span className={styles.aside}>{plural(otherCash.accounts, "ledger account")}</span>
                 </td>
@@ -220,7 +220,7 @@ export function ActivityWidget({ activity, timeZone }: { activity: SectionEnvelo
             {data.map((row) => (
               <tr key={row.id}>
                 <td className={styles.muted}>{formatDateTime(row.occurredAt, timeZone)}</td>
-                <td>{row.actor}</td>
+                <td className={styles.name}>{row.actor}</td>
                 <td className={styles.wrap}>
                   <TextLink href={row.href}>
                     {row.verb} {row.entity.toLowerCase()}

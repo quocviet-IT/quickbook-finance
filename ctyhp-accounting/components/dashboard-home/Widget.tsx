@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDownOutlined, ArrowUpOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { Button, Card, Select } from "antd";
 import IntentLink from "@/components/IntentLink";
+import { tokenVar } from "@/lib/design/tokens";
 import type { HomePeriodKey } from "@/lib/domain/dashboard-home/types";
 import styles from "./dashboard-home.module.css";
 import { PERIOD_OPTIONS } from "./view";
@@ -14,10 +15,13 @@ import { PERIOD_OPTIONS } from "./view";
  * links; and the three states a card can be in besides its figures.
  */
 
-/** 8px corners and a 48px head, as the rest of the page; set here, inline, so no stylesheet order can undo them. */
+/**
+ * 8px corners, a 48px head and the same 1px line as the band and the note
+ * above the tabs; set here, inline, so no stylesheet order can undo them.
+ */
 const CARD_STYLES = {
-  root: { borderRadius: 8 },
-  header: { minHeight: 48, padding: "0 16px" },
+  root: { borderRadius: 8, borderColor: tokenVar("border.default") },
+  header: { minHeight: 48, padding: "0 16px", borderBottomColor: tokenVar("border.default") },
   body: { padding: 0 },
 } satisfies Record<string, CSSProperties>;
 
