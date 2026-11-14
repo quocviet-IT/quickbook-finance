@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.38",
+    date: "2026-11-14",
+    headline: "The dashboard is rebuilt around four figures and four tabs, and says how far the books are posted.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Four figures on top, then Overview, Money in, Money out, and Banking and close",
+        detail:
+          "Cash on hand, net income this month, what customers owe you and what you owe sit in one band above four tabs, each with six months beside it and a link to its report. Overview has cash flow, Needs attention, profit and loss, expenses and insights; Money in has invoices, recent payments, sales and aging; Money out has bills and expenses; Banking and close has the bank accounts, the month-end close and recent accounting activity. Each tab shows how many things wait on it, and the tab you choose stays in the address.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "A note says how far the books are posted, and a month not entered yet is shown as not posted instead of zero",
+        detail:
+          "The top of the page says the last day posted, the last bank line imported and the last month closed. When nothing has been posted since before last month it says so, and the charts show the months not entered yet as Not posted rather than as months with nothing in them.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "A 30-day cash projection from invoices and bills due, and what customers owe longest",
+        detail:
+          "Cash flow adds the invoices and takes away the bills due in the next 30 days from cash today, and says which overdue invoices and bills it leaves out. Invoices lists the customers who have owed longest, and Bills the next bills to pay.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Each part of the dashboard loads and fails on its own",
+        detail:
+          "A part that cannot be read says so in its own card, with Retry, and the rest of the page stays as it is. Needs attention and the month-end close load after the figures, so they never hold them up.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "3.0.36",
     date: "2026-11-14",
     headline: "A month already reconciled is not reconciled a second time, and Import statement says what is already here before it imports.",
