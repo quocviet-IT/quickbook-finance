@@ -412,6 +412,22 @@ a {
   --ant-geekblue-7: var(--ob-tag-geekblue);
 }
 
+/*
+ * A permission switch flipped but not saved (3.0.34): ringed, so the reader can
+ * see exactly what Save will write before pressing it. The row also carries an
+ * Unsaved tag, as Approval policies does.
+ */
+.permission-matrix__cell {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+}
+
+.permission-matrix__cell--changed {
+  outline: 2px dashed var(--ob-intent-warning);
+  outline-offset: 1px;
+}
+
 /* A list of links, one to a line, each tall enough to press (3.0.30). */
 .accounting-link-list {
   display: grid;

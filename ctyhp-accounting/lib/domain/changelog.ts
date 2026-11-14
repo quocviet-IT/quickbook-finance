@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.34",
+    date: "2026-11-14",
+    headline: "On Permissions, switches no longer save as they move: change what you need, look it over, then Save changes.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Permissions are saved with Save changes",
+        detail:
+          "Each switch on the permission matrix used to save the moment it moved, so a slip of the mouse took a permission away from everyone in that role at once. Now a switch you change is ringed and its row marked Unsaved, the foot of the page counts the unsaved changes, and nothing is saved until you press Save changes. Save lists every change first, such as Accountant gets Approve bills or Sales loses Manage items, and asks you to confirm. Discard changes puts the matrix back as it is saved, and leaving the page with changes asks first. If the server refuses a change, the others are saved and the refused one stays marked, with the reason beside Save.",
+        route: "/settings/permissions",
+      },
+    ],
+  },
+  {
     version: "3.0.33",
     date: "2026-11-14",
     headline: "When the reconciliation screen cannot read something, it says which part, why, and offers Retry, instead of a passing Failed.",
