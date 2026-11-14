@@ -359,7 +359,8 @@ describe("getDashboardHome", () => {
   it("works out the insights from the same reads", async () => {
     const { home } = await load();
     expect(home.insights.data!.map((i) => i.headline)).toEqual([
-      "2 customers owe 100% of what is overdue",
+      // Two overdue customers: the larger one is named, never both (afaf1806).
+      "1 customer owes 59% of what is overdue",
       "Cash covers 2.3 months of expenses",
       "Gross margin is 56.0%, down from 60.0% in October",
     ]);
