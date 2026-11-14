@@ -428,6 +428,50 @@ a {
   outline-offset: 1px;
 }
 
+/*
+ * The Columns button above a table whose columns can be moved or resized, and
+ * its dialog (3.0.35): one row a column, its buttons at the end.
+ */
+.accounting-table-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.columns-dialog__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.columns-dialog__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--ob-border-subtle);
+}
+
+.columns-dialog__buttons {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* The place of a button a row does not have: the width of a small round one. */
+.columns-dialog__spacer {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+}
+
+.columns-dialog__said {
+  min-height: 22px;
+  margin: 12px 0 0;
+  color: var(--ob-text-secondary);
+}
+
 /* A list of links, one to a line, each tall enough to press (3.0.30). */
 .accounting-link-list {
   display: grid;

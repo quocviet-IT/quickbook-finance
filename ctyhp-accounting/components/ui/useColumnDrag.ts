@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { DragEvent } from "react";
-import { reorderColumns } from "@/lib/domain/column-order";
+import { moveColumn, reorderColumns } from "@/lib/domain/column-order";
 import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
 
 /**
@@ -32,10 +32,27 @@ export interface UseColumnDragResult<K extends string> {
    * ColumnHeaderCell's module comment for why that alone is enough.
    */
   headerCellProps: (key: K) => ColumnHeaderCellProps;
+  /**
+   * The same reorder without dragging (3.0.35, UI audit A9), for the Columns
+   * dialog: one place left or right. Returns the column's new position,
+   * counted from 1, for the dialog to announce.
+   */
+  move: (key: K, step: -1 | 1) => number;
+  /** Back to the shipped order. */
+  reset: () => void;
 }
 
 export function useColumnDrag<K extends string>(defaultOrder: readonly K[]): UseColumnDragResult<K> {
   const [order, setOrder] = useState<K[]>(() => [...defaultOrder]);
+  const move = useCallback(
+    (key: K, step: -1 | 1) => {
+      const next = moveColumn(order, key, step);
+      setOrder(next);
+      return next.indexOf(key) + 1;
+    },
+    [order],
+  );
+  const reset = useCallback(() => setOrder([...defaultOrder]), [defaultOrder]);
   const [draggingKey, setDraggingKey] = useState<K | null>(null);
   const [overKey, setOverKey] = useState<K | null>(null);
 
@@ -84,5 +101,5 @@ export function useColumnDrag<K extends string>(defaultOrder: readonly K[]): Use
     [draggingKey, overKey],
   );
 
-  return { order, headerCellProps };
+  return { order, headerCellProps, move, reset };
 }

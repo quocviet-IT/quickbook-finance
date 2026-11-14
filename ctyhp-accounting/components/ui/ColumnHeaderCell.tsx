@@ -36,6 +36,8 @@ export interface ColumnHeaderCellProps extends HTMLAttributes<HTMLTableCellEleme
   "data-dragging"?: boolean;
   /** Set only on the column currently under the pointer as a drop target. */
   "data-drop-target"?: boolean;
+  /** "<table>:<column>", on a resizable heading: how the Columns dialog measures it (3.0.35). */
+  "data-column-key"?: string;
   /**
    * Begin a width drag. Present only on a resizable column; its absence is
    * what decides that no handle is drawn. Never reaches the DOM — it is

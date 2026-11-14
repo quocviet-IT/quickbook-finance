@@ -236,3 +236,24 @@ export function resizeWithinBox<K extends string>(
   const allowed = wanted <= current ? wanted : Math.max(current, Math.min(wanted, ceiling));
   return { ...widths, [key]: Math.max(min, allowed) };
 }
+
+/**
+ * How far one press of Narrower or Wider moves a column in the Columns dialog
+ * (3.0.35, UI audit A9): the width change a drag gives, without dragging.
+ * Twenty pixels is about two characters, small enough to settle on a width,
+ * large enough that a few presses make a visible difference.
+ */
+export const COLUMN_WIDTH_STEP = 20;
+
+/** A column's width one step narrower or wider, by the same rules as a drag. */
+export function stepColumnWidth<K extends string>(
+  widths: Partial<Record<K, number>>,
+  key: K,
+  /** Its width now: its own, or what the browser gave an elastic column. */
+  currentWidth: number,
+  direction: -1 | 1,
+  budget: BoxBudget,
+  mins: Partial<Record<K, number>> = {},
+): Partial<Record<K, number>> {
+  return resizeWithinBox({ ...widths, [key]: Math.round(currentWidth) }, key, Math.round(currentWidth) + direction * COLUMN_WIDTH_STEP, budget, mins);
+}

@@ -9,6 +9,7 @@ import {
   parseStoredWidths,
   resizeWithinBox,
   serializeColumnWidths,
+  stepColumnWidth,
 } from "@/lib/domain/column-width";
 import { TABLE_BOX_AT_1280 } from "@/lib/design/table-metrics";
 import type { ColumnHeaderCellProps } from "./ColumnHeaderCell";
@@ -66,6 +67,15 @@ export interface UseColumnResizeResult<K extends string> {
   guardHeaderDrag: <P extends { onDragStart?: (event: DragEvent<HTMLTableCellElement>) => void }>(
     props: P,
   ) => P;
+  /**
+   * A width change without dragging (3.0.35, UI audit A9), for the Columns
+   * dialog: one step narrower or wider, by the same rules as a drag. Returns
+   * the column's new width in pixels, or null when its heading is not on the
+   * page to be measured.
+   */
+  step: (key: K, direction: -1 | 1) => number | null;
+  /** Back to the shipped widths, which are saved in place of the reader's. */
+  reset: () => void;
 }
 
 interface ActiveResize<K> {
@@ -154,6 +164,9 @@ export function useColumnResize<K extends string>(
 
   const resizeHandleProps = useCallback(
     (key: K): ColumnHeaderCellProps => ({
+      // How `step` below finds this heading to measure it: an elastic column
+      // has no width in state, only the one the browser gave it.
+      "data-column-key": `${storageKey}:${key}`,
       onResizeStart: (event: ReactPointerEvent<HTMLElement>) => {
         // Stops the browser turning this press into a text selection or into
         // the native header drag; `guardHeaderDrag` below is the second half
@@ -202,8 +215,24 @@ export function useColumnResize<K extends string>(
     // `mins` and `budget` are module constants at every call site, so listing
     // them is free; a caller building one inline would re-create these props
     // per render, which costs nothing worse than the render itself.
-    [widths, mins, budget],
+    [widths, mins, budget, storageKey],
   );
+
+  const step = useCallback(
+    (key: K, direction: -1 | 1): number | null => {
+      const cell = document.querySelector<HTMLElement>(`th[data-column-key="${CSS.escape(`${storageKey}:${key}`)}"]`);
+      if (!cell) return null;
+      const box = cell.closest(".ant-table")?.clientWidth ?? measuredBox.current ?? TABLE_BOX_AT_1280;
+      measuredBox.current = box;
+      const next = stepColumnWidth(widths, key, widths[key] ?? cell.getBoundingClientRect().width, direction, { box, ...budget }, mins);
+      setWidths(next);
+      return next[key] ?? null;
+    },
+    [widths, mins, budget, storageKey],
+  );
+
+  // The shipped widths, saved over the reader's by the effect above.
+  const reset = useCallback(() => setWidths(defaults), [defaults]);
 
   const guardHeaderDrag = useCallback(
     <P extends { onDragStart?: (event: DragEvent<HTMLTableCellElement>) => void }>(props: P): P => ({
@@ -222,5 +251,5 @@ export function useColumnResize<K extends string>(
     [],
   );
 
-  return { widths, resizeHandleProps, guardHeaderDrag };
+  return { widths, resizeHandleProps, guardHeaderDrag, step, reset };
 }
