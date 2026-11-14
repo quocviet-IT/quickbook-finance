@@ -19,14 +19,14 @@ export default function Sparkline({
 }: {
   values: readonly number[];
   posted: readonly boolean[];
-  /** A `var(--ob-…)` colour. */
+  /** A `var(--ob-…)` color. */
   color: string;
 }) {
   const { points, slot } = sparkPoints(values, posted, WIDTH, HEIGHT);
   const lines = runs(points);
   const last = [...points].reverse().find((point) => point !== null) ?? null;
   const gapWidth = px(Math.max(8, slot * 0.7));
-  // Centred on the month, and kept whole inside the 92 pixels at either end.
+  // Centered on the month, and kept whole inside the 92 pixels at either end.
   const gapX = (i: number) => px(Math.min(WIDTH - gapWidth - 1, Math.max(1, 2 + i * slot - gapWidth / 2)));
   return (
     <svg

@@ -16,7 +16,7 @@ import { Delta, Empty, LinkButton, PercentDelta, PeriodSelect, Swatch, TextLink,
 
 const INCOME = tokenVar("series.income");
 const SECONDARY = tokenVar("series.secondary");
-/** The ring's colours, in the order the lines come: the four largest accounts, then everything else. */
+/** The ring's colors, in the order the lines come: the four largest accounts, then everything else. */
 const DONUT_COLORS = [
   tokenVar("series.income"),
   tokenVar("series.secondary"),

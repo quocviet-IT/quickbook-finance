@@ -16,7 +16,7 @@ export interface DonutLine {
   key: string;
   name: string;
   amountMinor: number;
-  /** A `var(--ob-…)` colour. */
+  /** A `var(--ob-…)` color. */
   color: string;
 }
 

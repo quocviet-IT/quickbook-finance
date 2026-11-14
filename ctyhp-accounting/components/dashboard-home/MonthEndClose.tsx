@@ -7,7 +7,7 @@ import styles from "./dashboard-home.module.css";
 import { stepsDone } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
-/** How each step's state reads: a word and a tone, never a colour alone. */
+/** How each step's state reads: a word and a tone, never a color alone. */
 const STEP_LOOKS: Record<HomeCloseStep["status"], StatusLook> = {
   complete: { tone: "positive", label: "Done" },
   outstanding: { tone: "warning", label: "To do" },

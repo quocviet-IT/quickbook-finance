@@ -196,7 +196,7 @@ export const PALETTE = {
   antGoldDark7: "#e8b339",
 
   /*
-   * The Dashboard's second chart colour (3.0.38): expenses and money out,
+   * The Dashboard's second chart color (3.0.38): expenses and money out,
    * beside the teal of income and money in. A deep navy on a light card, and
    * a pale one on a dark card, so the pair reads apart in both themes.
    */

@@ -266,7 +266,7 @@ export const TOKENS = {
     expense: PALETTE.orange700,
     /**
      * The Dashboard's second series (3.0.38): expenses and money out beside
-     * income and money in, so one page reads in two chart colours, with red
+     * income and money in, so one page reads in two chart colors, with red
      * and amber left to mean overdue and due soon.
      */
     secondary: PALETTE.navy700,

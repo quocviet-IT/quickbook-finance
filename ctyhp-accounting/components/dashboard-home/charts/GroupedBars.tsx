@@ -15,7 +15,7 @@ export interface BarSeries {
   key: string;
   label: string;
   values: readonly number[];
-  /** A `var(--ob-…)` colour. */
+  /** A `var(--ob-…)` color. */
   color: string;
 }
 

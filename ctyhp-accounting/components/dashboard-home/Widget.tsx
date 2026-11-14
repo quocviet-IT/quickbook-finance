@@ -124,7 +124,7 @@ export function Empty({ title, children, action }: { title: string; children?: R
 }
 
 /**
- * A change in money with its direction as an arrow and in words, so colour is
+ * A change in money with its direction as an arrow and in words, so color is
  * never the only sign of it. `good` says which way is good news: up for cash
  * and income, down for spending.
  */
@@ -179,7 +179,7 @@ export function PeriodSelect({
   );
 }
 
-/** A colour key: a small square, or a short line for a balance, in a `var(--ob-…)` colour. */
+/** A color key: a small square, or a short line for a balance, in a `var(--ob-…)` color. */
 export function Swatch({ color, line = false, dashed = false, empty = false }: { color?: string; line?: boolean; dashed?: boolean; empty?: boolean }) {
   if (line) {
     return (

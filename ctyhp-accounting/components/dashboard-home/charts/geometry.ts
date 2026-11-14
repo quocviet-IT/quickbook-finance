@@ -57,7 +57,7 @@ export function yScale(ticks: readonly number[], top: number, bottom: number): (
 }
 
 /**
- * The centre of each of `count` equal bands between `left` and `right`, and a
+ * The center of each of `count` equal bands between `left` and `right`, and a
  * band's width. `extra` adds room after the last band (a fraction of a band),
  * where the cash chart puts its projected point.
  */
@@ -67,7 +67,7 @@ export function bands(count: number, left: number, right: number, extra = 0): { 
 }
 
 /**
- * Where each bar of a group sits: `count` bars side by side, centred on the
+ * Where each bar of a group sits: `count` bars side by side, centered on the
  * band, at most `widest` pixels each and never wider than the band allows,
  * with `gap` pixels between them.
  */

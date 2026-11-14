@@ -184,8 +184,8 @@ describe("money on the Dashboard", () => {
   });
 });
 
-describe("colour on the Dashboard", () => {
-  it("has no hex colour and never reads the light-only TOKENS", () => {
+describe("color on the Dashboard", () => {
+  it("has no hex color and never reads the light-only TOKENS", () => {
     for (const file of SCREEN) {
       const source = read(file);
       expect(source.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [], file).toEqual([]);
@@ -193,7 +193,7 @@ describe("colour on the Dashboard", () => {
     }
   });
 
-  it("colours SVG shapes through their style, never a presentation attribute holding a colour", () => {
+  it("colors SVG shapes through their style, never a presentation attribute holding a color", () => {
     for (const file of SCREEN.filter((path) => path.endsWith(".tsx"))) {
       const source = read(file);
       const attributes = source.match(/\b(fill|stroke)="[^"]*"/g) ?? [];
@@ -202,7 +202,7 @@ describe("colour on the Dashboard", () => {
     }
   });
 
-  it("draws expenses and money out in the second chart colour, and the donut in the five agreed", () => {
+  it("draws expenses and money out in the second chart color, and the donut in the five agreed", () => {
     expect(read("components/dashboard-home/charts/CashFlowChart.tsx")).toContain('tokenVar("series.secondary")');
     expect(read("components/dashboard-home/ProfitWidgets.tsx")).toMatch(
       /DONUT_COLORS = \[\s*tokenVar\("series\.income"\),\s*tokenVar\("series\.secondary"\),\s*tokenVar\("series\.net"\),\s*tokenVar\("series\.governance"\),\s*tokenVar\("series\.other"\),\s*\]/,

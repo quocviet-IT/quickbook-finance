@@ -3,7 +3,7 @@
  * and a twelve-column grid of cards.
  *
  * The app's own component language: Ant Design cards with a plain head, 1px
- * borders, 8px corners, no shadows, no gradients. Two chart colours (income
+ * borders, 8px corners, no shadows, no gradients. Two chart colors (income
  * and the secondary series) and red and amber only for overdue and due soon.
  *
  * Widths are decided by the space a part is given, not by the window: the band,
