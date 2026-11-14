@@ -6,7 +6,7 @@
  *
  * 1. books behind: "N months are missing from the books";
  * 2. a loss in the last full posted month;
- * 3. what is overdue, owed mostly by a few customers;
+ * 3. what is overdue, owed mostly by a few customers (never all of them);
  * 4. how many months of expenses cash covers;
  * 5. a change in gross margin of a point or more.
  *
@@ -24,6 +24,8 @@ export const MAX_INSIGHTS = 3;
 export const RUNWAY_MONTHS = { most: 5, fewest: 2 } as const;
 /** The smallest change in gross margin worth a sentence, in percentage points. */
 export const MARGIN_CHANGE_POINTS = 1;
+/** The most customers the receivables sentence names. */
+export const CONCENTRATION_CUSTOMERS = 3;
 
 export interface HomeInsightFacts {
   asOf: string;
@@ -97,15 +99,17 @@ function concentrationInsight(facts: HomeInsightFacts, money: Money): HomeInsigh
   if (parties === null || parties.length < 2) return null;
   const totalMinor = parties.reduce((sum, party) => sum + party.overdueMinor, 0);
   if (totalMinor <= 0) return null;
+  // Always fewer than everyone who is overdue: "2 customers owe 100%" says nothing.
   const top = [...parties]
     .sort((a, b) => b.overdueMinor - a.overdueMinor || a.name.localeCompare(b.name))
-    .slice(0, 3);
+    .slice(0, Math.min(CONCENTRATION_CUSTOMERS, parties.length - 1));
   const topMinor = top.reduce((sum, party) => sum + party.overdueMinor, 0);
+  const owe = pluralWord(top.length, "owes", "owe");
   return {
     key: "receivables-concentration",
     kind: "Receivables",
-    headline: `${top.length} customers owe ${Math.round((topMinor / totalMinor) * 100)}% of what is overdue`,
-    detail: `${listWords(top.map((party) => party.name))} owe ${money(topMinor)} of ${money(totalMinor)}.`,
+    headline: `${plural(top.length, "customer")} ${owe} ${Math.round((topMinor / totalMinor) * 100)}% of what is overdue`,
+    detail: `${listWords(top.map((party) => party.name))} ${owe} ${money(topMinor)} of ${money(totalMinor)}.`,
     link: { label: "Review overdue", href: `/invoices?queue=overdue&asOf=${facts.asOf}` },
   };
 }

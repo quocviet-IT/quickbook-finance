@@ -107,9 +107,14 @@ describe("overdue owed by a few customers", () => {
     });
   });
 
-  it("names fewer customers when fewer are overdue, and needs at least two", () => {
+  it("never names everyone who is overdue, and needs at least two", () => {
+    const three = homeInsights(facts({ overdueParties: parties.slice(0, 3) }), formatBaseMoney).find((i) => i.key === "receivables-concentration");
+    // 12,550 of 15,550 is 81%.
+    expect(three?.headline).toBe("2 customers owe 81% of what is overdue");
     const two = homeInsights(facts({ overdueParties: parties.slice(0, 2) }), formatBaseMoney).find((i) => i.key === "receivables-concentration");
-    expect(two?.headline).toBe("2 customers owe 100% of what is overdue");
+    // 7,400 of 12,550 is 59%.
+    expect(two?.headline).toBe("1 customer owes 59% of what is overdue");
+    expect(two?.detail).toBe("Sample Retail Co. owes $7,400.00 of $12,550.00.");
     expect(keys(facts({ overdueParties: parties.slice(0, 1) }))).not.toContain("receivables-concentration");
     expect(keys(facts({ overdueParties: [] }))).not.toContain("receivables-concentration");
   });
