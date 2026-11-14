@@ -18,6 +18,7 @@ import TableEmpty from "@/components/ui/TableEmpty";
 import DataTable from "@/components/ui/DataTable";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { RECONCILE_HISTORY, RECONCILE_HISTORY_PATH } from "@/lib/domain/reconcile-history";
+import { endsWithinReconciled, lastCompletedEnding, reconciledToNote, reconciledToRefusal } from "@/lib/domain/reconcile-period";
 import { createReconciliationAction, reconcileAccountAction } from "./actions";
 import type { ReconcileAccountView } from "./account-view";
 import StandingCard from "./StandingCard";
@@ -139,6 +140,9 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
     rowCount: shownRows.length,
     standingSettled,
   });
+
+  // A period already reconciled is not started again (3.0.36): its dates are greyed out, and the database refuses too.
+  const reconciledTo = lastCompletedEnding(shownRows);
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -282,8 +286,23 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
       )}
       <Modal open={open} title="New reconciliation" onCancel={() => setOpen(false)} onOk={submit} destroyOnHidden>
         <Form form={form} layout="vertical">
-          <Form.Item name="ending_date" label="Statement ending date" rules={[{ required: true }]}>
-            <DatePicker />
+          <Form.Item
+            name="ending_date"
+            label="Statement ending date"
+            extra={reconciledTo ? reconciledToNote(reconciledTo) : undefined}
+            rules={[
+              { required: true },
+              {
+                validator: (_, value?: { format: (f: string) => string }) =>
+                  value && reconciledTo && endsWithinReconciled(value.format("YYYY-MM-DD"), reconciledTo)
+                    ? Promise.reject(new Error(reconciledToRefusal(reconciledTo)))
+                    : Promise.resolve(),
+              },
+            ]}
+          >
+            <DatePicker
+              disabledDate={(day) => endsWithinReconciled(day.format("YYYY-MM-DD"), reconciledTo)}
+            />
           </Form.Item>
           <Form.Item name="ending_balance" label={words.endingInput} rules={[{ required: true }]}>
             <InputNumber style={{ width: 200 }} precision={baseDecimals} />

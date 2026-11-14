@@ -145,6 +145,12 @@ export interface ImportStatementModalProps {
   /** The dialog's title and button when the file is read for something other than importing it (Attach the statement). */
   title?: string;
   okLabel?: string;
+  /**
+   * Banking › Import statement (3.0.36): count only the lines new to this account,
+   * say before the import how many are already here, and offer nothing when none
+   * is new. A reconciliation leaves it off: it imports to pair, already here or not.
+   */
+  onlyNewLines?: boolean;
 }
 
 const BANKING_INTRO =
@@ -232,6 +238,7 @@ export default function ImportStatementModal({
   canOverride = false,
   title,
   okLabel,
+  onlyNewLines = false,
 }: ImportStatementModalProps) {
   const { message, modal } = App.useApp();
   const side: BalanceSide = bankAccount.side ?? "bank";
@@ -540,10 +547,11 @@ export default function ImportStatementModal({
           check,
           accounts: { here: hereLabel, labels: accountLabels ?? {} },
           canOverride,
+          onlyNewLines,
         },
         (minor) => formatMoney(minor, currencyCode, decimals),
       ),
-    [purpose, kind, shownLines, shownFigures, shownPrior, marks, check, hereLabel, accountLabels, canOverride, currencyCode, decimals],
+    [purpose, kind, shownLines, shownFigures, shownPrior, marks, check, hereLabel, accountLabels, canOverride, onlyNewLines, currencyCode, decimals],
   );
   const aside = useMemo(() => new Set(marks.aside), [marks.aside]);
 

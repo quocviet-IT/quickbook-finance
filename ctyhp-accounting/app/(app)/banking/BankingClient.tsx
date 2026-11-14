@@ -1099,6 +1099,8 @@ export default function BankingClient({
           }}
           importing={busy === "import"}
           canOverride={canOverride}
+          // A line already here is not imported again: count only the new ones, and say so before the import (3.0.36).
+          onlyNewLines
           onConfirm={(confirmed) => void confirmImport(confirmed)}
           onCancel={() => setImportOpen(false)}
         />
