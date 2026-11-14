@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.33",
+    date: "2026-11-14",
+    headline: "When the reconciliation screen cannot read something, it says which part, why, and offers Retry, instead of a passing Failed.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "The reconciliation screen says which part could not be read",
+        detail:
+          "The screen reads five things on its own: the reconciliation's figures, the statement lines, the book lines, the account's earlier reconciliations, and what Add all would add. When one of them could not be read, it used to say Failed in a message that was gone in seconds, and that part of the screen looked empty, as if the statement had no lines or the account nothing to tick. Now that part says it could not be read, gives the reason, and has Retry. Whatever it had already read stays on screen, marked as possibly out of date, and an empty table says Not read rather than nothing there.",
+        route: "/banking/reconcile",
+      },
+    ],
+  },
+  {
     version: "3.0.32",
     date: "2026-11-14",
     headline: "Each browser tab says which screen it is, Invoices · One Book, and a customer's or purchase order's tab names it.",

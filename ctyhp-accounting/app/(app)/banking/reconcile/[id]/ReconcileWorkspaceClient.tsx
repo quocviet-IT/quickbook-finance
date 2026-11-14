@@ -99,6 +99,7 @@ import StandingTag from "../StandingTag";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
+import ReadFailure, { type WorkspacePart } from "./ReadFailure";
 
 /** The statement dialog Banking uses, fetched when somebody opens it. */
 const ImportStatementModal = dynamic(() => import("../../ImportStatementModal"), { ssr: false });
@@ -205,7 +206,12 @@ export default function ReconcileWorkspaceClient({
   const lines = useMemo(() => cardBookLines(rawLines, side), [rawLines, side]);
   const detail = useMemo(() => (rawDetail ? cardDetail(rawDetail, side) : null), [rawDetail, side]);
   const statement = useMemo(() => (rawStatement ? cardStatement(rawStatement, side) : null), [rawStatement, side]);
-  const [loading, setLoading] = useState(false);
+  // Reading from the first moment when the page could not seed the figures, so
+  // the tables wait rather than show an empty account before the read lands.
+  const [loading, setLoading] = useState(() => seed === null);
+  /** Why each part could not be read, until it is read again (3.0.33). See ReadFailure. */
+  const [failed, setFailed] = useState<Partial<Record<WorkspacePart, string>>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
@@ -245,24 +251,39 @@ export default function ReconcileWorkspaceClient({
     setLoading(true);
     // One request for all three (2.92): Next sends Server Actions one at a
     // time, so three of them were three round trips on every reload.
-    const { lines: l, detail: d, statement: s } = await reconcileWorkspaceAction(reconciliationId);
+    // A request that throws (the network) fails all three alike.
+    const view = await reconcileWorkspaceAction(reconciliationId).catch((error: unknown) => {
+      const reason = `The request did not reach the server (${error instanceof Error ? error.message : String(error)}).`;
+      const down = { ok: false as const, error: reason };
+      return { lines: down, detail: down, statement: down };
+    });
     setLoading(false);
+    const { lines: l, detail: d, statement: s } = view;
+    // Each part keeps what it had when its own read fails, and says so where it sits.
+    const next: Partial<Record<WorkspacePart, string>> = {};
     if (l.ok && l.data) setLines(l.data);
-    else message.error(l.error ?? "Failed");
+    else next.lines = l.error ?? "The server gave no reason.";
     if (d.ok && d.data) setDetail(d.data);
-    else message.error(d.error ?? "Failed");
+    else next.figures = d.error ?? "The server gave no reason.";
     if (s.ok && s.data) setStatement(s.data);
-    else message.error(s.error ?? "Failed");
-  }, [reconciliationId, message]);
+    else next.statement = s.error ?? "The server gave no reason.";
+    setFailed((was) => ({ history: was.history, ...next }));
+  }, [reconciliationId]);
 
   // Read apart from the figures, so ticking a line does not wait on it: only a
   // statement imported or attached, the history brought forward, or a reopen
   // changes what it says.
   const loadHistory = useCallback(async () => {
-    const h = await sessionHistoryAdviceAction(reconciliationId);
+    setHistoryLoading(true);
+    const h = await sessionHistoryAdviceAction(reconciliationId).catch((error: unknown) => ({
+      ok: false as const,
+      data: undefined,
+      error: `The request did not reach the server (${error instanceof Error ? error.message : String(error)}).`,
+    }));
+    setHistoryLoading(false);
     if (h.ok) setHistoryFacts(h.data ?? null);
-    else message.error(h.error ?? "Failed");
-  }, [reconciliationId, message]);
+    setFailed((was) => ({ ...was, history: h.ok ? undefined : (h.error ?? "The server gave no reason.") }));
+  }, [reconciliationId]);
 
   useEffect(() => {
     // The page read the figures for the first paint; only the history is still to come.
@@ -305,19 +326,27 @@ export default function ReconcileWorkspaceClient({
     if (!missingKey || !working) return;
     let live = true;
     const key = missingKey;
-    void addMissingPlanAction(reconciliationId).then((res) => {
-      if (!live) return;
-      if (res.ok && res.data) {
-        setAddPlan({ key, plan: res.data });
-      } else {
-        setAddPlan(null);
-        message.error(res.error ?? "Could not work out what to add");
-      }
-    });
+    void addMissingPlanAction(reconciliationId)
+      .catch((error: unknown) => ({
+        ok: false as const,
+        data: undefined,
+        error: `The request did not reach the server (${error instanceof Error ? error.message : String(error)}).`,
+      }))
+      .then((res) => {
+        if (!live) return;
+        if (res.ok && res.data) {
+          setAddPlan({ key, plan: res.data });
+          setFailed((was) => ({ ...was, plan: undefined }));
+        } else {
+          setAddPlan(null);
+          // Beside where Add all would be, with Retry (3.0.33), not a toast.
+          setFailed((was) => ({ ...was, plan: res.error ?? "The server gave no reason." }));
+        }
+      });
     return () => {
       live = false;
     };
-  }, [missingKey, working, reconciliationId, planAsked, message]);
+  }, [missingKey, working, reconciliationId, planAsked]);
   // Shown only for the lines it was worked out for: while the next plan is on
   // its way, the box waits rather than offering the last one.
   const shownPlan =
@@ -746,6 +775,9 @@ export default function ReconcileWorkspaceClient({
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
+      {failed.figures ? (
+        <ReadFailure part="figures" reason={failed.figures} shown={detail !== null} retrying={loading} onRetry={() => void load()} />
+      ) : null}
       {detail && (
         <Space size="large" wrap>
           <Statistic title={words.beginning} value={money(detail.beginningMinor)} />
@@ -765,6 +797,9 @@ export default function ReconcileWorkspaceClient({
         : null}
       {overridesUnavailable ? (
         <Alert type="warning" showIcon title="Could not check this period for statements imported out of balance." />
+      ) : null}
+      {failed.history ? (
+        <ReadFailure part="history" reason={failed.history} shown={historyFacts !== null} retrying={historyLoading} onRetry={() => void loadHistory()} />
       ) : null}
       {historyAdvice && historyFacts ? (
         <Alert
@@ -869,6 +904,9 @@ export default function ReconcileWorkspaceClient({
           )}
         </Space>
       ) : null}
+      {failed.plan && missingKey && working ? (
+        <ReadFailure part="plan" reason={failed.plan} shown={false} retrying={false} onRetry={() => setPlanAsked((n) => n + 1)} />
+      ) : null}
       {shownPlan ? (
         <AddMissingBox
           key={missingKey}
@@ -886,9 +924,12 @@ export default function ReconcileWorkspaceClient({
         <Space size="small" style={{ marginBottom: 8 }} wrap>
           <Typography.Text strong>Statement lines</Typography.Text>
           <Typography.Text type="secondary">
-            {!statement || statement.lines.length === 0
-              ? "No statement is kept with this reconciliation yet — import it above."
-              : `${plural(statement.lines.length, "line")} from ${statement.fileName ?? "the statement"}`}
+            {/* A failed read is not an empty statement: say which it is. */}
+            {failed.statement && !statement
+              ? "Not read."
+              : !statement || statement.lines.length === 0
+                ? "No statement is kept with this reconciliation yet — import it above."
+                : `${plural(statement.lines.length, "line")} from ${statement.fileName ?? "the statement"}`}
           </Typography.Text>
           {standings ? (
             <Space size={4} wrap>
@@ -914,6 +955,11 @@ export default function ReconcileWorkspaceClient({
             This statement shows money in and out the other way around; its amounts were reversed to pair them.
           </Typography.Paragraph>
         ) : null}
+        {failed.statement ? (
+          <div style={{ marginBottom: 8 }}>
+            <ReadFailure part="statement" reason={failed.statement} shown={statement !== null} retrying={loading} onRetry={() => void load()} />
+          </div>
+        ) : null}
         <DataTable<ReconStatementLine>
           className={writing ? `${styles.statementLines} ${styles.withAction}` : styles.statementLines}
           rowKey="lineNo"
@@ -927,7 +973,7 @@ export default function ReconcileWorkspaceClient({
               : false
           }
           rows={statement?.lines ?? []}
-          locale={{ emptyText: "No statement kept with this reconciliation" }}
+          locale={{ emptyText: failed.statement ? "The statement lines could not be read" : "No statement kept with this reconciliation" }}
           columns={[
             { title: "Date", dataIndex: "txnDate", width: SW.date, render: (value: string) => formatDate(value) },
             flexColumn<ReconStatementLine>({ title: "Description", dataIndex: "description" }),
@@ -1014,11 +1060,17 @@ export default function ReconcileWorkspaceClient({
           </Space>
         ) : null}
       </Space>
+      {failed.lines ? (
+        <ReadFailure part="lines" reason={failed.lines} shown={lines.length > 0} retrying={loading} onRetry={() => void load()} />
+      ) : null}
       <DataTable<ReconLineView>
         className={styles.ledgerLines}
         rowKey="journalLineId"
         loading={loading}
         rows={lines}
+        // An account whose lines could not be read is not an account with none.
+        emptyTitle={failed.lines ? "The book lines could not be read" : undefined}
+        emptyDescription={failed.lines ? "Retry above reads them again." : undefined}
         columns={[
           {
             title: "Cleared",
