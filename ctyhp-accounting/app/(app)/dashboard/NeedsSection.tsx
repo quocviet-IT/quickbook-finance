@@ -1,36 +1,27 @@
-import NeedsAttention from "@/components/dashboard/NeedsAttention";
-import { holdsPermission } from "@/lib/auth";
-import { createSupabaseServerClient } from "@/lib/db/server";
-import { CHECKS_FAILED, clearLine, dashboardNeeds, unavailableNote, type AttentionChecks } from "@/lib/domain/dashboard-needs";
-import { formatMoney } from "@/lib/format";
-import { getAttentionChecks } from "@/lib/services/exceptions";
+import NeedsAttention from "@/components/dashboard-home/NeedsAttention";
+import type { HomeNeedsReport } from "@/lib/domain/dashboard-home/types";
+import { CHECKS_FAILED } from "@/lib/domain/dashboard-needs";
 
 /**
- * Needs attention (2.88), read on the server after the rest of the Dashboard
- * has been sent: the page wraps it in Suspense, so its reads never hold up the
- * figures above it. Drawn by a client component; this one only reads.
+ * Needs attention (2.88, rebuilt with the Dashboard in 3.0.38), drawn once its
+ * read has come back. The page starts the read and wraps this in Suspense, so
+ * the read never holds up the figures above it; the same read gives the tabs
+ * their counts, so it is made once.
+ *
+ * The rows when there are any; the clear line when there are none; and when
+ * not even that can be said, because no check could run, the sentence that
+ * says so. A note under the rows names any check that could not run.
  */
-export default async function NeedsSection({
-  today,
-  currencyCode,
-  decimals,
-}: {
-  today: string;
-  currencyCode: string;
-  decimals: number;
-}) {
-  // Only the reads are guarded: an error while drawing belongs to an error boundary, not here.
-  let checks: AttentionChecks | null = null;
+export default async function NeedsSection({ report }: { report: Promise<HomeNeedsReport> }) {
+  // Only the read is guarded: an error while drawing belongs to an error boundary, not here.
+  let read: HomeNeedsReport | null = null;
   try {
-    const sb = await createSupabaseServerClient();
-    // Only someone who may see the backups is told one is late; for anyone else the read finds nothing.
-    checks = await getAttentionChecks(sb, today, { backups: await holdsPermission("company.export") });
-  } catch {
-    checks = null;
+    read = await report;
+  } catch (cause) {
+    console.error("Needs attention could not be read:", cause);
+    read = null;
   }
-  if (!checks) return <NeedsAttention failure={CHECKS_FAILED} />;
-  const needs = dashboardNeeds(checks, (minor) => formatMoney(minor, currencyCode, decimals));
-  const clear = clearLine(checks);
-  if (needs.length === 0 && clear === null) return <NeedsAttention failure={CHECKS_FAILED} />;
-  return <NeedsAttention needs={needs} clear={clear} note={unavailableNote(checks.unavailable)} />;
+  if (!read) return <NeedsAttention failure={CHECKS_FAILED} />;
+  if (read.needs.length === 0 && read.clear === null) return <NeedsAttention failure={CHECKS_FAILED} />;
+  return <NeedsAttention needs={read.needs} clear={read.clear} note={read.note} />;
 }
