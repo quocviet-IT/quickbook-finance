@@ -94,7 +94,8 @@ describe("contrast in both themes (3.0.30)", () => {
 describe("telling a link from the words around it (3.0.30)", () => {
   const css = read("app", "globals.css");
   it("underlines a link inside a sentence, and only there", () => {
-    expect(css).toMatch(/:is\(p, li, dd, \.ant-typography, [^)]*\) a:not\(\.ant-btn\) \{\n  text-decoration: underline;/);
+    // Narrowed in 3.0.31: see link-underline-3031.test.ts.
+    expect(css).toMatch(/:is\(p, [^)]*\) a:not\(\.ant-btn\) \{\n  text-decoration: underline;/);
     // A name in a table, the menu, a button: no underline.
     expect(css).toMatch(/^a \{\n  text-decoration: none;\n\}/m);
   });
