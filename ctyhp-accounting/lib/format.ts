@@ -14,6 +14,35 @@ export function formatMoney(minor: number, currencyCode: string, decimals: numbe
 }
 
 /**
+ * A minor-unit amount, short, for a chart's axis: `$20K`, `$1.5M`, `-$300`.
+ * Approximate on purpose; a tooltip or table beside the chart gives the exact
+ * figure with {@link formatMoney}.
+ */
+export function formatCompactMoney(minor: number, currencyCode: string, decimals: number): string {
+  const value = minor / 10 ** decimals;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+      notation: "compact",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    }).format(value);
+  } catch {
+    const short = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+    return `${short} ${currencyCode}`;
+  }
+}
+
+/** A change, with its sign always shown: `+$1,234.56`, `-$1,234.56`, and `$0.00` for no change. */
+export function formatSignedMoney(minor: number, currencyCode: string, decimals: number): string {
+  const text = formatMoney(Math.abs(minor), currencyCode, decimals);
+  if (minor > 0) return `+${text}`;
+  if (minor < 0) return `-${text}`;
+  return text;
+}
+
+/**
  * The base currency a sentence built in lib/domain is written in, where the
  * module has no currency to hand.
  *
