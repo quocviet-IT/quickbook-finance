@@ -57,10 +57,12 @@ describe("the Dashboard's tabs", () => {
     for (const { key } of HOME_TABS) expect(client).toMatch(new RegExp(`^\\s+"?${key}"?: \\(`, "m"));
   });
 
-  it("leave out what this commit does not have yet: Customize and layouts", () => {
-    for (const word of ["Customize", "preset", "draggable"]) {
-      for (const file of SCREEN) expect(read(file), `${file} mentions ${word}`).not.toContain(word);
-    }
+  it("draw the Overview from the person's layout, and the other three as they were", () => {
+    // Since 3.0.39 the Overview's cards come from the person's layout; the other tabs keep release A's cards and widths.
+    expect(client).toMatch(/const visible = overview\.order\.filter\(\(key\) => overview\.shown\.includes\(key\)/);
+    expect(client).toMatch(/const \{ span, mid \} = overviewSpan\(overview, key\);/);
+    expect(client).toMatch(/"money-in": \(\s*<>\s*<Cell span=\{8\} mid=\{12\}>\s*\{cards\.invoices\(8\)\}/);
+    expect(client).toMatch(/"money-out": \(\s*<>\s*<Cell span=\{8\} mid=\{12\}>\s*\{cards\.bills\(8\)\}/);
   });
 });
 
