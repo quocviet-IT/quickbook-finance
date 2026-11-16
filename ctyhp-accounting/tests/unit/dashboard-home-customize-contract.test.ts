@@ -198,7 +198,10 @@ describe("the account watchlist", () => {
     expect(watchlist).toMatch(/<Select\s+mode="multiple"\s+maxCount=\{WATCHLIST_MAX\}/);
     expect(watchlist).toContain('showSearch={{ optionFilterProp: "label" }}');
     expect(watchlist).toContain("Up to 10 accounts. They are yours alone.");
-    expect(watchlist).toMatch(/await saveWatchlistAction\(selected\);[\s\S]*?router\.refresh\(\);/);
+    // The page is read again inside the save's transition, and the picker closes only when that is done,
+    // so the card never says "No accounts" for the seconds the read takes.
+    expect(watchlist).toMatch(/await saveWatchlistAction\(selected\);[\s\S]*?startSaving\(\(\) => router\.refresh\(\)\);/);
+    expect(watchlist).toMatch(/if \(!saving && saved\.current\) \{\s*saved\.current = false;\s*onClose\(\);/);
     expect(watchlist).toContain('<Empty title="No accounts on your watchlist yet." action={choose} />');
     expect(watchlist).toContain('<TextLink href="/accounts">Chart of accounts</TextLink>');
   });

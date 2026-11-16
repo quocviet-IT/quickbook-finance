@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Modal, Select } from "antd";
 import { saveWatchlistAction } from "@/app/(app)/dashboard/actions";
@@ -44,6 +44,15 @@ function ChooseAccounts({
     ...rows.filter((row) => !offered.has(row.accountId)).map((row) => optionOf({ id: row.accountId, code: row.code, name: row.name })),
   ];
 
+  // Set once the list is saved: the picker closes when the page has been read again, not before.
+  const saved = useRef(false);
+  useEffect(() => {
+    if (!saving && saved.current) {
+      saved.current = false;
+      onClose();
+    }
+  }, [saving, onClose]);
+
   function save() {
     startSaving(async () => {
       const result = await saveWatchlistAction(selected);
@@ -51,8 +60,11 @@ function ChooseAccounts({
         message.error(result.error);
         return;
       }
-      onClose();
-      router.refresh();
+      saved.current = true;
+      // The page takes a few seconds to read again. Inside the same transition,
+      // Save keeps spinning until the card holds the new list; closing first
+      // left the card saying "No accounts" for those seconds.
+      startSaving(() => router.refresh());
     });
   }
 
