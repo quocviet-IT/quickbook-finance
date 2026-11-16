@@ -48,6 +48,27 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.40",
+    date: "2026-11-16",
+    headline: "Money in and money out leave out transfers between your own bank accounts, and the dashboard loads in the shape you arranged.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Money in and money out no longer count a transfer between two of your own bank accounts",
+        detail:
+          "Moving money from one of your bank accounts to another is neither money in nor money out of the business, but the Cash flow card counted it on both sides. It is now left out of both, and the card says so under the chart; cash on hand and its change each month stay the same. If the transfers cannot be read, the card shows money in and money out as before and says that transfers count on both sides.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "While the dashboard loads, its outline follows the Overview you arranged",
+        detail:
+          "The grey outline shown while the dashboard is read now has the cards you chose for the Overview, in your order and at your widths, so the page no longer jumps when it arrives. It follows the layout you last saved in this company on this browser; until you have opened the dashboard once, it is the Standard layout.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "3.0.39",
     date: "2026-11-16",
     headline: "Customize the dashboard's Overview, hide its amounts with Privacy, and keep a watchlist of accounts.",
