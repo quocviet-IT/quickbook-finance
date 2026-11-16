@@ -166,14 +166,22 @@ export default function DashboardHomeClient({
         <BooksNote status={home.status} />
         <FigureBand figures={home.figures} status={status} money={money} />
         <Tabs
+          className={styles.tabs}
           activeKey={tab}
           onChange={(key) => changeTab(homeTabOf(key))}
           aria-label="Dashboard sections"
-          items={HOME_TABS.map(({ key, label }) => ({
+          items={HOME_TABS.map(({ key, label, short }) => ({
             key,
             label: (
               <span className={styles.tabLabel}>
-                {label}
+                {short ? (
+                  <>
+                    <span className={styles.tabLong}>{label}</span>
+                    <span className={styles.tabShort}>{short}</span>
+                  </>
+                ) : (
+                  label
+                )}
                 <Suspense fallback={null}>
                   <TabCount counts={counts} tab={key} />
                 </Suspense>

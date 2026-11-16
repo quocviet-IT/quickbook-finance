@@ -24,11 +24,12 @@ type Money = (minor: number) => string;
 
 /* --------------------------------------------------------------------- tabs */
 
-export const HOME_TABS: readonly { key: HomeTab; label: string }[] = [
+/** Each tab's key and label; `short` is what a phone shows, so all four fit across without a menu. */
+export const HOME_TABS: readonly { key: HomeTab; label: string; short?: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "money-in", label: "Money in" },
   { key: "money-out", label: "Money out" },
-  { key: "banking", label: "Banking and close" },
+  { key: "banking", label: "Banking and close", short: "Banking" },
 ];
 
 /** The tab named in the address, Overview for anything else. */

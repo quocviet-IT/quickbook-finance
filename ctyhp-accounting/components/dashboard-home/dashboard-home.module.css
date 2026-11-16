@@ -195,6 +195,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+.tabShort {
+  display: none;
+}
+
+/*
+ * A phone: the four tabs must fit across, or the last one hides behind a
+ * menu. A shorter name for the widest and a narrower gap between them.
+ * Two antd classes outrank antd's own rule for the gap, whichever loads last.
+ */
+@media (max-width: 600px) {
+  .tabLong {
+    display: none;
+  }
+
+  .tabShort {
+    display: inline;
+  }
+
+  .tabs:global(.ant-tabs) :global(.ant-tabs-tab + .ant-tabs-tab) {
+    margin-inline-start: 18px;
+  }
+}
+
 /* --- The grid of cards -------------------------------------------------- */
 .panel {
   container: homegrid / inline-size;
@@ -844,16 +867,22 @@
 }
 
 /* --- Open items split by due date --------------------------------------- */
+/*
+ * The figures above their table. Side by side only on a card wide enough for
+ * both: beside the table the three figures had to stand in a column, and the
+ * table's Amount column was cut off at 1440px.
+ */
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 20px;
+  gap: 16px;
 }
 
-@container card (max-width: 640px) {
+@container card (min-width: 960px) {
   .split {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 20px;
   }
 }
 

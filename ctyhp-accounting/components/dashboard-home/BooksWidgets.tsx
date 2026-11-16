@@ -111,13 +111,11 @@ export function BankAccountsWidget({
             ))}
             {otherCash ? (
               <tr>
-                <td className={styles.name}>
+                {/* No status, statement or reconciliation to show: the name takes their room instead of wrapping. */}
+                <td className={styles.name} colSpan={4}>
                   Cash not in a bank account
                   <span className={styles.aside}>{plural(otherCash.accounts, "ledger account")}</span>
                 </td>
-                <td />
-                <td />
-                <td />
                 <td className={styles.num}>{money(otherCash.bookMinor)}</td>
               </tr>
             ) : null}
