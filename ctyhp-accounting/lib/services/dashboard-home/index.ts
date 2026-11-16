@@ -488,17 +488,27 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     const behind = booksBehind(postedThrough, asOf);
     // No forecast while the books are behind; otherwise it needs both aging reports.
     const [ar, ap] = behind ? [null, null] : await Promise.all([receivablesAging, payablesAging]);
-    // Transfers between the company's own bank accounts come off both sides;
-    // when they could not be read, the gross figures stand and the card says so.
-    const flow = moved
-      ? withoutTransfers(b.bankMovement, moved, b.months)
-      : { inMinor: b.bankMovement.debitMinor, outMinor: b.bankMovement.creditMinor };
+    // Transfers between the company's own bank accounts come off both sides.
+    // When they could not be read, or do not fit the month's bank figures (a
+    // transfer posted between the two reads), the gross figures stand and the
+    // card says transfers count on both sides: never a wrong net, never a blank card.
+    const gross = { inMinor: b.bankMovement.debitMinor, outMinor: b.bankMovement.creditMinor };
+    let flow = gross;
+    let excluded = false;
+    if (moved) {
+      try {
+        flow = withoutTransfers(b.bankMovement, moved, b.months);
+        excluded = true;
+      } catch {
+        flow = gross;
+      }
+    }
     return {
       months: postedMonths(b, postedThrough).slice(shownFrom),
       balanceMinor: b.cash.slice(shownFrom),
       inMinor: flow.inMinor.slice(shownFrom),
       outMinor: flow.outMinor.slice(shownFrom),
-      transfersExcluded: moved !== null,
+      transfersExcluded: excluded,
       projection: ar && ap ? projection(b.cashToday, ar.rows, ap.rows, asOf) : null,
     };
   };

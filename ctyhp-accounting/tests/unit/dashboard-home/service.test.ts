@@ -318,11 +318,14 @@ describe("getDashboardHome", () => {
     expect(JSON.stringify(home)).not.toContain("statement timeout");
   });
 
-  it("does not draw cash flow when a month's transfers exceed its bank debits or credits", async () => {
+  it("charts the gross figures, and says transfers count on both sides, when a month's transfers exceed its bank debits or credits", async () => {
+    // A transfer posted between the ledger read and the transfers read: never a wrong net, never a blank card.
     const { home } = await load({ rpc: { acc_monthly_bank_transfers: () => ({ data: [{ month_key: "2026-11", transfer_base: 15_000_01 }] }) } });
-    expect(home.cash).toMatchObject({ dataState: "unavailable", data: null, unavailableReason: "Cash flow could not be read." });
-    // The figures above the tabs do not use the transfers.
-    expect(Object.entries(states(home)).filter(([, state]) => state !== "fresh")).toEqual([["cash", "unavailable"]]);
+    expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
+    const cash = home.cash.data!;
+    expect(cash.transfersExcluded).toBe(false);
+    const { flow, change } = flowAgainstBalance(cash);
+    expect(flow).toEqual(change);
   });
 
   it("makes the figures and the tabs agree: receivables and payables are the aging totals", async () => {
