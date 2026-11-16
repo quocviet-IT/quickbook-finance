@@ -2,13 +2,15 @@ import { Suspense } from "react";
 import NeedsAttention from "@/components/dashboard-home/NeedsAttention";
 import MonthEndClose from "@/components/dashboard-home/MonthEndClose";
 import { holdsPermission } from "@/lib/auth";
-import { createSupabaseServerClient } from "@/lib/db/server";
+import { resolveActiveCompany } from "@/lib/db/company";
+import { createSupabaseServerClient, createSupabaseServerClientForSchema } from "@/lib/db/server";
 import { needsByTab } from "@/lib/domain/dashboard-home/needs";
 import type { HomeTab } from "@/lib/domain/dashboard-home/types";
 import { pageMetadata } from "@/lib/domain/page-title";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
 import { getDashboardHome, getHomeNeeds } from "@/lib/services/dashboard-home";
+import { readDashboardPreference, type DashboardPreference } from "@/lib/services/dashboard-preferences";
 import { listCurrencies } from "@/lib/services/reference";
 import { createRequestMemo } from "@/lib/services/request-memo";
 import CloseSection from "./CloseSection";
@@ -20,13 +22,32 @@ export const metadata = pageMetadata("/dashboard");
 export const dynamic = "force-dynamic";
 
 /**
+ * The person's own choices in the open company (3.0.39): the Overview's layout,
+ * the watchlist and Privacy. Read with the person's own client for the
+ * register, the company resolved on the server. A failed read is null: the
+ * page then shows the Standard layout with Privacy off, and only the
+ * watchlist says it could not be read.
+ */
+async function readPreference(): Promise<DashboardPreference | null> {
+  try {
+    const { active } = await resolveActiveCompany();
+    if (!active) return null;
+    const control = await createSupabaseServerClientForSchema("onebook");
+    return await readDashboardPreference(control, active.id);
+  } catch (cause) {
+    console.error("The dashboard preference could not be read:", cause);
+    return null;
+  }
+}
+
+/**
  * The Dashboard (3.0.38): four figures, four tabs, and every card settling on
  * its own. The figures are read here; Needs attention and Month-end close are
  * streamed in after them, each behind its own Suspense boundary.
  */
 export default async function DashboardPage() {
   const sb = await createSupabaseServerClient();
-  const [company, currencies] = await Promise.all([getCurrentCompanySettings(sb), listCurrencies(sb)]);
+  const [company, currencies, preference] = await Promise.all([getCurrentCompanySettings(sb), listCurrencies(sb), readPreference()]);
   const timeZone = company?.time_zone ?? "America/New_York";
   const today = todayInTimeZone(timeZone);
   const base = currencies.find((c) => c.is_base);
@@ -51,7 +72,7 @@ export default async function DashboardPage() {
     fiscalStartMonth,
     baseCurrency,
     memo,
-    watchlist: [],
+    watchlist: preference ? preference.watchlist : null,
   });
 
   return (
@@ -61,6 +82,7 @@ export default async function DashboardPage() {
       accountingBasis={company?.accounting_basis ?? "accrual"}
       timeZone={timeZone}
       counts={counts}
+      preference={preference}
       needs={
         // Streamed in after the rest of the page: its checks never hold up the figures.
         <Suspense fallback={<NeedsAttention loading />}>

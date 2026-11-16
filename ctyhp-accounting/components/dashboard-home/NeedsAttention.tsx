@@ -4,6 +4,7 @@ import { Skeleton } from "antd";
 import type { HomeNeed } from "@/lib/domain/dashboard-home/types";
 import { plural } from "@/lib/format";
 import styles from "./dashboard-home.module.css";
+import { usePrivacy } from "./privacy";
 import { LinkButton, Spacer, TextLink, Widget } from "./Widget";
 
 const COUNT_TONE: Record<HomeNeed["tone"], string | undefined> = {
@@ -19,6 +20,9 @@ const COUNT_TONE: Record<HomeNeed["tone"], string | undefined> = {
  *
  * A check that could not run is named under the list and never counted as
  * clear; when no check could run, it says that instead of "nothing is waiting".
+ *
+ * Its rows are written on the server with their amounts in them, so it masks
+ * them itself from the Privacy context (3.0.39), not from anything it is handed.
  */
 export default function NeedsAttention({
   needs = [],
@@ -36,6 +40,7 @@ export default function NeedsAttention({
   failure?: string | null;
   loading?: boolean;
 }) {
+  const { text } = usePrivacy();
   const footer = (
     <>
       <TextLink href="/reports/exceptions">Exception report</TextLink>
@@ -63,8 +68,8 @@ export default function NeedsAttention({
           {needs.map((need) => (
             <li key={need.key} className={styles.needRow}>
               <span className={`${styles.needCount} ${COUNT_TONE[need.tone] ?? ""}`}>{need.count.toLocaleString("en-US")}</span>
-              <span className={styles.needTitle}>{need.title}</span>
-              <span className={styles.needDetail}>{need.detail}</span>
+              <span className={styles.needTitle}>{text(need.title)}</span>
+              <span className={styles.needDetail}>{text(need.detail)}</span>
               <span className={styles.needAction}>
                 <LinkButton href={need.href} label={`${need.action}: ${need.title}`}>
                   {need.action}
@@ -74,7 +79,7 @@ export default function NeedsAttention({
           ))}
         </ul>
       )}
-      {note && !loading && !failure ? <p className={styles.caption}>{note}</p> : null}
+      {note && !loading && !failure ? <p className={styles.caption}>{text(note)}</p> : null}
     </Widget>
   );
 }

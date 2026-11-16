@@ -5,8 +5,10 @@ import { ArrowDownOutlined, ArrowUpOutlined, ExclamationCircleFilled } from "@an
 import { Button, Card, Select } from "antd";
 import IntentLink from "@/components/IntentLink";
 import { tokenVar } from "@/lib/design/tokens";
+import { PRIVATE_CHANGE } from "@/lib/domain/dashboard-home/privacy";
 import type { HomePeriodKey } from "@/lib/domain/dashboard-home/types";
 import styles from "./dashboard-home.module.css";
+import { usePrivacy } from "./privacy";
 import { PERIOD_OPTIONS } from "./view";
 
 /**
@@ -126,9 +128,11 @@ export function Empty({ title, children, action }: { title: string; children?: R
 /**
  * A change in money with its direction as an arrow and in words, so color is
  * never the only sign of it. `good` says which way is good news: up for cash
- * and income, down for spending.
+ * and income, down for spending. With Privacy on the amount is masked; the
+ * arrow and the words stay.
  */
 export function Delta({ minor, money, good = "up" }: { minor: number; money: (minor: number) => string; good?: "up" | "down" }) {
+  const { on } = usePrivacy();
   if (minor === 0) return <span className={styles.delta}>No change</span>;
   const up = minor > 0;
   const tone = up === (good === "up") ? styles.up : styles.down;
@@ -136,7 +140,7 @@ export function Delta({ minor, money, good = "up" }: { minor: number; money: (mi
     <span className={`${styles.delta} ${tone}`}>
       {up ? <ArrowUpOutlined aria-hidden="true" /> : <ArrowDownOutlined aria-hidden="true" />}
       <span className="accounting-sr-only">{up ? "Up " : "Down "}</span>
-      {money(Math.abs(minor))}
+      {on ? PRIVATE_CHANGE : money(Math.abs(minor))}
     </span>
   );
 }

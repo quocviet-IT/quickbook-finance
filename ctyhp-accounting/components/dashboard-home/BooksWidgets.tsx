@@ -5,6 +5,7 @@ import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import { formatDate, formatDateTime, plural } from "@/lib/format";
 import type { DashboardActivity } from "@/lib/services/dashboard";
 import styles from "./dashboard-home.module.css";
+import { usePrivacy } from "./privacy";
 import { bankTable, bankTone, cardBalance } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
@@ -13,6 +14,8 @@ type Money = (minor: number) => string;
 /* -------------------------------------------------------------- bank accounts */
 
 function AccountRow({ account, money }: { account: HomeBankAccount; money: Money }) {
+  // The status is written on the server, at times with an amount in it.
+  const { text } = usePrivacy();
   const amount = (minor: number) => (account.isCard ? cardBalance(minor, money) : money(minor));
   return (
     <tr>
@@ -21,7 +24,7 @@ function AccountRow({ account, money }: { account: HomeBankAccount; money: Money
         {account.masked ? <span className={styles.aside}>{account.masked}</span> : null}
       </td>
       <td>
-        <StatusTag status={account.tone} looks={{ [account.tone]: { tone: bankTone(account.tone), label: account.statusText } }} />
+        <StatusTag status={account.tone} looks={{ [account.tone]: { tone: bankTone(account.tone), label: text(account.statusText) } }} />
       </td>
       <td className={account.reconciledThrough ? undefined : styles.muted}>
         {account.reconciledThrough ? formatDate(account.reconciledThrough) : "Never"}
@@ -145,8 +148,9 @@ export function BankAccountsWidget({
 
 /* ------------------------------------------------------------------ insights */
 
-/** Insights: at most three things the books show, each with its figures and where to look. */
+/** Insights: at most three things the books show, each with its figures and where to look. Written on the server, masked here. */
 export function InsightsWidget({ insights }: { insights: SectionEnvelope<HomeInsight[]> }) {
+  const { text } = usePrivacy();
   const footer = <span className={styles.caption}>Worked out from the books by fixed rules</span>;
   const data = insights.data;
   if (!data) {
@@ -169,8 +173,8 @@ export function InsightsWidget({ insights }: { insights: SectionEnvelope<HomeIns
         {data.map((insight) => (
           <li key={insight.key} className={styles.insightRow}>
             <span className={styles.insightKind}>{insight.kind}</span>
-            <span className={styles.insightHead}>{insight.headline}</span>
-            <p className={styles.insightDetail}>{insight.detail}</p>
+            <span className={styles.insightHead}>{text(insight.headline)}</span>
+            <p className={styles.insightDetail}>{text(insight.detail)}</p>
             <TextLink href={insight.link.href}>{insight.link.label}</TextLink>
           </li>
         ))}
