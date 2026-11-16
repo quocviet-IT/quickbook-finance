@@ -222,3 +222,27 @@ describe("retargetToSchema and catalog lookups", () => {
     expect(retargetToSchema(sql, "co_north")).toBe(sql);
   });
 });
+
+describe("line endings", () => {
+  const toLf = (sql: string) => sql.replace(/\r\n/g, "\n");
+  const toCrlf = (sql: string) => toLf(sql).replace(/\n/g, "\r\n");
+
+  it("strips a comment from a statement whose lines end in \r\n", () => {
+    const statement = toCrlf("-- reads onebook.company for the register\nset search_path = public");
+    expect(scopeOf(statement).scope).toBe("company");
+  });
+
+  it("plans every migration the same whether the file ends its lines in \n or \r\n", () => {
+    const differ: string[] = [];
+    for (const file of readdirSync(MIGRATIONS).filter((name) => name.endsWith(".sql"))) {
+      const sql = readFileSync(join(MIGRATIONS, file), "utf8");
+      const lf = planCompanySchema([{ file, sql: toLf(sql) }], "co_probe");
+      const crlf = planCompanySchema([{ file, sql: toCrlf(sql) }], "co_probe");
+      const same =
+        JSON.stringify(lf.statements) === JSON.stringify(crlf.statements.map(toLf)) &&
+        lf.skipped.length === crlf.skipped.length;
+      if (!same) differ.push(file);
+    }
+    expect(differ).toEqual([]);
+  });
+});

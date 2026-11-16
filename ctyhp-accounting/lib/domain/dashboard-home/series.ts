@@ -71,6 +71,38 @@ export function monthMovement(
 }
 
 /**
+ * Money in and money out per month: the bank-type debits and credits less the
+ * amount moved between two of the company's own bank accounts that month
+ * (`acc_monthly_bank_transfers`, keyed by month; a month with none has no
+ * key). A transfer is one debit to a bank and one credit to another, so it
+ * comes off both sides and money in minus money out, the change in cash, is
+ * unchanged.
+ *
+ * Throws when a month's transfer is larger than its debits or its credits.
+ * Both come from the same posted entries, so that cannot happen; if it does,
+ * the figures disagree and are not drawn.
+ */
+export function withoutTransfers(
+  movement: { debitMinor: number[]; creditMinor: number[] },
+  transfers: ReadonlyMap<string, number>,
+  months: readonly MonthKeyed[],
+): { inMinor: number[]; outMinor: number[] } {
+  const inMinor: number[] = [];
+  const outMinor: number[] = [];
+  months.forEach((month, index) => {
+    const debit = movement.debitMinor[index] ?? 0;
+    const credit = movement.creditMinor[index] ?? 0;
+    const transfer = transfers.get(month.key) ?? 0;
+    if (transfer < 0 || transfer > debit || transfer > credit) {
+      throw new Error(`Transfers in ${month.key} do not fit within that month's bank debits and credits`);
+    }
+    inMinor.push(debit - transfer);
+    outMinor.push(credit - transfer);
+  });
+  return { inMinor, outMinor };
+}
+
+/**
  * Each month, marked posted or not. A month is not posted when it starts
  * after the month of the last posted entry and has no ledger activity: not a
  * month of zeros, a month nobody has entered yet. A quiet month before the

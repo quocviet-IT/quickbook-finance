@@ -89,11 +89,16 @@ export interface HomeCash {
   months: HomeMonth[];
   /** Month-end cash (bank-type accounts); the last is today's. */
   balanceMinor: number[];
-  /** Gross debits to bank-type accounts per month. */
+  /** Debits to bank-type accounts per month, less transfers between them when `transfersExcluded`. */
   inMinor: number[];
-  /** Gross credits to bank-type accounts per month. */
+  /** Credits to bank-type accounts per month, less transfers between them when `transfersExcluded`. */
   outMinor: number[];
-  /** Always false in this release: a transfer between two own bank accounts counts on both sides. */
+  /**
+   * True when a transfer between two of the company's own bank accounts is
+   * left out of both money in and money out (3.0.40); false when the
+   * transfers could not be read, and the gross figures count it on both sides.
+   * Either way, money in minus money out is the month's change in cash.
+   */
   transfersExcluded: boolean;
   /** Null while the books are behind (status.behind). */
   projection: HomeProjection | null;

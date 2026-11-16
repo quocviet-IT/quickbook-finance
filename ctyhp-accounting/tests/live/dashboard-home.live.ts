@@ -17,7 +17,16 @@
  *      Accounts figure is not zero: each Balance equals that figure
  *      (`getChartBalances`), and This month and Last month equal the
  *      account's natural activity from `getLedgerBalances` over the month to
- *      date and the whole previous month.
+ *      date and the whole previous month;
+ *  (g) Cash flow's money in and money out (3.0.40): each month, money in
+ *      minus money out is the change in cash on hand, the first month's from
+ *      the bank-type balance at the end of the month before; and an
+ *      independent recount of the transfers between the company's own bank
+ *      accounts, from the posted journal lines on bank-type accounts (per
+ *      entry, the smaller of its bank debits and bank credits), taken off the
+ *      gross bank debits and credits, gives money in and money out exactly.
+ *      The gross from the lines is also checked against the ledger, so a
+ *      line the recount missed cannot agree by accident.
  * Counts and agree/disagree are logged; names and amounts never are.
  * Nothing is written: every call is a select or a read-only RPC.
  *
@@ -35,12 +44,14 @@ import { homeMonthRanges, homePeriodRanges } from "@/lib/domain/dashboard-home/r
 import { hasActivity } from "@/lib/domain/dashboard-home/series";
 import type { HomeOpenSide, HomePeriodFigures, HomePeriodKey } from "@/lib/domain/dashboard-home/types";
 import { buildProfitAndLoss, type LedgerBalance } from "@/lib/domain/reports";
+import { addIsoDays } from "@/lib/domain/work-queue";
 import { listAccounts } from "@/lib/services/accounts";
 import { getApAging, getArAging, type AgingReport } from "@/lib/services/aging";
 import { getChartBalances, type ChartBalances } from "@/lib/services/chart-balances";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
 import { getDashboardHome, HOME_MONTHS, type DashboardHome } from "@/lib/services/dashboard-home";
+import { readAllPages } from "@/lib/services/paging";
 import { listCurrencies } from "@/lib/services/reference";
 import { getLedgerBalances } from "@/lib/services/reports";
 
@@ -93,6 +104,62 @@ beforeAll(async () => {
 
 function bankTotal(rows: readonly LedgerBalance[]): number {
   return rows.filter((row) => row.accountType === "bank").reduce((sum, row) => sum + row.debitBase - row.creditBase, 0);
+}
+
+/** One posted journal line on a bank-type posting account, as PostgREST returns it with its entry. */
+interface BankLine {
+  journal_entry_id: string;
+  debit_minor: number | string;
+  credit_minor: number | string;
+  amount_base_minor: number | string;
+  acc_journal_entry: { entry_date: string; status: string };
+}
+
+/**
+ * Every month's gross bank debits and credits, and the transfers between the
+ * company's own bank accounts, recounted from the journal lines rather than
+ * through acc_monthly_bank_transfers: per posted entry, the smaller of its
+ * bank debits and bank credits, summed by the entry's month.
+ */
+async function recountBankMovement(
+  sb: SupabaseClient,
+  from: string,
+  to: string,
+): Promise<{ lines: number; entries: number; byMonth: Map<string, { debit: number; credit: number; transfer: number }> }> {
+  const lines = await readAllPages<BankLine>(
+    (start, end) =>
+      sb
+        .from("acc_journal_line")
+        .select(
+          "id,journal_entry_id,debit_minor,credit_minor,amount_base_minor," +
+            "acc_journal_entry!inner(entry_date,status),acc_account!inner(account_type,is_posting_account)",
+        )
+        .eq("acc_account.account_type", "bank")
+        .eq("acc_account.is_posting_account", true)
+        .eq("acc_journal_entry.status", "posted")
+        .gte("acc_journal_entry.entry_date", from)
+        .lte("acc_journal_entry.entry_date", to)
+        .order("id")
+        .range(start, end),
+    (message) => new Error(`journal lines: ${message}`),
+  );
+  const entries = new Map<string, { month: string; debit: number; credit: number }>();
+  for (const line of lines) {
+    const entry = entries.get(line.journal_entry_id) ?? { month: String(line.acc_journal_entry.entry_date).slice(0, 7), debit: 0, credit: 0 };
+    const amount = Number(line.amount_base_minor);
+    if (Number(line.debit_minor) > 0) entry.debit += amount;
+    if (Number(line.credit_minor) > 0) entry.credit += amount;
+    entries.set(line.journal_entry_id, entry);
+  }
+  const byMonth = new Map<string, { debit: number; credit: number; transfer: number }>();
+  for (const entry of entries.values()) {
+    const month = byMonth.get(entry.month) ?? { debit: 0, credit: 0, transfer: 0 };
+    month.debit += entry.debit;
+    month.credit += entry.credit;
+    month.transfer += Math.min(entry.debit, entry.credit);
+    byMonth.set(entry.month, month);
+  }
+  return { lines: lines.length, entries: entries.size, byMonth };
 }
 
 function figuresOf(rows: LedgerBalance[]): HomePeriodFigures {
@@ -259,6 +326,45 @@ describe("the Dashboard's figures on every company's books", () => {
         if (row.lastMonthMinor !== natural(lastMonth, account)) disagree += 1;
       }
       console.log(`${c.name}: ${data.rows.length} watched accounts, ${data.choices.length} to choose from, ${disagree === 0 ? "all agree" : `${disagree} DISAGREE`}`);
+      expect(disagree, c.name).toBe(0);
+    }
+  });
+
+  it("money in and money out leave out transfers between own bank accounts, and their difference is the change in cash", async () => {
+    for (const c of companies) {
+      const cash = c.home.cash.data;
+      if (!cash) throw new Error(`${c.name}: cash flow unavailable`);
+      const months = homeMonthRanges(c.today, HOME_MONTHS);
+      const [opening, monthly, recount] = await Promise.all([
+        getLedgerBalances(c.sb, null, addIsoDays(months[0].from, -1)),
+        Promise.all(months.map((month) => getLedgerBalances(c.sb, month.from, month.to))),
+        recountBankMovement(c.sb, months[0].from, c.today),
+      ]);
+      let flowDisagree = 0;
+      let recountDisagree = 0;
+      let grossDisagree = 0;
+      let monthsWithTransfers = 0;
+      months.forEach((month, index) => {
+        // (a) Money in minus money out is the month's change in cash on hand.
+        const previous = index === 0 ? bankTotal(opening) : cash.balanceMinor[index - 1];
+        if (cash.inMinor[index] - cash.outMinor[index] !== cash.balanceMinor[index] - previous) flowDisagree += 1;
+        // (b) The gross less the recounted transfers is money in and money out.
+        const counted = recount.byMonth.get(month.key) ?? { debit: 0, credit: 0, transfer: 0 };
+        if (counted.transfer > 0) monthsWithTransfers += 1;
+        if (counted.debit - counted.transfer !== cash.inMinor[index]) recountDisagree += 1;
+        if (counted.credit - counted.transfer !== cash.outMinor[index]) recountDisagree += 1;
+        // The lines recounted are all of the ledger's bank debits and credits that month.
+        const bank = monthly[index].filter((row) => row.accountType === "bank");
+        if (bank.reduce((sum, row) => sum + row.debitBase, 0) !== counted.debit) grossDisagree += 1;
+        if (bank.reduce((sum, row) => sum + row.creditBase, 0) !== counted.credit) grossDisagree += 1;
+      });
+      const disagree = flowDisagree + recountDisagree + grossDisagree;
+      console.log(
+        `${c.name}: ${months.length} months, ${recount.lines} bank lines in ${recount.entries} entries, ${monthsWithTransfers} months with transfers, ` +
+          `transfers ${cash.transfersExcluded ? "left out" : "NOT LEFT OUT"}: ` +
+          (disagree === 0 ? "all agree" : `${flowDisagree} flow, ${recountDisagree} recount, ${grossDisagree} gross DISAGREE`),
+      );
+      expect(cash.transfersExcluded, c.name).toBe(true);
       expect(disagree, c.name).toBe(0);
     }
   });

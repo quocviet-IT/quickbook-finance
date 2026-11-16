@@ -48,6 +48,7 @@ import {
   lastReleaseSeenServerSnapshot,
   subscribeReleaseNotes,
 } from "@/lib/client/release-notes";
+import { ActiveCompanyProvider } from "./ActiveCompanyContext";
 import CompanySwitcher, { type CompanyChoice } from "./CompanySwitcher";
 import ThemeToggle from "./theme/ThemeToggle";
 import { humanizeStatus } from "@/lib/domain/status-label";
@@ -532,7 +533,9 @@ export default function AppShell({
           </div>
         </Header>
         <Content id="main-content" tabIndex={-1} className="app-shell__content">
-          <div className="app-shell__content-inner">{children}</div>
+          <div className="app-shell__content-inner">
+            <ActiveCompanyProvider slug={activeCompany?.slug ?? null}>{children}</ActiveCompanyProvider>
+          </div>
         </Content>
       </Layout>
       <AssistantLauncher />

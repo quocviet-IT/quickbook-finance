@@ -164,7 +164,10 @@ describe("Customize", () => {
   it("saves without reading the page again, and stays open with the reason when it cannot", () => {
     const save = client.slice(client.indexOf("function saveLayout()"), client.indexOf("function endDrag()"));
     expect(save).toContain("await saveOverviewLayoutAction(next)");
-    expect(save).toMatch(/if \(result\.ok\) \{\s*setLayout\(next\);\s*setDraft\(null\);\s*message\.success\("Layout saved"\);\s*\} else \{\s*message\.error\(result\.error\);/);
+    // setLayoutKnown (3.0.40): what was just saved is the person's own, and is remembered for the loading outline.
+    expect(save).toMatch(
+      /if \(result\.ok\) \{\s*setLayout\(next\);\s*setLayoutKnown\(true\);\s*setDraft\(null\);\s*message\.success\("Layout saved"\);\s*\} else \{\s*message\.error\(result\.error\);/,
+    );
     expect(save).not.toContain("router.refresh");
   });
 

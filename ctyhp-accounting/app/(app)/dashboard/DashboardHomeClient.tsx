@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, use, useState, useTransition, type DragEvent, type ReactNode } from "react";
+import { Suspense, use, useEffect, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppstoreOutlined, ArrowsAltOutlined, HolderOutlined, ReloadOutlined, ShrinkOutlined } from "@ant-design/icons";
 import { App, Button, Switch, Tabs, Tag } from "antd";
+import { useActiveCompanySlug } from "@/components/ActiveCompanyContext";
 import PageHeader from "@/components/PageHeader";
 import BooksNote from "@/components/dashboard-home/BooksNote";
 import { ActivityWidget, BankAccountsWidget, InsightsWidget } from "@/components/dashboard-home/BooksWidgets";
@@ -17,6 +18,7 @@ import { Empty } from "@/components/dashboard-home/Widget";
 import styles from "@/components/dashboard-home/dashboard-home.module.css";
 import { PrivacyProvider, usePrivacy } from "@/components/dashboard-home/privacy";
 import { HOME_TABS, homeTabHref, homeTabOf } from "@/components/dashboard-home/view";
+import { rememberOverviewLayout } from "@/lib/client/dashboard-layout-memory";
 import {
   moveWidgetBefore,
   overviewSpan,
@@ -158,8 +160,21 @@ function DashboardScreen({
 
   /** The person's saved Overview. */
   const [layout, setLayout] = useState<OverviewLayout>(() => preference?.overview ?? standardLayout());
+  /**
+   * Whether `layout` is the person's own: read with the page, or saved here.
+   * Not when the preference could not be read: the Standard layout drawn then
+   * stands in for one unknown, and must not replace the one remembered.
+   */
+  const [layoutKnown, setLayoutKnown] = useState(preference !== null);
   /** The layout being customized; null when the Overview is not being customized. Cancel drops it. */
   const [draft, setDraft] = useState<OverviewLayout | null>(null);
+  const slug = useActiveCompanySlug();
+
+  // The saved layout, never the draft, is remembered in this browser so the
+  // next loading outline is drawn in it: on arrival, and after Save layout.
+  useEffect(() => {
+    if (slug !== null && layoutKnown) rememberOverviewLayout(slug, layout);
+  }, [slug, layout, layoutKnown]);
   const [dragged, setDragged] = useState<HomeWidgetKey | null>(null);
   const [dropOn, setDropOn] = useState<HomeWidgetKey | null>(null);
   const editing = draft !== null;
@@ -203,6 +218,7 @@ function DashboardScreen({
       const result = await saveOverviewLayoutAction(next);
       if (result.ok) {
         setLayout(next);
+        setLayoutKnown(true);
         setDraft(null);
         message.success("Layout saved");
       } else {

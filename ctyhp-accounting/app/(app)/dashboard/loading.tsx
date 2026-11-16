@@ -1,3 +1,4 @@
+import OverviewSkeleton from "@/components/dashboard-home/OverviewSkeleton";
 import styles from "@/components/dashboard-home/dashboard-home.module.css";
 
 /** A grey block of a given size, standing in for text or a chart. */
@@ -5,22 +6,11 @@ function Block({ width, height }: { width: string; height: number }) {
   return <div className={styles.skeleton} style={{ width, height }} />;
 }
 
-/** A card's outline while it loads: a title, a figure, a line and its chart or rows. */
-function CardShape({ chart }: { chart: number }) {
-  return (
-    <div className={styles.skeletonCard}>
-      <Block width="34%" height={16} />
-      <Block width="48%" height={28} />
-      <Block width="38%" height={12} />
-      <Block width="100%" height={chart} />
-    </div>
-  );
-}
-
 /**
  * The Dashboard's own shape in grey while it is read (3.0.38): the header, the
  * status note, the band of four figures, the tabs, and the Overview's cards,
- * so nothing moves when the page arrives.
+ * so nothing moves when the page arrives. The cards follow the Overview the
+ * person arranged, as this browser remembers it (3.0.40).
  */
 export default function DashboardLoading() {
   return (
@@ -49,21 +39,7 @@ export default function DashboardLoading() {
         </div>
         <div className={styles.panel}>
           <div className={styles.grid}>
-            <div className={`${styles.cell} ${styles.span8} ${styles.mid12}`}>
-              <CardShape chart={276} />
-            </div>
-            <div className={`${styles.cell} ${styles.span4} ${styles.mid6}`}>
-              <CardShape chart={200} />
-            </div>
-            <div className={`${styles.cell} ${styles.span4} ${styles.mid6}`}>
-              <CardShape chart={190} />
-            </div>
-            <div className={`${styles.cell} ${styles.span4} ${styles.mid6}`}>
-              <CardShape chart={160} />
-            </div>
-            <div className={`${styles.cell} ${styles.span4} ${styles.mid6}`}>
-              <CardShape chart={160} />
-            </div>
+            <OverviewSkeleton />
           </div>
         </div>
       </div>

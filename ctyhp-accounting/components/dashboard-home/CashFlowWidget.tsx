@@ -120,7 +120,11 @@ export default function CashFlowWidget({
         money={money}
         compact={compact}
       />
-      {data.transfersExcluded ? null : <p className={styles.caption}>Transfers between your own accounts count on both sides.</p>}
+      <p className={styles.caption}>
+        {data.transfersExcluded
+          ? "Transfers between your own bank accounts are left out of money in and money out."
+          : "Transfers between your own accounts count on both sides."}
+      </p>
       {projection ? (
         <div>
           <p className={styles.caption} style={{ marginBottom: 6 }}>

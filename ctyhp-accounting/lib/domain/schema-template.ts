@@ -116,7 +116,11 @@ function isOnlyComment(statement: string): boolean {
 function code(statement: string): string {
   return statement
     .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
+    // A file checked out on Windows ends its lines in \r\n. Split on "\n" alone,
+    // every line kept its \r, `--.*$` could not reach the end of it, and a
+    // comment stayed in: a header that mentions onebook. or storage.objects then
+    // made the statement under it look global and kept it out of every company.
+    .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ""))
     .join(" ")
     .replace(/\s+/g, " ")

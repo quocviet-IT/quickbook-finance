@@ -26,7 +26,7 @@ import {
   type HomeMonthRange,
   type HomePeriodRange,
 } from "@/lib/domain/dashboard-home/ranges";
-import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows } from "@/lib/domain/dashboard-home/series";
+import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows, withoutTransfers } from "@/lib/domain/dashboard-home/series";
 import { watchChoices, watchRows, type HomeWatchChoice, type HomeWatchRow } from "@/lib/domain/dashboard-home/watchlist";
 import type {
   HomeBank,
@@ -71,7 +71,8 @@ import { envelopeOf } from "@/lib/services/work-surface/envelope";
  * on its own.
  *
  * Each read is started once and shared: the ledger before the window and each
- * month's activity in it, the three "same days" comparisons, both aging
+ * month's activity in it, each month's transfers between the company's own
+ * bank accounts (3.0.40), the three "same days" comparisons, both aging
  * reports (one memo, so their control read is made once), the chart of
  * accounts, and the bank reads. Each section waits only for the reads it is
  * built from, inside its own envelope, so a read that fails makes the
@@ -179,6 +180,18 @@ async function readPostedThrough(sb: SupabaseClient, asOf: string): Promise<{ po
   const later = await sb.from("acc_journal_entry").select("id").eq("status", "posted").limit(1);
   if (later.error) throw new DashboardHomeError(later.error.message);
   return { postedThrough: null, firstUse: (later.data ?? []).length === 0 };
+}
+
+/**
+ * Each month's amount moved between two of the company's own bank accounts
+ * (`acc_monthly_bank_transfers`, 0199), in the same window as the monthly
+ * ledger read. A month with none has no key. One row per month at most, so
+ * the read is never near PostgREST's row cap and is not paged.
+ */
+async function readMonthlyBankTransfers(sb: SupabaseClient, asOf: string, months: number): Promise<Map<string, number>> {
+  const { data, error } = await sb.rpc("acc_monthly_bank_transfers", { p_to: asOf, p_months: months });
+  if (error) throw new DashboardHomeError(error.message);
+  return new Map(((data ?? []) as { month_key: string; transfer_base: number | string }[]).map((row) => [String(row.month_key), Number(row.transfer_base)]));
 }
 
 async function readLastClosed(sb: SupabaseClient): Promise<HomeStatus["lastClosed"]> {
@@ -333,8 +346,8 @@ interface Books {
   cash: number[];
   receivables: number[];
   payables: number[];
-  bankIn: number[];
-  bankOut: number[];
+  /** Gross debits and credits to bank-type accounts per month, transfers between them included. */
+  bankMovement: { debitMinor: number[]; creditMinor: number[] };
   /** Every account's balance as of asOf: the opening plus each month's activity. */
   balances: LedgerBalance[];
   cashToday: number;
@@ -342,7 +355,6 @@ interface Books {
 
 function booksFrom(months: HomeMonthRange[], opening: LedgerBalance[], byMonth: Map<string, LedgerBalance[]>): Books {
   const cash = monthEndBalances(opening, byMonth, months, ["bank"]);
-  const movement = monthMovement(byMonth, months, ["bank"]);
   return {
     months,
     byMonth,
@@ -350,8 +362,7 @@ function booksFrom(months: HomeMonthRange[], opening: LedgerBalance[], byMonth: 
     cash,
     receivables: monthEndBalances(opening, byMonth, months, ["accounts_receivable"]),
     payables: monthEndBalances(opening, byMonth, months, ["accounts_payable"]),
-    bankIn: movement.debitMinor,
-    bankOut: movement.creditMinor,
+    bankMovement: monthMovement(byMonth, months, ["bank"]),
     balances: sumLedgerRows([opening, ...months.map((month) => byMonth.get(month.key))]),
     cashToday: cash[cash.length - 1],
   };
@@ -402,6 +413,8 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
   const opening = shared(getLedgerBalances(sb, null, addIsoDays(windowMonths[0].from, -1)));
   const monthly = shared(getMonthlyLedgerBalances(sb, asOf, HOME_WINDOW_MONTHS));
   const books = shared(Promise.all([opening, monthly]).then(([open, byMonth]) => booksFrom(windowMonths, open, byMonth)));
+  // Null when it cannot be read: cash flow then shows gross money in and out, and says so.
+  const transfers = orNull(readMonthlyBankTransfers(sb, asOf, HOME_WINDOW_MONTHS));
   const priorMonth = orNull(getLedgerBalances(sb, ranges.month.priorFrom, ranges.month.priorTo));
   const priorQuarter = orNull(getLedgerBalances(sb, ranges.quarter.priorFrom, ranges.quarter.priorTo));
   const priorYear = orNull(getLedgerBalances(sb, ranges.year.priorFrom, ranges.year.priorTo));
@@ -471,16 +484,31 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
   };
 
   const cash = async (): Promise<HomeCash> => {
-    const [b, { postedThrough }] = await Promise.all([books, posted]);
+    const [b, { postedThrough }, moved] = await Promise.all([books, posted, transfers]);
     const behind = booksBehind(postedThrough, asOf);
     // No forecast while the books are behind; otherwise it needs both aging reports.
     const [ar, ap] = behind ? [null, null] : await Promise.all([receivablesAging, payablesAging]);
+    // Transfers between the company's own bank accounts come off both sides.
+    // When they could not be read, or do not fit the month's bank figures (a
+    // transfer posted between the two reads), the gross figures stand and the
+    // card says transfers count on both sides: never a wrong net, never a blank card.
+    const gross = { inMinor: b.bankMovement.debitMinor, outMinor: b.bankMovement.creditMinor };
+    let flow = gross;
+    let excluded = false;
+    if (moved) {
+      try {
+        flow = withoutTransfers(b.bankMovement, moved, b.months);
+        excluded = true;
+      } catch {
+        flow = gross;
+      }
+    }
     return {
       months: postedMonths(b, postedThrough).slice(shownFrom),
       balanceMinor: b.cash.slice(shownFrom),
-      inMinor: b.bankIn.slice(shownFrom),
-      outMinor: b.bankOut.slice(shownFrom),
-      transfersExcluded: false,
+      inMinor: flow.inMinor.slice(shownFrom),
+      outMinor: flow.outMinor.slice(shownFrom),
+      transfersExcluded: excluded,
       projection: ar && ap ? projection(b.cashToday, ar.rows, ap.rows, asOf) : null,
     };
   };
