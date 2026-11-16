@@ -189,10 +189,13 @@ describe("money on the Dashboard", () => {
     expect(bank).toContain("cardBalance(minor, money)");
   });
 
-  it("says that transfers between the company's own accounts count on both sides while they do", () => {
-    expect(read("components/dashboard-home/CashFlowWidget.tsx")).toMatch(
-      /data\.transfersExcluded \? null : <p className=\{styles\.caption\}>Transfers between your own accounts count on both sides\.<\/p>/,
+  it("says whether transfers between the company's own bank accounts are left out of money in and out, or count on both sides", () => {
+    const widget = read("components/dashboard-home/CashFlowWidget.tsx");
+    expect(widget).toMatch(
+      /<p className=\{styles\.caption\}>\s*\{data\.transfersExcluded\s*\? "Transfers between your own bank accounts are left out of money in and money out\."\s*: "Transfers between your own accounts count on both sides\."\}\s*<\/p>/,
     );
+    // One caption, always shown: never silent about which figures the bars are.
+    expect(widget.match(/Transfers between your own/g)).toHaveLength(2);
   });
 });
 
