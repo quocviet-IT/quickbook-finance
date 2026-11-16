@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.39",
+    date: "2026-11-16",
+    headline: "Customize the dashboard's Overview, hide its amounts with Privacy, and keep a watchlist of accounts.",
+    changes: [
+      {
+        kind: "added",
+        title: "Customize the Overview: choose its cards, their order and their width, or start from Standard, Owner or Accountant",
+        detail:
+          "Customize, at the top of the dashboard, opens the Overview tab with a list of every card. Tick the ones to show, move them with the arrows or by dragging the cards, and make each one wider or narrower from the bar above it, or start from Standard, Owner or Accountant. Save layout keeps it for you in this company; other people keep their own, and the other three tabs stay as they are.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "Privacy hides every amount on the dashboard until you turn it off",
+        detail:
+          "With Privacy on, the figures, cards, tables and charts show dots in place of every amount, so the dashboard can stay open on a screen others can see. Counts, dates, percentages and names stay, and the charts keep their shapes. It stays on for you in this company until you turn it off.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "An account watchlist: up to 10 accounts with this month, last month and their Chart of Accounts balance",
+        detail:
+          "Banking and close has a new Account watchlist card; you can add it to the Overview too. Choose up to 10 accounts from the chart: each shows its activity this month and last month, and the same balance the Chart of Accounts shows for it. The list is yours alone.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "3.0.38",
     date: "2026-11-14",
     headline: "The dashboard is rebuilt around four figures and four tabs, and says how far the books are posted.",
