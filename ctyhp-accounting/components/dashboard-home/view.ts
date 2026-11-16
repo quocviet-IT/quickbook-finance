@@ -6,7 +6,7 @@
  * written by the `money` function the widget is given.
  */
 import { listWords } from "@/lib/domain/dashboard-home/insights";
-import { longMonthName } from "@/lib/domain/dashboard-home/ranges";
+import { longMonthName, monthYearLabel } from "@/lib/domain/dashboard-home/ranges";
 import type {
   HomeBank,
   HomeBankAccount,
@@ -157,6 +157,15 @@ export function payablesLine(figure: HomeFigures["payables"], money: Money): Fig
   const ledger = ledgerLine(figure, money);
   if (ledger) return ledger;
   return { tone: null, lead: figure.valueMinor === 0 ? "No open bills" : "Nothing due in 7 days", rest: "" };
+}
+
+/**
+ * "11 months of earlier years are still open, the oldest January 2025.": the
+ * months the close checklist does not cover, said so they are not taken for closed.
+ */
+export function earlierOpenSentence(open: { count: number; oldestPeriodEnd: string }): string {
+  if (open.count === 1) return `${monthYearLabel(open.oldestPeriodEnd)}, from an earlier year, is still open.`;
+  return `${plural(open.count, "month")} of earlier years are still open, the oldest ${monthYearLabel(open.oldestPeriodEnd)}.`;
 }
 
 /** "Net income, November": the month the figure is for, by name. */

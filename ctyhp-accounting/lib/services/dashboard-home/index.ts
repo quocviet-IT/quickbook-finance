@@ -30,7 +30,8 @@ import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows
 import type {
   HomeBank,
   HomeCash,
-  HomeClose,
+  HomeCloseReport,
+  HomeEarlierOpen,
   HomeFigures,
   HomeInsight,
   HomeNeedsReport,
@@ -45,6 +46,7 @@ import type {
 } from "@/lib/domain/dashboard-home/types";
 import { dashboardNeeds, type AttentionKey } from "@/lib/domain/dashboard-needs";
 import { naturalBalance } from "@/lib/domain/accounts";
+import { fiscalYearForDate } from "@/lib/domain/fiscal";
 import { buildProfitAndLoss, type LedgerBalance, type ProfitAndLoss } from "@/lib/domain/reports";
 import { addIsoDays } from "@/lib/domain/work-queue";
 import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
@@ -603,6 +605,8 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
 export interface HomeNeedsInput {
   asOf: string;
   baseCurrency: { code: string; decimals: number };
+  /** The company's first month of the fiscal year: a month left open in an earlier year is dealt with elsewhere. */
+  fiscalStartMonth: number;
   /** The reader holds company.export, so may be told a backup is late (2.90). */
   backups: boolean;
   /** The request's memo, shared with `getDashboardHome` so the aging reports are read once. */
@@ -635,18 +639,23 @@ async function readPendingApprovals(sb: SupabaseClient): Promise<number> {
   return count ?? 0;
 }
 
-/** Open periods whose last day has passed, and the oldest one's last day. */
-async function readMonthsOpen(sb: SupabaseClient, asOf: string): Promise<HomeNeedFacts["monthsOpen"]> {
+/** Open periods whose last day has passed, the oldest one's last day, and whether it is from an earlier fiscal year. */
+async function readMonthsOpen(sb: SupabaseClient, asOf: string, fiscalStartMonth: number): Promise<HomeNeedFacts["monthsOpen"]> {
   const { data, count, error } = await sb
     .from("acc_accounting_period")
-    .select("period_end", { count: "exact" })
+    .select("period_end,fiscal_year", { count: "exact" })
     .eq("status", "open")
     .lt("period_end", asOf)
     .order("period_end")
     .limit(1);
   if (error) throw new DashboardHomeError(error.message);
-  const oldest = ((data ?? []) as { period_end: string }[])[0]?.period_end;
-  return oldest ? { count: count ?? 1, oldestPeriodEnd: String(oldest).slice(0, 10) } : null;
+  const oldest = ((data ?? []) as { period_end: string; fiscal_year: number | string }[])[0];
+  if (!oldest?.period_end) return null;
+  return {
+    count: count ?? 1,
+    oldestPeriodEnd: String(oldest.period_end).slice(0, 10),
+    earlierYear: Number(oldest.fiscal_year) < fiscalYearForDate(asOf, fiscalStartMonth),
+  };
 }
 
 /**
@@ -655,7 +664,7 @@ async function readMonthsOpen(sb: SupabaseClient, asOf: string): Promise<HomeNee
  * read fails is named in the note and never counted as clear.
  */
 export async function getHomeNeeds(sb: SupabaseClient, input: HomeNeedsInput): Promise<HomeNeedsReport> {
-  const { asOf, baseCurrency, backups } = input;
+  const { asOf, baseCurrency, backups, fiscalStartMonth } = input;
   const memo = input.memo ?? createRequestMemo();
   const money = (minor: number) => formatMoney(minor, baseCurrency.code, baseCurrency.decimals);
   const settle = <T>(work: Promise<T>) =>
@@ -669,7 +678,7 @@ export async function getHomeNeeds(sb: SupabaseClient, input: HomeNeedsInput): P
     settle(agingRead(sb, "payables", asOf, memo)),
     settle(readCardActivity(sb, asOf)),
     settle(readPendingApprovals(sb)),
-    settle(readMonthsOpen(sb, asOf)),
+    settle(readMonthsOpen(sb, asOf, fiscalStartMonth)),
   ]);
 
   const made = ATTENTION_KEYS.filter((key) => key !== "backup" || backups);
@@ -700,12 +709,28 @@ export async function getHomeNeeds(sb: SupabaseClient, input: HomeNeedsInput): P
 
 /* --------------------------------------------------------------- month-end close */
 
+/** Open months of fiscal years before `fiscalYear`: every one of them has ended. */
+async function readEarlierOpen(sb: SupabaseClient, fiscalYear: number): Promise<HomeEarlierOpen | null> {
+  const { data, count, error } = await sb
+    .from("acc_accounting_period")
+    .select("period_end", { count: "exact" })
+    .eq("status", "open")
+    .lt("fiscal_year", fiscalYear)
+    .order("period_end")
+    .limit(1);
+  if (error) throw new DashboardHomeError(error.message);
+  const oldest = ((data ?? []) as { period_end: string }[])[0]?.period_end;
+  return oldest ? { count: count ?? 1, oldestPeriodEnd: String(oldest).slice(0, 10) } : null;
+}
+
 /**
  * The month-end close widget, streamed on its own: the real checklist of the
- * period a close is about (the oldest overdue open period, else the current
- * one), at asOf. Null when the company has no period for it.
+ * period a close is about (the oldest overdue open period of this fiscal year,
+ * else the current one), at asOf, as the period close screen picks it. Months
+ * of earlier fiscal years still open are counted apart: that screen does not
+ * show them, Accounting periods does.
  */
-export async function getHomeClose(sb: SupabaseClient, input: { asOf: string }): Promise<HomeClose | null> {
+export async function getHomeClose(sb: SupabaseClient, input: { asOf: string }): Promise<HomeCloseReport> {
   const context = await getAccountingContext(sb);
   const { asOf } = input;
   // Every widget on the page speaks for the same day.
@@ -715,15 +740,22 @@ export async function getHomeClose(sb: SupabaseClient, input: { asOf: string }):
     currentPeriod: context.periods.find((p) => p.periodStart <= asOf && asOf <= p.periodEnd) ?? null,
     overduePeriods: context.periods.filter((p) => p.status === "open" && p.periodEnd < asOf),
   };
-  const readiness = await getCloseReadiness(sb, sameDay);
-  if (!readiness) return null;
+  const [readiness, earlierOpen] = await Promise.all([
+    getCloseReadiness(sb, sameDay),
+    // Only a sentence rests on it: when it cannot be read, the sentence is left out.
+    orNull(readEarlierOpen(sb, context.fiscalYear)),
+  ]);
+  if (!readiness) return { close: null, earlierOpen };
   const lastClosed = readiness.history[0];
   return {
-    periodLabel: monthYearLabel(readiness.period.periodStart),
-    periodEnd: readiness.period.periodEnd,
-    steps: readiness.steps.map((step) => ({ key: step.key, title: step.title, status: step.status, href: step.href })),
-    complete: readiness.progress.complete,
-    applicable: readiness.progress.applicable,
-    lastClosedLabel: lastClosed ? monthYearLabel(lastClosed.periodEnd) : null,
+    close: {
+      periodLabel: monthYearLabel(readiness.period.periodStart),
+      periodEnd: readiness.period.periodEnd,
+      steps: readiness.steps.map((step) => ({ key: step.key, title: step.title, status: step.status, href: step.href })),
+      complete: readiness.progress.complete,
+      applicable: readiness.progress.applicable,
+      lastClosedLabel: lastClosed ? monthYearLabel(lastClosed.periodEnd) : null,
+    },
+    earlierOpen,
   };
 }

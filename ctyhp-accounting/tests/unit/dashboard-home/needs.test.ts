@@ -41,7 +41,7 @@ const facts: HomeNeedFacts = {
   billsDueSoon: { count: 2, amountMinor: 4_200_00, firstDueDate: "2026-11-16" },
   cardActivity: { cards: 1, lines: 14, amountMinor: 1_234_56 },
   approvals: 3,
-  monthsOpen: { count: 1, oldestPeriodEnd: "2026-10-31" },
+  monthsOpen: { count: 1, oldestPeriodEnd: "2026-10-31", earlierYear: false },
   unavailable: [],
 };
 
@@ -117,8 +117,14 @@ describe("homeNeeds", () => {
     expect(byKey.monthsOpen).toMatchObject({ tab: "banking", tone: "info", title: "Month not closed", detail: "October 2026 has ended and is still open", href: "/accounting?mode=close", action: "Continue" });
   });
 
+  it("sends months left open in an earlier fiscal year to Accounting periods, which the close screen does not cover", () => {
+    const earlier: HomeNeedFacts = { ...facts, monthsOpen: { count: 11, oldestPeriodEnd: "2025-01-31", earlierYear: true } };
+    const row = homeNeeds([], earlier, formatBaseMoney).find((need) => need.key === "monthsOpen");
+    expect(row).toMatchObject({ count: 11, title: "Months not closed", detail: "The oldest is January 2025", href: "/settings/periods", action: "Review" });
+  });
+
   it("leaves out a row with nothing to count", () => {
-    const quiet: HomeNeedFacts = { ...facts, approvals: 0, cardActivity: { cards: 1, lines: 0, amountMinor: 0 }, monthsOpen: { count: 0, oldestPeriodEnd: "2026-10-31" } };
+    const quiet: HomeNeedFacts = { ...facts, approvals: 0, cardActivity: { cards: 1, lines: 0, amountMinor: 0 }, monthsOpen: { count: 0, oldestPeriodEnd: "2026-10-31", earlierYear: false } };
     expect(homeNeeds([], quiet, formatBaseMoney).map((n) => n.key)).toEqual(["overdueInvoices", "billsOverdue", "billsDueSoon"]);
   });
 });

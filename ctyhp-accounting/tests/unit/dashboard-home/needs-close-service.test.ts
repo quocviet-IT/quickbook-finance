@@ -78,7 +78,7 @@ function handlers(over: FakeHandlers["rpc"] = {}): FakeHandlers {
     },
     tables: {
       acc_approval_request: () => ({ count: 3 }),
-      acc_accounting_period: () => ({ data: [{ period_end: "2026-09-30" }], count: 2 }),
+      acc_accounting_period: () => ({ data: [{ period_end: "2026-09-30", fiscal_year: 2026 }], count: 2 }),
     },
   };
 }
@@ -95,7 +95,7 @@ describe("getHomeNeeds", () => {
   it("adds the money rows to the existing checks, in base currency from the aging reports", async () => {
     attention.checks = { ...CLEAR, waitingLines: 37 };
     const { sb } = fakeSupabase(handlers());
-    const report = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, backups: false });
+    const report = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: false });
     expect(report.needs.map((n) => [n.key, n.count, n.tab, n.tone, n.action])).toEqual([
       ["overdueInvoices", 1, "money-in", "danger", "Review"],
       ["billsOverdue", 1, "money-out", "danger", "Pay"],
@@ -110,6 +110,8 @@ describe("getHomeNeeds", () => {
     // The card's charges as its statement prints them: positive.
     expect(byKey.cardActivity.detail).toContain("$1,234.56 on 1 card");
     expect(byKey.monthsOpen.detail).toBe("The oldest is September 2026");
+    // September is in this fiscal year, so the period close screen takes it.
+    expect(byKey.monthsOpen.href).toBe("/accounting?mode=close");
     expect(report.note).toBeNull();
     // The backup check is asked for only for someone who may see the backups.
     expect(attention.calls[0]).toEqual([sb, AS_OF, { backups: false }]);
@@ -119,10 +121,10 @@ describe("getHomeNeeds", () => {
     const { sb } = fakeSupabase(handlers({ acc_ap_ageing: () => ({ error: { message: "boom" } }), acc_ar_ageing: () => ({ data: [] }), acc_unreconciled_cards: () => ({ data: [{ card_count: 0, item_count: 0, amount_minor: 0 }] }) }));
     const quiet = { ...handlers(), tables: { acc_approval_request: () => ({ count: 0 }), acc_accounting_period: () => ({ data: [], count: 0 }) } };
     const { sb: clearSb } = fakeSupabase({ ...quiet, rpc: { ...quiet.rpc, acc_ar_ageing: () => ({ data: [] }), acc_ap_ageing: () => ({ data: [] }), acc_unreconciled_cards: () => ({ data: [] }) } });
-    const clear = await getHomeNeeds(clearSb, { asOf: AS_OF, baseCurrency: USD, backups: true });
+    const clear = await getHomeNeeds(clearSb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: true });
     expect(clear).toEqual({ needs: [], clear: "Nothing is waiting. Every check came back clear.", note: null });
 
-    const partly = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, backups: true });
+    const partly = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: true });
     expect(partly.needs.map((n) => n.key)).not.toContain("billsOverdue");
     expect(partly.note).toBe("2 checks could not run just now, so overdue bills and bills due in the next 7 days are not counted here.");
     expect(partly.clear).toBe("Nothing is waiting among the checks that ran.");
@@ -131,7 +133,7 @@ describe("getHomeNeeds", () => {
   it("counts every existing check unavailable when they could not be read at all", async () => {
     attention.fail = true;
     const { sb } = fakeSupabase(handlers());
-    const report = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, backups: false });
+    const report = await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: false });
     expect(report.note).toMatch(/^7 checks could not run just now/);
     expect(report.needs.map((n) => n.key)).toContain("overdueInvoices");
   });
@@ -140,7 +142,7 @@ describe("getHomeNeeds", () => {
     const { sb, requests } = fakeSupabase(handlers());
     const memo = createRequestMemo();
     await getDashboardHome(sb, { asOf: AS_OF, fiscalStartMonth: 1, baseCurrency: USD, memo });
-    await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, backups: false, memo });
+    await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: false, memo });
     expect(requests.filter((r) => r === "rpc:acc_ar_ageing")).toHaveLength(1);
     expect(requests.filter((r) => r === "rpc:acc_ap_ageing")).toHaveLength(1);
   });
@@ -152,10 +154,60 @@ describe("getHomeNeeds", () => {
   });
 });
 
+describe("getHomeNeeds, months left open", () => {
+  it("knows a month from an earlier fiscal year, by the company's own fiscal year", async () => {
+    const earlier = (fiscal_year: number) => ({
+      ...handlers(),
+      tables: { ...handlers().tables, acc_accounting_period: () => ({ data: [{ period_end: "2026-06-30", fiscal_year }], count: 5 }) },
+    });
+    // A fiscal year that starts in July: on 11/13/2026 it is fiscal year 2026, so June 2026 (fiscal 2025) is earlier.
+    const july = await getHomeNeeds(fakeSupabase(earlier(2025)).sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 7, backups: false });
+    expect(july.needs.find((n) => n.key === "monthsOpen")).toMatchObject({ href: "/settings/periods", action: "Review" });
+    const calendar = await getHomeNeeds(fakeSupabase(earlier(2026)).sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: false });
+    expect(calendar.needs.find((n) => n.key === "monthsOpen")).toMatchObject({ href: "/accounting?mode=close", action: "Continue" });
+  });
+});
+
 describe("getHomeClose", () => {
-  it("is null when the company has no period to close", async () => {
+  it("has no checklist when the company has no period to close", async () => {
     const { sb } = fakeSupabase({});
-    await expect(getHomeClose(sb, { asOf: AS_OF })).resolves.toBeNull();
+    await expect(getHomeClose(sb, { asOf: AS_OF })).resolves.toEqual({ close: null, earlierOpen: null });
+  });
+
+  it("counts the months of earlier fiscal years still open, which the checklist does not cover", async () => {
+    let asked: unknown[] = [];
+    const { sb } = fakeSupabase({
+      tables: {
+        acc_accounting_period: (query) => {
+          asked = query.filters;
+          return { data: [{ period_end: "2025-01-31" }], count: 11 };
+        },
+      },
+    });
+    await expect(getHomeClose(sb, { asOf: AS_OF })).resolves.toEqual({
+      close: null,
+      earlierOpen: { count: 11, oldestPeriodEnd: "2025-01-31" },
+    });
+    // Open, and before the fiscal year the close screen works in.
+    expect(asked).toEqual([
+      ["eq", "status", "open"],
+      ["lt", "fiscal_year", 2026],
+    ]);
+  });
+
+  it("leaves that sentence out, and keeps the checklist, when the earlier months cannot be read", async () => {
+    close.readiness = {
+      period: { id: "p10", label: "2026-10", periodStart: "2026-10-01", periodEnd: "2026-10-31", status: "open" },
+      steps: [],
+      progress: { complete: 0, outstanding: 0, notApplicable: 0, unavailable: 0, applicable: 0, percent: 0 },
+      gateBlockers: null,
+      history: [],
+      medianDaysToClose: null,
+    };
+    const { sb } = fakeSupabase({ tables: { acc_accounting_period: () => ({ error: { message: "boom" } }) } });
+    const result = await getHomeClose(sb, { asOf: AS_OF });
+    expect(result.earlierOpen).toBeNull();
+    expect(result.close?.periodLabel).toBe("October 2026");
   });
 
   it("turns the real checklist into the widget's steps, on the page's own day", async () => {
@@ -173,7 +225,8 @@ describe("getHomeClose", () => {
     };
     const { sb } = fakeSupabase({});
     const result = await getHomeClose(sb, { asOf: AS_OF });
-    expect(result).toEqual({
+    expect(result.earlierOpen).toBeNull();
+    expect(result.close).toEqual({
       periodLabel: "October 2026",
       periodEnd: "2026-10-31",
       steps: [

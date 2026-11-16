@@ -1,10 +1,10 @@
 "use client";
 import { Skeleton } from "antd";
 import StatusTag from "@/components/ui/StatusTag";
-import type { HomeClose, HomeCloseStep } from "@/lib/domain/dashboard-home/types";
+import type { HomeCloseReport, HomeCloseStep } from "@/lib/domain/dashboard-home/types";
 import type { StatusLook } from "@/lib/domain/status-label";
 import styles from "./dashboard-home.module.css";
-import { stepsDone } from "./view";
+import { earlierOpenSentence, stepsDone } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
 /** How each step's state reads: a word and a tone, never a color alone. */
@@ -16,6 +16,7 @@ const STEP_LOOKS: Record<HomeCloseStep["status"], StatusLook> = {
 };
 
 const CLOSE_HREF = "/accounting?mode=close";
+const PERIODS_HREF = "/settings/periods";
 
 /**
  * Month-end close: the real checklist of the month a close is about (the
@@ -24,18 +25,24 @@ const CLOSE_HREF = "/accounting?mode=close";
  * rest of the page has been sent, so it never holds up the figures.
  */
 export default function MonthEndClose({
-  close = null,
+  report = null,
   failure = null,
   loading = false,
 }: {
-  close?: HomeClose | null;
+  report?: HomeCloseReport | null;
   /** The safe sentence when the checklist could not be read. */
   failure?: string | null;
   loading?: boolean;
 }) {
+  const close = report?.close ?? null;
+  const earlier = report?.earlierOpen ? earlierOpenSentence(report.earlierOpen) : null;
   const footer = (
     <>
-      <TextLink href={CLOSE_HREF}>Close checklist</TextLink>
+      {report && !close ? (
+        <TextLink href={PERIODS_HREF}>Accounting periods</TextLink>
+      ) : (
+        <TextLink href={CLOSE_HREF}>Close checklist</TextLink>
+      )}
       <Spacer />
       {close ? (
         <LinkButton href={CLOSE_HREF} primary>
@@ -59,9 +66,12 @@ export default function MonthEndClose({
     );
   }
   if (!close) {
+    // As the period close screen says it, and what is still open in earlier years when anything is.
     return (
       <Widget title="Month-end close" footer={footer}>
-        <Empty title="No accounting period covers today." action={<TextLink href={CLOSE_HREF}>Go to period close</TextLink>} />
+        <Empty title="No accounting period covers today.">
+          {earlier ?? "Generate this fiscal year's periods and the checklist will have something to measure."}
+        </Empty>
       </Widget>
     );
   }
@@ -88,6 +98,11 @@ export default function MonthEndClose({
           </li>
         ))}
       </ul>
+      {earlier ? (
+        <p className={styles.caption}>
+          {earlier} <TextLink href={PERIODS_HREF}>Accounting periods</TextLink>
+        </p>
+      ) : null}
     </Widget>
   );
 }

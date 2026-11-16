@@ -258,6 +258,24 @@ export interface HomeClose {
   lastClosedLabel: string | null;
 }
 
+/** Months of earlier fiscal years that have ended and are still open. */
+export interface HomeEarlierOpen {
+  count: number;
+  oldestPeriodEnd: string;
+}
+
+/**
+ * Month-end close as the card shows it. The close checklist covers this fiscal
+ * year only, as the period close screen does; months of earlier years still
+ * open are closed in Accounting periods, so they are said apart.
+ */
+export interface HomeCloseReport {
+  /** The checklist of the month a close is about; null when no month of this fiscal year has ended open and none covers today. */
+  close: HomeClose | null;
+  /** Null when every month of earlier years is closed, or when that could not be read. */
+  earlierOpen: HomeEarlierOpen | null;
+}
+
 export interface HomeInsight {
   key: string;
   /** The small label over the sentence: "Books", "Profit", "Receivables", "Cash", "Margin". */

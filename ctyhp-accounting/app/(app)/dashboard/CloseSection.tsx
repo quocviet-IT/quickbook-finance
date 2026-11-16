@@ -1,6 +1,6 @@
 import MonthEndClose from "@/components/dashboard-home/MonthEndClose";
 import { createSupabaseServerClient } from "@/lib/db/server";
-import type { HomeClose } from "@/lib/domain/dashboard-home/types";
+import type { HomeCloseReport } from "@/lib/domain/dashboard-home/types";
 import { getHomeClose } from "@/lib/services/dashboard-home";
 
 /**
@@ -11,15 +11,15 @@ import { getHomeClose } from "@/lib/services/dashboard-home";
  */
 export default async function CloseSection({ asOf }: { asOf: string }) {
   // Only the read is guarded: an error while drawing belongs to an error boundary, not here.
-  let close: HomeClose | null = null;
+  let report: HomeCloseReport | null = null;
   let failed = false;
   try {
     const sb = await createSupabaseServerClient();
-    close = await getHomeClose(sb, { asOf });
+    report = await getHomeClose(sb, { asOf });
   } catch (cause) {
     console.error("Month-end close could not be read:", cause);
     failed = true;
   }
-  if (failed) return <MonthEndClose failure="Month-end close could not be read." />;
-  return <MonthEndClose close={close} />;
+  if (failed || !report) return <MonthEndClose failure="Month-end close could not be read." />;
+  return <MonthEndClose report={report} />;
 }

@@ -36,8 +36,12 @@ export interface HomeNeedFacts {
   cardActivity: { cards: number; lines: number; amountMinor: number } | null;
   /** Approval requests waiting for a decision. */
   approvals: number | null;
-  /** Open periods whose last day has passed; the oldest one's last day. */
-  monthsOpen: { count: number; oldestPeriodEnd: string } | null;
+  /**
+   * Open periods whose last day has passed; the oldest one's last day, and
+   * whether it belongs to an earlier fiscal year (the period close screen then
+   * cannot show it, Accounting periods can).
+   */
+  monthsOpen: { count: number; oldestPeriodEnd: string; earlierYear: boolean } | null;
   unavailable: HomeNeedKey[];
 }
 
@@ -129,8 +133,8 @@ function newRows(facts: HomeNeedFacts, money: (minor: number) => string): HomeNe
         monthsOpen.count === 1
           ? `${monthYearLabel(monthsOpen.oldestPeriodEnd)} has ended and is still open`
           : `The oldest is ${monthYearLabel(monthsOpen.oldestPeriodEnd)}`,
-      href: "/accounting?mode=close",
-      action: "Continue",
+      href: monthsOpen.earlierYear ? "/settings/periods" : "/accounting?mode=close",
+      action: monthsOpen.earlierYear ? "Review" : "Continue",
     });
   }
   return rows;

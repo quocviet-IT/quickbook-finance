@@ -37,8 +37,9 @@ export default async function DashboardPage() {
   // Needs attention is read once, started now and not awaited: its rows are
   // streamed into their card, and its counts into the tabs. A failed read is
   // the card's to say; the tabs then show no count.
+  const fiscalStartMonth = company?.fiscal_year_start_month ?? 1;
   const needs = holdsPermission("company.export").then((backups) =>
-    getHomeNeeds(sb, { asOf: today, baseCurrency, backups, memo }),
+    getHomeNeeds(sb, { asOf: today, baseCurrency, fiscalStartMonth, backups, memo }),
   );
   const counts: Promise<Record<HomeTab, number> | null> = needs.then(
     (report) => needsByTab(report.needs),
@@ -47,7 +48,7 @@ export default async function DashboardPage() {
 
   const home = await getDashboardHome(sb, {
     asOf: today,
-    fiscalStartMonth: company?.fiscal_year_start_month ?? 1,
+    fiscalStartMonth,
     baseCurrency,
     memo,
   });

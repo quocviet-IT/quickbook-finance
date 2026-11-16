@@ -5,6 +5,7 @@ import {
   booksNote,
   cardBalance,
   daysLate,
+  earlierOpenSentence,
   formatChange,
   homeTabHref,
   homeTabOf,
@@ -152,6 +153,13 @@ describe("the lines under the four figures", () => {
       "Accounts Payable in the ledger is $25,000.00, $2,480.00 less than what is listed here.",
     );
     expect(ledgerDifference("Accounts Payable", 2_748_000, 2_748_000, money)).toBeNull();
+  });
+
+  it("says which months of earlier years are still open, so the close card never reads as all closed", () => {
+    expect(earlierOpenSentence({ count: 11, oldestPeriodEnd: "2025-01-31" })).toBe(
+      "11 months of earlier years are still open, the oldest January 2025.",
+    );
+    expect(earlierOpenSentence({ count: 1, oldestPeriodEnd: "2025-06-30" })).toBe("June 2025, from an earlier year, is still open.");
   });
 
   it("names the month of the net income figure", () => {
