@@ -4,6 +4,7 @@ import StatusTag from "@/components/ui/StatusTag";
 import type { HomeCloseReport, HomeCloseStep } from "@/lib/domain/dashboard-home/types";
 import type { StatusLook } from "@/lib/domain/status-label";
 import styles from "./dashboard-home.module.css";
+import { usePrivacy } from "./privacy";
 import { earlierOpenSentence, stepsDone } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
@@ -23,6 +24,9 @@ const PERIODS_HREF = "/settings/periods";
  * oldest month that has ended and is still open, else this one), each step
  * with its state and where it is dealt with. Read on the server after the
  * rest of the page has been sent, so it never holds up the figures.
+ *
+ * Streamed in from the server, so it reads Privacy (3.0.39) from the context
+ * itself: a step written on the server is masked like any other sentence.
  */
 export default function MonthEndClose({
   report = null,
@@ -34,8 +38,9 @@ export default function MonthEndClose({
   failure?: string | null;
   loading?: boolean;
 }) {
+  const { text } = usePrivacy();
   const close = report?.close ?? null;
-  const earlier = report?.earlierOpen ? earlierOpenSentence(report.earlierOpen) : null;
+  const earlier = report?.earlierOpen ? text(earlierOpenSentence(report.earlierOpen)) : null;
   const footer = (
     <>
       {report && !close ? (
@@ -92,7 +97,7 @@ export default function MonthEndClose({
         {close.steps.map((step) => (
           <li key={step.key} className={`${styles.stepRow} ${step.status === "not-applicable" ? styles.stepAside : ""}`}>
             <span className={styles.stepTitle}>
-              <TextLink href={step.href}>{step.title}</TextLink>
+              <TextLink href={step.href}>{text(step.title)}</TextLink>
             </span>
             <StatusTag status={step.status} looks={STEP_LOOKS} />
           </li>

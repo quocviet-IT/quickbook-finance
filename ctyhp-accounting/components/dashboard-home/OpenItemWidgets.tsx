@@ -3,9 +3,10 @@ import StatusTag from "@/components/ui/StatusTag";
 import { tokenVar } from "@/lib/design/tokens";
 import type { HomeOpenSide, HomePayables, HomePayment, HomeReceivables, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
-import { formatDate, formatMoney, plural } from "@/lib/format";
+import { formatDate, plural } from "@/lib/format";
 import { stackShares } from "./charts/geometry";
 import styles from "./dashboard-home.module.css";
+import { usePrivacy } from "./privacy";
 import { billDueLook, daysLate, ledgerDifference, otherCurrencies } from "./view";
 import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
@@ -290,6 +291,7 @@ export function BillsWidget({
 
 /** The latest customer payments, each in its own currency: a payment is never written as if it were in the base currency. */
 export function PaymentsWidget({ payments }: { payments: SectionEnvelope<HomePayment[]> }) {
+  const { own } = usePrivacy();
   const footer = <TextLink href="/payments">Payments</TextLink>;
   const data = payments.data;
   if (!data) {
@@ -326,7 +328,7 @@ export function PaymentsWidget({ payments }: { payments: SectionEnvelope<HomePay
               <tr key={payment.id}>
                 <td className={styles.muted}>{formatDate(payment.date)}</td>
                 <td className={styles.name}>{payment.customerName}</td>
-                <td className={styles.num}>{formatMoney(payment.amountMinor, payment.currencyCode, payment.decimals)}</td>
+                <td className={styles.num}>{own(payment.amountMinor, payment.currencyCode, payment.decimals)}</td>
               </tr>
             ))}
           </tbody>

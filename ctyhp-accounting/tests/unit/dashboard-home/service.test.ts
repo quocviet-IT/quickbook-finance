@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { chartFigures } from "@/lib/domain/chart-groups";
+import { listAccounts } from "@/lib/services/accounts";
 import { getDashboardHome, type DashboardHome } from "@/lib/services/dashboard-home";
+import { getLedgerBalances } from "@/lib/services/reports";
 import { fakeSupabase, filterValue, type Answer, type FakeHandlers } from "./fake-supabase";
 
 /**
@@ -7,7 +10,7 @@ import { fakeSupabase, filterValue, type Answer, type FakeHandlers } from "./fak
  * the service reads it. Every figure below is worked out by hand from the rows.
  */
 const AS_OF = "2026-11-13";
-const INPUT = { asOf: AS_OF, fiscalStartMonth: 1, baseCurrency: { code: "USD", decimals: 2 } };
+const INPUT = { asOf: AS_OF, fiscalStartMonth: 1, baseCurrency: { code: "USD", decimals: 2 }, watchlist: [] as string[] | null };
 
 type Type = "bank" | "accounts_receivable" | "current_asset" | "accounts_payable" | "credit_card" | "income" | "cost_of_goods_sold" | "expense";
 const ACCOUNTS: Record<string, { name: string; type: Type; detail?: string }> = {
@@ -200,9 +203,12 @@ function handlers(over: { rpc?: FakeHandlers["rpc"]; tables?: FakeHandlers["tabl
   };
 }
 
-async function load(over: Parameters<typeof handlers>[0] = {}): Promise<{ home: DashboardHome; requests: string[] }> {
+async function load(
+  over: Parameters<typeof handlers>[0] = {},
+  watchlist: string[] | null = [],
+): Promise<{ home: DashboardHome; requests: string[] }> {
   const { sb, requests } = fakeSupabase(handlers(over));
-  const home = await getDashboardHome(sb, INPUT);
+  const home = await getDashboardHome(sb, { ...INPUT, watchlist });
   return { home, requests };
 }
 
@@ -475,5 +481,82 @@ describe("books behind and a new company", () => {
       tables: { acc_journal_entry: (q) => ({ data: q.filters.some(([op]) => op === "lte") ? [] : [{ id: "je-future" }] }) },
     });
     expect(later.home.status.data).toMatchObject({ postedThrough: null, firstUse: false });
+  });
+});
+
+describe("the account watchlist", () => {
+  /** The chart as listAccounts reads it, with the status and contra flag the watchlist needs; Cash on Hand is inactive. */
+  const chart = (): FakeHandlers["tables"] => ({
+    acc_account: () => ({
+      data: Object.entries(ACCOUNTS).map(([code, a]) => ({
+        id: `a-${code}`,
+        account_code: code,
+        name: a.name,
+        account_type: a.type,
+        detail_type: a.detail ?? null,
+        is_contra: false,
+        status: code === "1000" ? "inactive" : "active",
+      })),
+    }),
+  });
+  const WATCHED = ["a-4000", "a-1010", "a-2000", "a-6100"];
+
+  it("is built from the reads already made: not one request more", async () => {
+    const { requests: without } = await load({ tables: chart() });
+    const { home, requests } = await load({ tables: chart() }, WATCHED);
+    expect(home.watchlist.dataState).toBe("fresh");
+    expect(requests).toHaveLength(23);
+    expect([...requests].sort()).toEqual([...without].sort());
+  });
+
+  it("gives each account this month, last month and its Chart of Accounts balance, in the person's order", async () => {
+    const { home } = await load({ tables: chart() }, WATCHED);
+    expect(home.watchlist.data!.rows.map((r) => [r.code, r.typeLabel, r.thisMonthMinor, r.lastMonthMinor, r.balanceMinor])).toEqual([
+      // Income: the fiscal year to date, January's 10,000, five months of 50,000 and November's 20,000.
+      ["4000", "Income", 20_000_00, 50_000_00, 280_000_00],
+      // A bank account: everything since the books began.
+      ["1010", "Bank", 3_000_00, 4_000_00, 83_000_00],
+      // A liability reads positive when it is owed.
+      ["2000", "Accounts Payable", 0, 1_000_00, 12_000_00],
+      ["6100", "Expense", 9_000_00, 25_000_00, 136_000_00],
+    ]);
+  });
+
+  it("makes Balance exactly what chartFigures gives for the ledger as of asOf and the fiscal year to date", async () => {
+    const { sb } = fakeSupabase(handlers({ tables: chart() }));
+    const home = await getDashboardHome(sb, { ...INPUT, watchlist: Object.keys(ACCOUNTS).map((code) => `a-${code}`) });
+    const accounts = (await listAccounts(sb)).map((a) => ({ ...a }));
+    const asOf = await getLedgerBalances(sb, null, AS_OF);
+    const year = MONTHLY.filter((m) => m.month_key >= "2026-01").map((m) => ({ accountId: m.account_id, debitBase: m.debit_base, creditBase: m.credit_base }));
+    const yearByAccount = [...new Set(year.map((row) => row.accountId))].map((accountId) => ({
+      accountId,
+      debitBase: year.filter((row) => row.accountId === accountId).reduce((s, row) => s + row.debitBase, 0),
+      creditBase: year.filter((row) => row.accountId === accountId).reduce((s, row) => s + row.creditBase, 0),
+    }));
+    const expected = chartFigures(accounts, asOf, yearByAccount);
+    const rows = home.watchlist.data!.rows;
+    expect(rows).toHaveLength(10);
+    for (const row of rows) expect(row.balanceMinor + 0, row.code).toBe(expected[row.accountId] + 0);
+  });
+
+  it("offers the active accounts by code, and leaves out an id no longer in the chart", async () => {
+    const { home } = await load({ tables: chart() }, ["a-gone", "a-4000"]);
+    expect(home.watchlist.data!.rows.map((r) => r.accountId)).toEqual(["a-4000"]);
+    const choices = home.watchlist.data!.choices;
+    expect(choices.map((c) => c.code)).toEqual(["1010", "1030", "1100", "1210", "2000", "2050", "4000", "5000", "6100"]);
+    expect(choices[0]).toEqual({ id: "a-1010", code: "1010", name: "Sample Checking", typeLabel: "Bank" });
+  });
+
+  it("when the watchlist could not be read, only that card is unavailable, and it says so", async () => {
+    const { home, requests } = await load({ tables: chart() }, null);
+    expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
+    expect(home.watchlist).toMatchObject({ dataState: "unavailable", data: null, unavailableReason: "Your watchlist could not be read." });
+    expect(requests).toHaveLength(23);
+  });
+
+  it("goes with the ledger: when the monthly read fails, it is unavailable too", async () => {
+    const { home } = await load({ tables: chart(), rpc: { acc_monthly_ledger_balances: () => ({ error: { message: "statement timeout" } }) } }, WATCHED);
+    expect(home.watchlist).toMatchObject({ dataState: "unavailable", unavailableReason: "The account watchlist could not be read." });
+    expect(JSON.stringify(home.watchlist)).not.toContain("statement timeout");
   });
 });

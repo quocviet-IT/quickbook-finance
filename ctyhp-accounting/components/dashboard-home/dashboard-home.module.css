@@ -31,6 +31,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Privacy (3.0.39): the switch and its word, one label, as tall as the buttons beside it. */
+.privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 2px;
+  font-size: 14px;
+  color: var(--ob-text-body);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* --- Books status note -------------------------------------------------- */
 .note {
   display: flex;
@@ -268,6 +281,101 @@
   .cell {
     grid-column: span 12;
   }
+}
+
+/* --- Customize the Overview (3.0.39) ------------------------------------ */
+/* The panel between the tabs and the Overview's cards: the app's card, outlined in the primary color while it is open. */
+.customize {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-intent-primary);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.customizeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The fourteen cards in their order, in as many columns of at least 250px as fit. */
+.customizeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 2px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.customizeItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.customizeCheck {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A card's cell while the Overview is customized: dashed, and picked up to be moved. */
+.editing {
+  border-radius: 8px;
+  outline: 2px dashed var(--ob-border-muted);
+  outline-offset: 2px;
+  cursor: grab;
+}
+
+.dragging {
+  opacity: 0.45;
+}
+
+/* Where a dragged card will land: just before this one. After .editing, so it wins. */
+.dropTarget {
+  outline: 2px solid var(--ob-intent-primary);
+}
+
+/* The slim bar above a card being customized: its grip, its name and Wider or Narrower. */
+.editBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 32px;
+  margin-bottom: 6px;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.editTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ob-text-heading);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grip {
+  flex: none;
+  color: var(--ob-text-faint);
+}
+
+/* Every card hidden: one full-width box in the app's card look, pointing back at the list above. */
+.allHidden {
+  flex: 1 1 auto;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
 }
 
 /* --- A card ------------------------------------------------------------- */
@@ -864,6 +972,20 @@
   margin-left: 6px;
   font-size: 12px;
   color: var(--ob-text-secondary);
+}
+
+/* An account's code before its name, in the watchlist (3.0.39). */
+.code {
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The watchlist's account picker: the search field and its note under it. */
+.watchPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
 }
 
 /* --- Open items split by due date --------------------------------------- */

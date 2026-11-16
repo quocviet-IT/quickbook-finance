@@ -57,10 +57,12 @@ describe("the Dashboard's tabs", () => {
     for (const { key } of HOME_TABS) expect(client).toMatch(new RegExp(`^\\s+"?${key}"?: \\(`, "m"));
   });
 
-  it("leave out what this release does not have: Privacy, Customize, layouts", () => {
-    for (const word of ["Privacy", "Customize", "preset", "draggable"]) {
-      for (const file of SCREEN) expect(read(file), `${file} mentions ${word}`).not.toContain(word);
-    }
+  it("draw the Overview from the person's layout, and the other three as they were", () => {
+    // Since 3.0.39 the Overview's cards come from the person's layout; the other tabs keep release A's cards and widths.
+    expect(client).toMatch(/const visible = overview\.order\.filter\(\(key\) => overview\.shown\.includes\(key\)/);
+    expect(client).toMatch(/const \{ span, mid \} = overviewSpan\(overview, key\);/);
+    expect(client).toMatch(/"money-in": \(\s*<>\s*<Cell span=\{8\} mid=\{12\}>\s*\{cards\.invoices\(8\)\}/);
+    expect(client).toMatch(/"money-out": \(\s*<>\s*<Cell span=\{8\} mid=\{12\}>\s*\{cards\.bills\(8\)\}/);
   });
 });
 
@@ -102,6 +104,7 @@ describe("each card stands on its own", () => {
     bank: "components/dashboard-home/BooksWidgets.tsx",
     activity: "components/dashboard-home/BooksWidgets.tsx",
     insights: "components/dashboard-home/BooksWidgets.tsx",
+    watchlist: "components/dashboard-home/WatchlistWidget.tsx",
   };
 
   it("hands every section to its card as an envelope", () => {
@@ -120,6 +123,8 @@ describe("each card stands on its own", () => {
     expect(read("components/dashboard-home/OpenItemWidgets.tsx")).toMatch(/if \(!ar && !ap\) \{\s*return \(\s*<Widget[\s\S]{0,160}?<Unavailable/);
     // Bank accounts, Insights, Recent accounting activity.
     expect(count("components/dashboard-home/BooksWidgets.tsx")).toBe(3);
+    // The account watchlist (3.0.39).
+    expect(count("components/dashboard-home/WatchlistWidget.tsx")).toBe(1);
     expect(read("components/dashboard-home/BooksNote.tsx")).toMatch(/if \(!status\.data\) \{[\s\S]{0,400}?<RetryButton \/>/);
   });
 
@@ -140,12 +145,16 @@ describe("each card stands on its own", () => {
 describe("money on the Dashboard", () => {
   it("writes a payment in its own currency, never as base currency", () => {
     const widgets = read("components/dashboard-home/OpenItemWidgets.tsx");
-    expect(widgets).toContain("formatMoney(payment.amountMinor, payment.currencyCode, payment.decimals)");
+    // Through Privacy's `own` (3.0.39), which is formatMoney in the payment's currency while Privacy is off.
+    expect(widgets).toContain("own(payment.amountMinor, payment.currencyCode, payment.decimals)");
+    expect(read("components/dashboard-home/privacy.tsx")).toContain(
+      "own: (minor, code, decimals) => (on ? PRIVATE_AMOUNT : formatMoney(minor, code, decimals))",
+    );
     for (const file of SCREEN) {
       const source = read(file);
       // Every payment amount on the screen goes through its own currency.
       const uses = source.match(/payment\.amountMinor/g)?.length ?? 0;
-      const own = source.match(/formatMoney\(payment\.amountMinor, payment\.currencyCode, payment\.decimals\)/g)?.length ?? 0;
+      const own = source.match(/\bown\(payment\.amountMinor, payment\.currencyCode, payment\.decimals\)/g)?.length ?? 0;
       expect(uses, file).toBe(own);
       expect(source, file).not.toMatch(/money\(\s*payment\./);
     }
@@ -161,8 +170,11 @@ describe("money on the Dashboard", () => {
 
   it("formats with the company's base currency, handed down from the page", () => {
     expect(page).toMatch(/const baseCurrency = \{ code: base\?\.code \?\? "USD", decimals: base\?\.decimal_places \?\? 2 \};/);
-    expect(client).toContain("formatMoney(minor, currency.code, currency.decimals)");
-    expect(client).toContain("formatCompactMoney(minor, currency.code, currency.decimals)");
+    // Through the Privacy context (3.0.39), which the client gives the page's currency.
+    expect(client).toContain("<PrivacyProvider on={privacy} currency={props.currency}>");
+    const privacy = read("components/dashboard-home/privacy.tsx");
+    expect(privacy).toContain("formatMoney(minor, currency.code, currency.decimals)");
+    expect(privacy).toContain("formatCompactMoney(minor, currency.code, currency.decimals)");
   });
 
   it("adds only cash to Cash on hand, and lists the cards after it as what is owed", () => {

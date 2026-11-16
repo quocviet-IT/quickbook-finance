@@ -27,6 +27,7 @@ import {
   type HomePeriodRange,
 } from "@/lib/domain/dashboard-home/ranges";
 import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows } from "@/lib/domain/dashboard-home/series";
+import { watchChoices, watchRows, type HomeWatchChoice, type HomeWatchRow } from "@/lib/domain/dashboard-home/watchlist";
 import type {
   HomeBank,
   HomeCash,
@@ -111,6 +112,17 @@ export interface DashboardHome {
   /** The audit feed without system activity; empty both when nothing happened and when the reader may not read the audit log. */
   activity: SectionEnvelope<DashboardActivity[]>;
   insights: SectionEnvelope<HomeInsight[]>;
+  /**
+   * The person's account watchlist (3.0.39), with the accounts the picker
+   * offers; unavailable when the watchlist could not be read, or the ledger
+   * or the chart could not.
+   */
+  watchlist: SectionEnvelope<HomeWatchlist>;
+}
+
+export interface HomeWatchlist {
+  rows: HomeWatchRow[];
+  choices: HomeWatchChoice[];
 }
 
 export interface DashboardHomeInput {
@@ -122,7 +134,12 @@ export interface DashboardHomeInput {
    * reports are read once for the whole page; left out, this call makes its own.
    */
   memo?: RequestMemo;
+  /** The person's watchlist, account ids in their order; null when it could not be read. */
+  watchlist: string[] | null;
 }
+
+/** Said when the person's own watchlist could not be read. */
+export const WATCHLIST_UNREAD = "Your watchlist could not be read.";
 
 /** A shared read's failure is answered by the sections that use it; this only keeps Node from calling it unhandled. */
 function shared<T>(work: Promise<T>): Promise<T> {
@@ -560,6 +577,28 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     );
   };
 
+  /**
+   * The watchlist, from reads already made: the opening and monthly ledger
+   * (since the books began, this month, last month and the fiscal year to
+   * date) and the chart. Its Balance is the Chart of Accounts figure.
+   */
+  const watchlist = async (ids: readonly string[]): Promise<HomeWatchlist> => {
+    const [chart, b] = await Promise.all([accounts, books]);
+    const current = windowMonths[windowMonths.length - 1].key;
+    const previous = windowMonths[windowMonths.length - 2].key;
+    return {
+      rows: watchRows({
+        ids,
+        accounts: chart,
+        thisMonth: b.byMonth.get(current) ?? [],
+        lastMonth: b.byMonth.get(previous) ?? [],
+        sinceTheBooksBegan: b.balances,
+        fiscalYearToDate: monthsIn(b, ranges.year),
+      }),
+      choices: watchChoices(chart),
+    };
+  };
+
   const [
     statusEnvelope,
     figuresEnvelope,
@@ -571,6 +610,7 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     bankEnvelope,
     activityEnvelope,
     insightsEnvelope,
+    watchlistEnvelope,
   ] = await Promise.all([
     envelopeOf(status(), "How far the books are posted could not be read."),
     envelopeOf(figures(), "The four figures could not be read."),
@@ -582,6 +622,9 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     envelopeOf(bank(), "Bank accounts could not be read."),
     envelopeOf(readActivity(sb), "Recent accounting activity could not be read."),
     envelopeOf(insights(), "Insights could not be read."),
+    input.watchlist === null
+      ? envelopeOf<HomeWatchlist>(Promise.reject(new DashboardHomeError("The watchlist preference could not be read")), WATCHLIST_UNREAD)
+      : envelopeOf(watchlist(input.watchlist), "The account watchlist could not be read."),
   ]);
 
   return {
@@ -597,6 +640,7 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
     bank: bankEnvelope,
     activity: activityEnvelope,
     insights: insightsEnvelope,
+    watchlist: watchlistEnvelope,
   };
 }
 
