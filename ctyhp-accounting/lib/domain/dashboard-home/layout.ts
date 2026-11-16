@@ -71,7 +71,9 @@ export interface HomePreset {
  * The three layouts to start from. Standard is the Overview as it was before
  * it could be changed (3.0.38): cash flow wide, then Needs attention, profit
  * and loss, expenses and insights. Recent accounting activity is last in every
- * order and shown in none.
+ * order and shown in none. Each preset fills its rows: a wide card beside a
+ * narrow one, three narrow ones, so no row ends in a gap (the mockup's
+ * Accountant put Bank accounts after two narrow cards, which left one).
  */
 export const HOME_PRESETS: readonly HomePreset[] = [
   {
@@ -96,9 +98,9 @@ export const HOME_PRESETS: readonly HomePreset[] = [
     key: "accountant",
     label: "Accountant",
     layout: {
-      order: ["needs", "close", "bank", "watchlist", "aging", "pnl", "cash", "expenses", "insights", "invoices", "bills", "sales", "payments", "activity"],
-      shown: ["needs", "close", "bank", "watchlist"],
-      wide: ["bank"],
+      order: ["bank", "needs", "close", "watchlist", "aging", "pnl", "cash", "expenses", "insights", "invoices", "bills", "sales", "payments", "activity"],
+      shown: ["bank", "needs", "close", "watchlist"],
+      wide: ["bank", "watchlist"],
     },
   },
 ];

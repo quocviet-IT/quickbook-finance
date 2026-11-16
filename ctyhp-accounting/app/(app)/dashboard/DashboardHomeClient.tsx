@@ -68,7 +68,10 @@ function Cell({ span, mid, edit = null, children }: { span: 4 | 6 | 8 | 12; mid:
       {edit ? (
         <div className={styles.editBar}>
           <HolderOutlined className={styles.grip} aria-hidden="true" />
-          <span className={styles.editTitle}>{edit.title}</span>
+          {/* The card's own head names it just below; the bar says what it is for. */}
+          <span className={styles.editTitle}>
+            Drag to move<span className="accounting-sr-only"> {edit.title}</span>
+          </span>
           <span className={styles.spacer} />
           <Button
             size="small"

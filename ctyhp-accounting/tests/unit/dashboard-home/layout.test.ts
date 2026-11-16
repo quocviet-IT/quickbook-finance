@@ -75,16 +75,30 @@ describe("the presets", () => {
     expect(isStandard(standard)).toBe(true);
   });
 
-  it("take Owner and Accountant from the approved mockup", () => {
+  it("fill every row: no preset leaves a gap at the end of a row", () => {
+    for (const preset of HOME_PRESETS) {
+      const { order, shown, wide } = preset.layout;
+      let used = 0;
+      for (const key of order.filter((k) => shown.includes(k))) {
+        const span = wide.includes(key) ? 8 : 4;
+        // A card that does not fit what is left of the row starts a new one, leaving a gap.
+        expect(used === 0 || used + span <= 12, `${preset.key}: ${key} leaves a gap`).toBe(true);
+        used = (used + span) % 12;
+      }
+      expect(used, `${preset.key}: the last row is not full`).toBe(0);
+    }
+  });
+
+  it("take Owner and Accountant from the approved mockup, Accountant reordered to fill its rows", () => {
     expect(presetLayout("owner")).toEqual({
       order: ["cash", "insights", "pnl", "expenses", "invoices", "bills", "sales", "needs", "bank", "close", "watchlist", "payments", "aging", "activity"],
       shown: ["cash", "insights", "pnl", "expenses", "sales"],
       wide: ["cash"],
     });
     expect(presetLayout("accountant")).toEqual({
-      order: ["needs", "close", "bank", "watchlist", "aging", "pnl", "cash", "expenses", "insights", "invoices", "bills", "sales", "payments", "activity"],
-      shown: ["needs", "close", "bank", "watchlist"],
-      wide: ["bank"],
+      order: ["bank", "needs", "close", "watchlist", "aging", "pnl", "cash", "expenses", "insights", "invoices", "bills", "sales", "payments", "activity"],
+      shown: ["bank", "needs", "close", "watchlist"],
+      wide: ["bank", "watchlist"],
     });
   });
 
