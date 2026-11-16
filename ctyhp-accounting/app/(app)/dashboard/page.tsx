@@ -51,6 +51,7 @@ export default async function DashboardPage() {
     fiscalStartMonth,
     baseCurrency,
     memo,
+    watchlist: [],
   });
 
   return (

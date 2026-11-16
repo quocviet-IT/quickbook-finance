@@ -91,7 +91,8 @@ describe("what is streamed in after the figures", () => {
 
 describe("each card stands on its own", () => {
   // The envelope sections of the page, each named by the card that draws it.
-  const sections: Record<Exclude<keyof DashboardHome, "asOf" | "generatedAt">, string> = {
+  // The watchlist (3.0.39) is drawn from the next commit on.
+  const sections: Record<Exclude<keyof DashboardHome, "asOf" | "generatedAt" | "watchlist">, string> = {
     status: "components/dashboard-home/BooksNote.tsx",
     figures: "components/dashboard-home/FigureBand.tsx",
     cash: "components/dashboard-home/CashFlowWidget.tsx",

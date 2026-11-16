@@ -67,6 +67,7 @@ beforeAll(async () => {
       asOf: today,
       fiscalStartMonth,
       baseCurrency: { code: base?.code ?? "USD", decimals: base?.decimal_places ?? 2 },
+      watchlist: [],
     });
     companies.push({ name: row.schema_name, sb, today, fiscalStartMonth, home });
   }

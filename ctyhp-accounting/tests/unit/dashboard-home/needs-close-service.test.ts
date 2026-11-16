@@ -141,7 +141,7 @@ describe("getHomeNeeds", () => {
   it("shares the aging reads with getDashboardHome through the request's memo", async () => {
     const { sb, requests } = fakeSupabase(handlers());
     const memo = createRequestMemo();
-    await getDashboardHome(sb, { asOf: AS_OF, fiscalStartMonth: 1, baseCurrency: USD, memo });
+    await getDashboardHome(sb, { asOf: AS_OF, fiscalStartMonth: 1, baseCurrency: USD, memo, watchlist: [] });
     await getHomeNeeds(sb, { asOf: AS_OF, baseCurrency: USD, fiscalStartMonth: 1, backups: false, memo });
     expect(requests.filter((r) => r === "rpc:acc_ar_ageing")).toHaveLength(1);
     expect(requests.filter((r) => r === "rpc:acc_ap_ageing")).toHaveLength(1);
