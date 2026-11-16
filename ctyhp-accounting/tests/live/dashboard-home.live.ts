@@ -12,7 +12,12 @@
  *  (d) Owed to you and You owe equal the A/R and A/P Aging totals, bucket by
  *      bucket, the overdue, due soon, later and credits add back to them, and
  *      the ledger balance said beside each is the report's control account;
- *  (e) the Bank accounts rows add up to Cash on hand.
+ *  (e) the Bank accounts rows add up to Cash on hand;
+ *  (f) the account watchlist (3.0.39), given up to 10 accounts whose Chart of
+ *      Accounts figure is not zero: each Balance equals that figure
+ *      (`getChartBalances`), and This month and Last month equal the
+ *      account's natural activity from `getLedgerBalances` over the month to
+ *      date and the whole previous month.
  * Counts and agree/disagree are logged; names and amounts never are.
  * Nothing is written: every call is a select or a read-only RPC.
  *
@@ -22,12 +27,17 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 import { smokeSession } from "../../scripts/smoke-environment.mjs";
+import type { AccountRow } from "@/lib/db/types";
+import { accountNormalBalance } from "@/lib/domain/accounts";
+import { naturalBalanceMinor } from "@/lib/domain/chart-groups";
 import { totalExpenses } from "@/lib/domain/dashboard-home/expenses";
 import { homeMonthRanges, homePeriodRanges } from "@/lib/domain/dashboard-home/ranges";
 import { hasActivity } from "@/lib/domain/dashboard-home/series";
 import type { HomeOpenSide, HomePeriodFigures, HomePeriodKey } from "@/lib/domain/dashboard-home/types";
 import { buildProfitAndLoss, type LedgerBalance } from "@/lib/domain/reports";
+import { listAccounts } from "@/lib/services/accounts";
 import { getApAging, getArAging, type AgingReport } from "@/lib/services/aging";
+import { getChartBalances, type ChartBalances } from "@/lib/services/chart-balances";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
 import { getDashboardHome, HOME_MONTHS, type DashboardHome } from "@/lib/services/dashboard-home";
@@ -40,6 +50,10 @@ interface Company {
   today: string;
   fiscalStartMonth: number;
   home: DashboardHome;
+  /** The chart, its figures today, and the accounts handed to the watchlist. */
+  accounts: AccountRow[];
+  chart: ChartBalances;
+  watched: string[];
 }
 
 const companies: Company[] = [];
@@ -63,13 +77,16 @@ beforeAll(async () => {
     const base = currencies.find((currency) => currency.is_base);
     const today = todayInTimeZone(settings?.time_zone ?? "UTC");
     const fiscalStartMonth = settings?.fiscal_year_start_month ?? 1;
+    // The watchlist is given up to 10 accounts the Chart of Accounts shows a figure for today.
+    const [accounts, chart] = await Promise.all([listAccounts(sb), getChartBalances(sb, today)]);
+    const watched = accounts.filter((account) => (chart.figures[account.id] ?? 0) !== 0).slice(0, 10).map((account) => account.id);
     const home = await getDashboardHome(sb, {
       asOf: today,
       fiscalStartMonth,
       baseCurrency: { code: base?.code ?? "USD", decimals: base?.decimal_places ?? 2 },
-      watchlist: [],
+      watchlist: watched,
     });
-    companies.push({ name: row.schema_name, sb, today, fiscalStartMonth, home });
+    companies.push({ name: row.schema_name, sb, today, fiscalStartMonth, home, accounts, chart, watched });
   }
   if (companies.length === 0) throw new Error("The smoke user belongs to no company.");
 });
@@ -95,7 +112,7 @@ function sameFigures(a: HomePeriodFigures, b: HomePeriodFigures): boolean {
 describe("the Dashboard's figures on every company's books", () => {
   it("reads every section", () => {
     for (const c of companies) {
-      const sections = ["status", "figures", "cash", "profit", "receivables", "payables", "payments", "bank", "activity", "insights"] as const;
+      const sections = ["status", "figures", "cash", "profit", "receivables", "payables", "payments", "bank", "activity", "insights", "watchlist"] as const;
       const unavailable = sections.filter((key) => c.home[key].dataState === "unavailable");
       console.log(`${c.name}: ${sections.length - unavailable.length} of ${sections.length} sections read${unavailable.length ? `; UNAVAILABLE ${unavailable.join(", ")}` : ""}`);
       expect(unavailable, c.name).toEqual([]);
@@ -211,6 +228,38 @@ describe("the Dashboard's figures on every company's books", () => {
           `${bank.otherCash ? `${bank.otherCash.accounts} other cash accounts` : "no other cash"}: ${agree ? "rows add up" : "ROWS DO NOT ADD UP"}`,
       );
       expect(agree, c.name).toBe(true);
+    }
+  });
+
+  it("the watchlist's Balance is the Chart of Accounts figure, and its months the ledger's natural activity", async () => {
+    for (const c of companies) {
+      const data = c.home.watchlist.data;
+      if (!data) throw new Error(`${c.name}: watchlist unavailable`);
+      // The whole previous month, then the month to date.
+      const [previous, current] = homeMonthRanges(c.today, 2);
+      const [thisMonth, lastMonth] = await Promise.all([
+        getLedgerBalances(c.sb, current.from, current.to),
+        getLedgerBalances(c.sb, previous.from, previous.to),
+      ]);
+      const byId = new Map(c.accounts.map((account) => [account.id, account]));
+      const natural = (rows: readonly LedgerBalance[], account: AccountRow) => {
+        const row = rows.find((r) => r.accountId === account.id);
+        return row ? naturalBalanceMinor(row.debitBase, row.creditBase, accountNormalBalance(account.account_type, account.is_contra)) : 0;
+      };
+      let disagree = 0;
+      if (data.rows.map((row) => row.accountId).join() !== c.watched.join()) disagree += 1;
+      for (const row of data.rows) {
+        const account = byId.get(row.accountId);
+        if (!account) {
+          disagree += 1;
+          continue;
+        }
+        if (row.balanceMinor !== (c.chart.figures[row.accountId] ?? 0)) disagree += 1;
+        if (row.thisMonthMinor !== natural(thisMonth, account)) disagree += 1;
+        if (row.lastMonthMinor !== natural(lastMonth, account)) disagree += 1;
+      }
+      console.log(`${c.name}: ${data.rows.length} watched accounts, ${data.choices.length} to choose from, ${disagree === 0 ? "all agree" : `${disagree} DISAGREE`}`);
+      expect(disagree, c.name).toBe(0);
     }
   });
 });

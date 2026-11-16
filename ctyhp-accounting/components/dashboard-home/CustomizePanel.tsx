@@ -1,6 +1,6 @@
 "use client";
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
-import { Button, Checkbox } from "antd";
+import { Button, Checkbox, Tooltip } from "antd";
 import {
   HOME_PRESETS,
   moveWidget,
@@ -55,20 +55,24 @@ export default function CustomizePanel({
               <Checkbox className={styles.customizeCheck} checked={layout.shown.includes(key)} onChange={() => onChange(toggleShown(layout, key))}>
                 {title}
               </Checkbox>
-              <Button
-                size="small"
-                icon={<ArrowUpOutlined aria-hidden="true" />}
-                aria-label={`Move ${title} earlier`}
-                disabled={index === 0}
-                onClick={() => onChange(moveWidget(layout, key, -1))}
-              />
-              <Button
-                size="small"
-                icon={<ArrowDownOutlined aria-hidden="true" />}
-                aria-label={`Move ${title} later`}
-                disabled={index === last}
-                onClick={() => onChange(moveWidget(layout, key, 1))}
-              />
+              <Tooltip title="Move earlier">
+                <Button
+                  size="small"
+                  icon={<ArrowUpOutlined aria-hidden="true" />}
+                  aria-label={`Move ${title} earlier`}
+                  disabled={index === 0}
+                  onClick={() => onChange(moveWidget(layout, key, -1))}
+                />
+              </Tooltip>
+              <Tooltip title="Move later">
+                <Button
+                  size="small"
+                  icon={<ArrowDownOutlined aria-hidden="true" />}
+                  aria-label={`Move ${title} later`}
+                  disabled={index === last}
+                  onClick={() => onChange(moveWidget(layout, key, 1))}
+                />
+              </Tooltip>
             </li>
           );
         })}
