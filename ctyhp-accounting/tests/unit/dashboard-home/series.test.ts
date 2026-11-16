@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import { buildProfitAndLoss } from "@/lib/domain/reports";
-import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows } from "@/lib/domain/dashboard-home/series";
+import { hasActivity, markPosted, monthEndBalances, monthMovement, sumLedgerRows, withoutTransfers } from "@/lib/domain/dashboard-home/series";
 
 const row = (accountId: string, accountType: LedgerBalance["accountType"], debitBase: number, creditBase: number): LedgerBalance => ({
   accountId,
@@ -53,6 +53,59 @@ describe("monthMovement", () => {
       ["2026-11", [row("1010", "bank", 0, 75_00)]],
     ]);
     expect(monthMovement(byMonth, months, ["bank"])).toEqual({ debitMinor: [210_00, 0, 0], creditMinor: [55_00, 0, 75_00] });
+  });
+});
+
+describe("withoutTransfers", () => {
+  // September: a 300 deposit to checking, a 120 payment from it, and 1,000 moved
+  // from checking to savings. October: nothing. November: 75 paid from checking.
+  const opening = [row("1010", "bank", 5_000_00, 0), row("1030", "bank", 0, 0)];
+  const byMonth = new Map<string, LedgerBalance[]>([
+    [
+      "2026-09",
+      [
+        row("1010", "bank", 300_00, 120_00 + 1_000_00),
+        row("1030", "bank", 1_000_00, 0),
+        row("1210", "current_asset", 0, 300_00),
+        row("6100", "expense", 120_00, 0),
+      ],
+    ],
+    ["2026-11", [row("1010", "bank", 0, 75_00), row("6100", "expense", 75_00, 0)]],
+  ]);
+  const transfers = new Map([["2026-09", 1_000_00]]);
+  const movement = monthMovement(byMonth, months, ["bank"]);
+
+  it("takes a month's transfer off both money in and money out", () => {
+    expect(movement).toEqual({ debitMinor: [1_300_00, 0, 0], creditMinor: [1_120_00, 0, 75_00] });
+    const { inMinor, outMinor } = withoutTransfers(movement, transfers, months);
+    expect(inMinor[0]).toBe(300_00);
+    expect(outMinor[0]).toBe(120_00);
+  });
+
+  it("leaves a month without a transfer as it was", () => {
+    const { inMinor, outMinor } = withoutTransfers(movement, transfers, months);
+    expect([inMinor[1], outMinor[1]]).toEqual([0, 0]);
+    expect([inMinor[2], outMinor[2]]).toEqual([0, 75_00]);
+    expect(withoutTransfers(movement, new Map(), months)).toEqual({ inMinor: movement.debitMinor, outMinor: movement.creditMinor });
+  });
+
+  it("keeps money in minus money out equal to each month's change in cash on hand", () => {
+    const { inMinor, outMinor } = withoutTransfers(movement, transfers, months);
+    const balances = monthEndBalances(opening, byMonth, months, ["bank"]);
+    const before = [5_000_00, ...balances.slice(0, -1)];
+    expect(balances).toEqual([5_180_00, 5_180_00, 5_105_00]);
+    months.forEach((month, index) => {
+      expect(inMinor[index] - outMinor[index], month.key).toBe(balances[index] - before[index]);
+      expect(inMinor[index] - outMinor[index], month.key).toBe(movement.debitMinor[index] - movement.creditMinor[index]);
+    });
+  });
+
+  it("refuses a transfer larger than the month's debits or credits rather than draw it", () => {
+    expect(() => withoutTransfers(movement, new Map([["2026-11", 75_00]]), months)).toThrow(/2026-11/);
+    expect(() => withoutTransfers(movement, new Map([["2026-09", 1_120_01]]), months)).toThrow(/2026-09/);
+    expect(() => withoutTransfers(movement, new Map([["2026-09", -1]]), months)).toThrow(/2026-09/);
+    // Exactly equal to the smaller side is a month whose only payments were transfers.
+    expect(withoutTransfers(movement, new Map([["2026-09", 1_120_00]]), months).outMinor[0]).toBe(0);
   });
 });
 
