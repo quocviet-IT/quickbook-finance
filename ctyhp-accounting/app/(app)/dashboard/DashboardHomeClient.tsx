@@ -12,6 +12,7 @@ import CustomizePanel from "@/components/dashboard-home/CustomizePanel";
 import FigureBand from "@/components/dashboard-home/FigureBand";
 import { AgingWidget, BillsWidget, InvoicesWidget, PaymentsWidget } from "@/components/dashboard-home/OpenItemWidgets";
 import { ExpensesWidget, ProfitAndLossWidget, SalesWidget } from "@/components/dashboard-home/ProfitWidgets";
+import WatchlistWidget from "@/components/dashboard-home/WatchlistWidget";
 import { Empty } from "@/components/dashboard-home/Widget";
 import styles from "@/components/dashboard-home/dashboard-home.module.css";
 import { PrivacyProvider, usePrivacy } from "@/components/dashboard-home/privacy";
@@ -261,8 +262,7 @@ function DashboardScreen({
     invoices: () => <InvoicesWidget receivables={home.receivables} status={status} asOf={home.asOf} money={money} currencyCode={currency.code} />,
     bills: () => <BillsWidget payables={home.payables} status={status} money={money} currencyCode={currency.code} />,
     close: () => close,
-    // Drawn from the next release step on.
-    watchlist: () => null,
+    watchlist: (span) => <WatchlistWidget watchlist={home.watchlist} width={span} currencyCode={currency.code} />,
     sales: () => <SalesWidget profit={home.profit} status={status} money={money} compact={compact} />,
     payments: () => <PaymentsWidget payments={home.payments} />,
     aging: () => <AgingWidget receivables={home.receivables} payables={home.payables} money={money} currencyCode={currency.code} />,
@@ -270,7 +270,7 @@ function DashboardScreen({
   };
 
   // The Overview as the person arranged it: hidden cards are not drawn at all.
-  const visible = overview.order.filter((key) => overview.shown.includes(key) && cards[key](4) !== null);
+  const visible = overview.order.filter((key) => overview.shown.includes(key));
   const overviewCells =
     visible.length === 0 ? (
       <div className={`${styles.cell} ${styles.span12} ${styles.mid12}`}>
@@ -328,6 +328,9 @@ function DashboardScreen({
         </Cell>
         <Cell span={4} mid={12}>
           {cards.close(4)}
+        </Cell>
+        <Cell span={12} mid={12}>
+          {cards.watchlist(12)}
         </Cell>
         <Cell span={12} mid={12}>
           {cards.activity(12)}

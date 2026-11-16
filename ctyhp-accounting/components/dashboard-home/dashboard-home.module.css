@@ -974,6 +974,20 @@
   color: var(--ob-text-secondary);
 }
 
+/* An account's code before its name, in the watchlist (3.0.39). */
+.code {
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The watchlist's account picker: the search field and its note under it. */
+.watchPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
 /* --- Open items split by due date --------------------------------------- */
 /*
  * The figures above their table. Side by side only on a card wide enough for

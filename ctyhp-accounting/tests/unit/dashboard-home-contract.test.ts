@@ -93,8 +93,7 @@ describe("what is streamed in after the figures", () => {
 
 describe("each card stands on its own", () => {
   // The envelope sections of the page, each named by the card that draws it.
-  // The watchlist (3.0.39) is drawn from the next commit on.
-  const sections: Record<Exclude<keyof DashboardHome, "asOf" | "generatedAt" | "watchlist">, string> = {
+  const sections: Record<Exclude<keyof DashboardHome, "asOf" | "generatedAt">, string> = {
     status: "components/dashboard-home/BooksNote.tsx",
     figures: "components/dashboard-home/FigureBand.tsx",
     cash: "components/dashboard-home/CashFlowWidget.tsx",
@@ -105,6 +104,7 @@ describe("each card stands on its own", () => {
     bank: "components/dashboard-home/BooksWidgets.tsx",
     activity: "components/dashboard-home/BooksWidgets.tsx",
     insights: "components/dashboard-home/BooksWidgets.tsx",
+    watchlist: "components/dashboard-home/WatchlistWidget.tsx",
   };
 
   it("hands every section to its card as an envelope", () => {
@@ -123,6 +123,8 @@ describe("each card stands on its own", () => {
     expect(read("components/dashboard-home/OpenItemWidgets.tsx")).toMatch(/if \(!ar && !ap\) \{\s*return \(\s*<Widget[\s\S]{0,160}?<Unavailable/);
     // Bank accounts, Insights, Recent accounting activity.
     expect(count("components/dashboard-home/BooksWidgets.tsx")).toBe(3);
+    // The account watchlist (3.0.39).
+    expect(count("components/dashboard-home/WatchlistWidget.tsx")).toBe(1);
     expect(read("components/dashboard-home/BooksNote.tsx")).toMatch(/if \(!status\.data\) \{[\s\S]{0,400}?<RetryButton \/>/);
   });
 
