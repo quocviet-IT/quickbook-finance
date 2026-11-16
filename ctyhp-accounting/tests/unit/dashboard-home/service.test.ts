@@ -132,6 +132,11 @@ function handlers(over: { rpc?: FakeHandlers["rpc"]; tables?: FakeHandlers["tabl
         expect(args).toEqual({ p_to: AS_OF, p_months: 14 });
         return { data: MONTHLY };
       },
+      // No entry in MONTHLY moves money between two bank accounts.
+      acc_monthly_bank_transfers: (args) => {
+        expect(args).toEqual({ p_to: AS_OF, p_months: 14 });
+        return { data: [] };
+      },
       acc_ar_ageing: () => ({ data: AR_ROWS }),
       acc_ap_ageing: () => ({ data: AP_ROWS }),
       acc_period_close_history: () => ({ data: [{ period_id: "p9", period_label: "2026-09", period_end: "2026-09-30", closed_at: "2026-10-08T15:00:00Z" }] }),
@@ -215,6 +220,27 @@ async function load(
 const SECTIONS = ["status", "figures", "cash", "profit", "receivables", "payables", "payments", "bank", "activity", "insights"] as const;
 const states = (home: DashboardHome) => Object.fromEntries(SECTIONS.map((key) => [key, home[key].dataState]));
 
+/** Cash at the end of May 2026, the month before the six on the chart: the opening's 80,500, nothing moved since. */
+const CASH_BEFORE_CHART = 80_500_00;
+
+/** Each month's money in minus money out, beside its change in cash on hand. */
+function flowAgainstBalance(cash: NonNullable<DashboardHome["cash"]["data"]>): { flow: number[]; change: number[] } {
+  const before = [CASH_BEFORE_CHART, ...cash.balanceMinor.slice(0, -1)];
+  return {
+    flow: cash.inMinor.map((value, index) => value - cash.outMinor[index]),
+    change: cash.balanceMinor.map((value, index) => value - before[index]),
+  };
+}
+
+/**
+ * MONTHLY with 5,000 moved from Sample Checking to Sample Savings in October:
+ * one entry, a credit to checking and a debit to savings.
+ */
+const WITH_TRANSFER = [
+  ...MONTHLY.map((row) => (row.month_key === "2026-10" && row.account_code === "1010" ? { ...row, credit_base: row.credit_base + 5_000_00 } : row)),
+  { month_key: "2026-10", ...ledgerRow("1030", 5_000_00, 0) },
+];
+
 describe("getDashboardHome", () => {
   it("reads every section fresh from one pass of shared reads", async () => {
     const { home } = await load();
@@ -238,13 +264,65 @@ describe("getDashboardHome", () => {
     expect(home.cash.data!.balanceMinor).toEqual(cash.series);
   });
 
-  it("charts gross money in and out of the bank-type accounts, transfers included", async () => {
+  it("charts money in and out of the bank-type accounts, and says transfers between them are left out", async () => {
     const { home } = await load();
+    // Nothing here moved between two bank accounts: money in and out are the bank debits and credits.
     expect(home.cash.data).toMatchObject({
       inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
       outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      transfersExcluded: true,
+    });
+    const { flow, change } = flowAgainstBalance(home.cash.data!);
+    expect(flow).toEqual(change);
+  });
+
+  it("leaves a transfer between two of the company's own bank accounts out of both money in and money out", async () => {
+    const { home } = await load({
+      rpc: {
+        acc_monthly_ledger_balances: () => ({ data: WITH_TRANSFER }),
+        // PostgREST may send a bigint as text.
+        acc_monthly_bank_transfers: () => ({ data: [{ month_key: "2026-10", transfer_base: "500000" }] }),
+      },
+    });
+    const cash = home.cash.data!;
+    expect(home.cash.dataState).toBe("fresh");
+    // October's bank debits are 53,000 and credits 49,000; the 5,000 transfer comes off both.
+    expect(cash).toMatchObject({
+      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
+      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      transfersExcluded: true,
+    });
+    // Moving money between two bank accounts does not change cash on hand.
+    expect(cash.balanceMinor).toEqual([84_500_00, 88_500_00, 92_500_00, 96_500_00, 100_500_00, 103_500_00]);
+    const { flow, change } = flowAgainstBalance(cash);
+    expect(flow).toEqual(change);
+  });
+
+  it("charts the gross figures when the transfers cannot be read, and says they count on both sides", async () => {
+    const { home } = await load({
+      rpc: {
+        acc_monthly_ledger_balances: () => ({ data: WITH_TRANSFER }),
+        acc_monthly_bank_transfers: () => ({ error: { message: "statement timeout" } }),
+      },
+    });
+    // Only the footnote changes: every section is read.
+    expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
+    const cash = home.cash.data!;
+    expect(cash).toMatchObject({
+      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 53_000_00, 18_000_00],
+      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 49_000_00, 15_000_00],
       transfersExcluded: false,
     });
+    const { flow, change } = flowAgainstBalance(cash);
+    expect(flow).toEqual(change);
+    expect(JSON.stringify(home)).not.toContain("statement timeout");
+  });
+
+  it("does not draw cash flow when a month's transfers exceed its bank debits or credits", async () => {
+    const { home } = await load({ rpc: { acc_monthly_bank_transfers: () => ({ data: [{ month_key: "2026-11", transfer_base: 15_000_01 }] }) } });
+    expect(home.cash).toMatchObject({ dataState: "unavailable", data: null, unavailableReason: "Cash flow could not be read." });
+    // The figures above the tabs do not use the transfers.
+    expect(Object.entries(states(home)).filter(([, state]) => state !== "fresh")).toEqual([["cash", "unavailable"]]);
   });
 
   it("makes the figures and the tabs agree: receivables and payables are the aging totals", async () => {
@@ -375,16 +453,17 @@ describe("getDashboardHome", () => {
     ]);
   });
 
-  it("makes the requests it is budgeted for: 19 plus one per bank account, one more for a payment in another currency", async () => {
+  it("makes the requests it is budgeted for: 20 plus one per bank account, one more for a payment in another currency", async () => {
     const { requests } = await load();
     // 3 bank accounts and one euro payment among the recent ones.
-    expect(requests).toHaveLength(23);
+    expect(requests).toHaveLength(24);
     // The ledger as of asOf is read once for both aging reports' control balance.
     expect(requests.filter((r) => r === "rpc:acc_ledger_balances")).toHaveLength(5);
     const tally = requests.reduce<Record<string, number>>((all, r) => ({ ...all, [r]: (all[r] ?? 0) + 1 }), {});
     expect(tally).toEqual({
       "rpc:acc_ledger_balances": 5,
       "rpc:acc_monthly_ledger_balances": 1,
+      "rpc:acc_monthly_bank_transfers": 1,
       "rpc:acc_ar_ageing": 1,
       "rpc:acc_ap_ageing": 1,
       "from:acc_account": 1,
@@ -505,7 +584,7 @@ describe("the account watchlist", () => {
     const { requests: without } = await load({ tables: chart() });
     const { home, requests } = await load({ tables: chart() }, WATCHED);
     expect(home.watchlist.dataState).toBe("fresh");
-    expect(requests).toHaveLength(23);
+    expect(requests).toHaveLength(24);
     expect([...requests].sort()).toEqual([...without].sort());
   });
 
@@ -551,7 +630,7 @@ describe("the account watchlist", () => {
     const { home, requests } = await load({ tables: chart() }, null);
     expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
     expect(home.watchlist).toMatchObject({ dataState: "unavailable", data: null, unavailableReason: "Your watchlist could not be read." });
-    expect(requests).toHaveLength(23);
+    expect(requests).toHaveLength(24);
   });
 
   it("goes with the ledger: when the monthly read fails, it is unavailable too", async () => {
