@@ -208,9 +208,11 @@ describe("Import statement: what is already here, said before the import", () =>
 });
 
 describe("where people read about it", () => {
-  it("is the newest release", () => {
-    expect(RELEASES[0].version).toBe("3.0.36");
-    expect(RELEASES[0].changes.map((c) => c.title)).toEqual([
+  it("is release 3.0.36, with both changes", () => {
+    // It was the newest release until 3.0.38; found by its version since.
+    const release = RELEASES.find((candidate) => candidate.version === "3.0.36");
+    expect(release).toBeDefined();
+    expect(release?.changes.map((c) => c.title)).toEqual([
       "A second reconciliation for a month already reconciled is refused",
       "Import statement counts only the lines that are new",
     ]);

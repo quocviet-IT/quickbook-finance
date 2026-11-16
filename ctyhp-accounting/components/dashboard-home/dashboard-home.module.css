@@ -1,0 +1,1056 @@
+/*
+ * The Dashboard (3.0.38): a status note, four figures in one band, four tabs,
+ * and a twelve-column grid of cards.
+ *
+ * The app's own component language: Ant Design cards with a plain head, 1px
+ * borders, 8px corners, no shadows, no gradients. Two chart colors (income
+ * and the secondary series) and red and amber only for overdue and due soon.
+ *
+ * Widths are decided by the space a part is given, not by the window: the band,
+ * the grid and each card are size containers, so a card reads the same in a
+ * narrow column at desktop as at full width on a phone.
+ */
+
+.root {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 1440px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Page header tools ------------------------------------------------- */
+.headTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Books status note -------------------------------------------------- */
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  padding: 8px 14px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ob-text-secondary);
+}
+
+.note strong {
+  color: var(--ob-text-heading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.noteWarn {
+  border-color: var(--ob-feedback-cautionBorder);
+  background: var(--ob-feedback-warningBg);
+  color: var(--ob-feedback-warningText);
+}
+
+.noteWarn strong {
+  color: var(--ob-feedback-warningText);
+}
+
+.noteIcon {
+  margin-right: 6px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* --- Four figures ------------------------------------------------------- */
+.bandBox {
+  container: band / inline-size;
+}
+
+.band {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+  overflow: hidden;
+}
+
+.kpi,
+.kpi:hover,
+.kpi:focus-visible {
+  color: inherit;
+  text-decoration: none;
+}
+
+.kpi {
+  display: block;
+  min-width: 0;
+  padding: 14px 16px;
+  border-left: 1px solid var(--ob-border-default);
+  container: kpi / inline-size;
+}
+
+.kpi:first-child {
+  border-left: 0;
+}
+
+.kpi:hover {
+  background: var(--ob-surface-subtle);
+}
+
+.kpi:focus-visible {
+  outline: 2px solid var(--ob-intent-primary);
+  outline-offset: -2px;
+}
+
+.kpiGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kpiLabel {
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+/*
+ * The value and its sparkline share a line while both fit, and the sparkline
+ * drops under the value when they do not: a long figure never runs into it.
+ */
+.kpiRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kpiSpark {
+  flex: none;
+  margin-bottom: 4px;
+}
+
+.kpiLine {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two to a row on a phone: a smaller figure, so a seven-digit amount still fits. */
+@container kpi (max-width: 200px) {
+  .kpiValue {
+    font-size: 19px;
+  }
+}
+
+/* Two by two once the four no longer fit across, phone included. */
+@container band (max-width: 900px) {
+  .band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--ob-border-default);
+  }
+}
+
+.bandState {
+  grid-column: 1 / -1;
+  padding: 12px 16px;
+}
+
+/* --- Tabs -------------------------------------------------------------- */
+.tabLabel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tabCount {
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabShort {
+  display: none;
+}
+
+/*
+ * A phone: the four tabs must fit across, or the last one hides behind a
+ * menu. A shorter name for the widest and a narrower gap between them.
+ * Two antd classes outrank antd's own rule for the gap, whichever loads last.
+ */
+@media (max-width: 600px) {
+  .tabLong {
+    display: none;
+  }
+
+  .tabShort {
+    display: inline;
+  }
+
+  .tabs:global(.ant-tabs) :global(.ant-tabs-tab + .ant-tabs-tab) {
+    margin-inline-start: 18px;
+  }
+}
+
+/* --- The grid of cards -------------------------------------------------- */
+.panel {
+  container: homegrid / inline-size;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.span4 {
+  grid-column: span 4;
+}
+
+.span6 {
+  grid-column: span 6;
+}
+
+.span8 {
+  grid-column: span 8;
+}
+
+.span12 {
+  grid-column: span 12;
+}
+
+/* Tablet widths: the narrow cards share a row in twos, the wide ones take it. */
+@container homegrid (max-width: 1020px) {
+  .mid6 {
+    grid-column: span 6;
+  }
+
+  .mid12 {
+    grid-column: span 12;
+  }
+}
+
+/* One card a row. */
+@container homegrid (max-width: 700px) {
+  .cell {
+    grid-column: span 12;
+  }
+}
+
+/* --- A card ------------------------------------------------------------- */
+.card {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.card :global(.ant-card-body) {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ob-text-heading);
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  container: card / inline-size;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--ob-border-default);
+  font-size: 13px;
+}
+
+.caption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.caption b {
+  color: var(--ob-text-heading);
+  font-weight: 600;
+}
+
+.period {
+  width: 136px;
+}
+
+/* --- Headline figure in a card ------------------------------------------ */
+.hero {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.heroValue {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.heroValueSmall {
+  font-size: 20px;
+}
+
+.heroSub {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.up {
+  color: var(--ob-money-positive);
+}
+
+.down {
+  color: var(--ob-money-negative);
+}
+
+.danger {
+  color: var(--ob-intent-danger);
+  font-weight: 600;
+}
+
+.warning {
+  color: var(--ob-intent-warning);
+  font-weight: 600;
+}
+
+/* --- Legends ------------------------------------------------------------ */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.swatchLine {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  margin-right: 6px;
+  border-top: 2px solid var(--ob-series-income);
+  vertical-align: 4px;
+}
+
+.swatchDash {
+  border-top-style: dashed;
+}
+
+.swatchEmpty {
+  border: 1px solid var(--ob-border-muted);
+}
+
+.legendGrid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 14px;
+}
+
+.legendName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.legendShare {
+  font-size: 13px;
+  text-align: right;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.legendAmount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.legendTotal {
+  padding-top: 6px;
+  border-top: 1px solid var(--ob-border-subtle);
+  font-weight: 600;
+}
+
+/* --- Charts ------------------------------------------------------------- */
+.chartBox {
+  position: relative;
+  min-width: 0;
+}
+
+.chartMeasure {
+  width: 100%;
+  min-width: 0;
+}
+
+.chartSvg {
+  display: block;
+}
+
+.chartText {
+  fill: var(--ob-text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.chartStrong {
+  fill: var(--ob-text-heading);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.gridLine {
+  stroke: var(--ob-series-grid);
+  stroke-width: 1;
+}
+
+.baseLine {
+  stroke: var(--ob-border-muted);
+  stroke-width: 1;
+}
+
+.cashFill {
+  opacity: 0.07;
+}
+
+.openPoint {
+  fill: var(--ob-surface-card);
+}
+
+.notPosted {
+  fill: var(--ob-surface-subtle);
+  stroke: var(--ob-border-muted);
+  stroke-width: 1;
+}
+
+.hoverBand {
+  fill: var(--ob-surface-muted);
+}
+
+.hit {
+  fill: transparent;
+}
+
+.spark {
+  display: block;
+}
+
+.sparkGap {
+  fill: var(--ob-surface-subtle);
+  stroke: var(--ob-border-muted);
+  stroke-width: 1;
+}
+
+.tip {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--ob-text-heading);
+  color: var(--ob-surface-card);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tipHead {
+  font-weight: 600;
+}
+
+/* --- Donut -------------------------------------------------------------- */
+.donutLayout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.donutLayout > .legendGrid {
+  width: 100%;
+}
+
+@container card (min-width: 520px) {
+  .donutLayout {
+    flex-direction: row;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .donutLayout > .legendGrid {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}
+
+.donutBox {
+  position: relative;
+  flex: none;
+  width: 160px;
+  height: 160px;
+}
+
+.donutSvg {
+  display: block;
+}
+
+.donutTrack {
+  stroke: var(--ob-border-subtle);
+}
+
+.donutFigure {
+  fill: var(--ob-text-heading);
+  font-size: 18px;
+  font-weight: 600;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Next 30 days ------------------------------------------------------- */
+.forecast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 18px;
+  padding: 10px 14px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 6px;
+  background: var(--ob-surface-subtle);
+}
+
+.forecastItem {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.forecastItem span {
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.forecastItem strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.forecastTotal strong {
+  font-size: 20px;
+}
+
+.forecastSign {
+  padding-bottom: 2px;
+  font-size: 16px;
+  color: var(--ob-text-faint);
+}
+
+/* --- Rows that reach the card's edges ----------------------------------- */
+.rows {
+  margin: 0 -16px;
+  padding: 0;
+  list-style: none;
+}
+
+.rows:last-child {
+  margin-bottom: -14px;
+}
+
+.needRow {
+  display: grid;
+  grid-template-columns: minmax(36px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ob-border-subtle);
+}
+
+.needRow:last-child {
+  border-bottom: 0;
+}
+
+.needCount {
+  grid-row: 1 / 3;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.needTitle {
+  font-weight: 500;
+  color: var(--ob-text-heading);
+}
+
+.needDetail {
+  grid-column: 2;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.needAction {
+  grid-row: 1 / 3;
+  grid-column: 3;
+}
+
+.clear {
+  color: var(--ob-intent-success);
+}
+
+.insightRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ob-border-subtle);
+}
+
+.insightRow:last-child {
+  border-bottom: 0;
+}
+
+.insightKind {
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.insightHead {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.insightDetail {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ob-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 4px 16px;
+  border-top: 1px solid var(--ob-border-subtle);
+  font-size: 14px;
+}
+
+.stepTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stepAside {
+  opacity: 0.6;
+}
+
+.progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--ob-border-default);
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--ob-series-income);
+}
+
+/* --- Tables ------------------------------------------------------------- */
+.tableWrap {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 6px;
+}
+
+.tableFlush {
+  margin: 0 -16px;
+  border: 0;
+  border-radius: 0;
+}
+
+.tableFlush:last-child {
+  margin-bottom: -14px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ob-border-subtle);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table thead th {
+  height: 36px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  line-height: 16px;
+  white-space: normal;
+  background: var(--ob-surface-muted);
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.table tbody th {
+  font-weight: 400;
+}
+
+.table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.table tfoot td,
+.table tfoot th {
+  border-top: 1px solid var(--ob-border-default);
+  border-bottom: 0;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table .muted {
+  color: var(--ob-text-secondary);
+}
+
+.table .wrap {
+  white-space: normal;
+  min-width: 180px;
+}
+
+/* A name: it wraps rather than widen the table past its card. */
+.table .name {
+  min-width: 120px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.table .totalRow > * {
+  border-top: 1px solid var(--ob-border-default);
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.table .subhead > * {
+  height: 32px;
+  background: var(--ob-surface-subtle);
+  color: var(--ob-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tableFlush .table th:first-child,
+.tableFlush .table td:first-child {
+  padding-left: 16px;
+}
+
+.tableFlush .table th:last-child,
+.tableFlush .table td:last-child {
+  padding-right: 16px;
+}
+
+.aside {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--ob-text-secondary);
+}
+
+/* --- Open items split by due date --------------------------------------- */
+/*
+ * The figures above their table. Side by side only on a card wide enough for
+ * both: beside the table the three figures had to stand in a column, and the
+ * table's Amount column was cut off at 1440px.
+ */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+@container card (min-width: 960px) {
+  .split {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 20px;
+  }
+}
+
+.splitMain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  container-type: inline-size;
+}
+
+.stack {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  gap: 2px;
+  border-radius: 3px;
+  background: var(--ob-border-default);
+}
+
+.stack > i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+}
+
+.figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fig {
+  min-width: 0;
+  padding: 0 12px;
+  border-left: 1px solid var(--ob-border-subtle);
+}
+
+.fig:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.figLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ob-text-secondary);
+}
+
+.figKey {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.figValue {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ob-text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.figCount {
+  font-size: 12px;
+  color: var(--ob-text-secondary);
+}
+
+/* Too narrow for three across: one under another. */
+@container (max-width: 330px) {
+  .figs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .fig {
+    padding: 0;
+    border-left: 0;
+  }
+}
+
+/* --- States ------------------------------------------------------------- */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--ob-text-secondary);
+}
+
+.stateTitle {
+  font-weight: 600;
+  color: var(--ob-text-heading);
+}
+
+.stateFailed .stateTitle {
+  color: var(--ob-intent-danger);
+}
+
+.stateIcon {
+  margin-right: 6px;
+}
+
+/* --- Loading ------------------------------------------------------------ */
+.skeleton {
+  border-radius: 4px;
+  background: var(--ob-surface-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: homeSkeletonPulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes homeSkeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.skeletonCard {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--ob-border-default);
+  border-radius: 8px;
+  background: var(--ob-surface-card);
+}
+
+.skeletonKpi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-left: 1px solid var(--ob-border-default);
+}
+
+.skeletonKpi:first-child {
+  border-left: 0;
+}
+
+@container band (max-width: 900px) {
+  .skeletonKpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .skeletonKpi:nth-child(n + 3) {
+    border-top: 1px solid var(--ob-border-default);
+  }
+}
+
+.skeletonTabs {
+  display: flex;
+  gap: 28px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ob-border-default);
+}

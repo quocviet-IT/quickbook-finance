@@ -132,12 +132,15 @@ describe("where the card figures are read", () => {
   });
 
   it("the dashboard reads the cards' figure and shows it as the statement prints it", () => {
-    const src = read("lib/services/dashboard.ts");
+    // Since the Dashboard was rebuilt (3.0.38) the read is Needs attention's,
+    // and the figure is one of its rows on the Banking and close tab, shown
+    // only when there is a card with lines no reconciliation has ticked.
+    const src = read("lib/services/dashboard-home/index.ts");
     expect(src).toMatch(/sb\.rpc\("acc_unreconciled_cards", \{ p_as_of: asOf \}\)/);
     expect(src).toMatch(/shown\(Number\(c\.amount_minor \?\? 0\), "card"\)/);
-    const client = read("app/(app)/dashboard/DashboardClient.tsx");
-    expect(client).toContain('"Unreconciled card activity"');
-    expect(client).toMatch(/metrics\.unreconciledCards && metrics\.unreconciledCards\.cards > 0/);
+    const needs = read("lib/domain/dashboard-home/needs.ts");
+    expect(needs).toContain('"Card activity not reconciled"');
+    expect(needs).toMatch(/cardActivity && cardActivity\.cards > 0 && cardActivity\.lines > 0/);
   });
 });
 
