@@ -4,7 +4,6 @@ import { useInitiallyOpen } from "@/lib/client/use-initially-open";
 import { formatDate, formatMoney, plural } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Alert,
   App,
@@ -16,13 +15,16 @@ import {
   Modal,
   Select,
   Space,
+  Tabs,
   Tag,
   type MenuProps,
 } from "antd";
 import { DeleteOutlined, PaperClipOutlined, PlusOutlined } from "@ant-design/icons";
 import DataTable from "@/components/ui/DataTable";
 import StatusTag from "@/components/ui/StatusTag";
-import { PAID_LABELS } from "@/lib/domain/status-label";
+import { BillStatusTag } from "@/components/bills/BillStatusTag";
+import { billStatusCounts, sortBillsByAttention, type BillStatusTab } from "@/lib/domain/bill-attention";
+import { tokenVar } from "@/lib/design/tokens";
 import { flexColumn, secondaryLine } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
@@ -30,7 +32,7 @@ import { isOverdueDocument, matchesDocumentKeyword } from "@/lib/domain/document
 import IconActionButton from "@/components/ui/IconActionButton";
 import dynamic from "next/dynamic";
 import type { AttachmentTarget } from "@/components/documents/AttachmentDrawer";
-import type { BillStatus, AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
+import type { AccountRow, CurrencyRow, VendorRow, ItemRow } from "@/lib/db/types";
 import type { BillWithVendor } from "@/lib/services/payables";
 import { itemToBillLineDefaults } from "@/lib/domain/items";
 import { withVendor } from "@/lib/domain/vendors";
@@ -64,6 +66,32 @@ interface LineForm {
 const AttachmentDrawer = dynamic(() => import("@/components/documents/AttachmentDrawer"), {
   ssr: false,
 });
+
+/** The status tabs above the list, in the order an accountant works them (3.0.44). */
+const BILL_STATUS_TABS: readonly { key: BillStatusTab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "overdue", label: "Overdue" },
+  { key: "draft", label: "Draft" },
+  { key: "open", label: "Open" },
+  { key: "partial", label: "Partially paid" },
+  { key: "paid", label: "Paid" },
+  { key: "void", label: "Void" },
+];
+
+/**
+ * Every fixed column of the list, left to right: Bill number, Date, Due,
+ * Total, Balance, Status, Actions. The Vendor column takes what is left.
+ * Actions is 124, as on Invoices: the paperclip, Post and the menu need 118.
+ */
+export const BILL_LIST_FIXED_WIDTHS = [
+  COLUMN.CODE,
+  COLUMN.DATE,
+  COLUMN.DATE,
+  COLUMN.MONEY,
+  COLUMN.MONEY,
+  COLUMN.STATUS,
+  124,
+] as const;
 
 export default function BillsClient({
   initialCreateOpen,
@@ -153,11 +181,12 @@ export default function BillsClient({
   );
 
   const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | BillStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<BillStatusTab>("all");
   const { today } = useCompanyClock();
 
   const visibleBills = useMemo(() => {
-    if (!initialQueue) return bills;
+    // Overdue first, then due within a week, then drafts, then the rest (3.0.44, as Invoices since 3.0.11).
+    if (!initialQueue) return sortBillsByAttention(bills, today);
     const filtered = bills.filter(
       (bill) =>
         (bill.status === "open" || bill.status === "partial") &&
@@ -170,7 +199,10 @@ export default function BillsClient({
       if (right.id === initialQueue.focusId) return 1;
       return (left.due_date ?? "").localeCompare(right.due_date ?? "");
     });
-  }, [bills, initialQueue]);
+  }, [bills, initialQueue, today]);
+
+  /** What each status tab holds, counted by the rule its filter applies. */
+  const statusCounts = useMemo(() => billStatusCounts(visibleBills, today), [visibleBills, today]);
 
   // On top of the queue narrowing, never instead of it. The keyword covers
   // the vendor reference too — that is the string in a bookkeeper's hand
@@ -259,6 +291,24 @@ export default function BillsClient({
 
   return (
     <>
+      {/* Status tabs with their counts, in place of a status select (3.0.44, as
+          Invoices since 3.0.11): how many are overdue is what this list is opened to learn. */}
+      <Tabs
+        className="accounting-status-tabs"
+        activeKey={statusFilter}
+        onChange={(key) => setStatusFilter(key as BillStatusTab)}
+        items={BILL_STATUS_TABS.map(({ key, label }) => ({
+          key,
+          label: (
+            <span>
+              {label}{" "}
+              <span style={{ color: tokenVar("text.secondary"), fontVariantNumeric: "tabular-nums" }}>
+                {statusCounts[key]}
+              </span>
+            </span>
+          ),
+        }))}
+      />
       <FilterBar
         resultCount={filteredBills.length}
         actions={
@@ -284,21 +334,6 @@ export default function BillsClient({
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
         />
-        <Select
-          aria-label="Filter bills by status"
-          value={statusFilter}
-          onChange={setStatusFilter}
-          style={{ minWidth: 150 }}
-          options={[
-            { value: "all", label: "All statuses" },
-            { value: "overdue", label: "Overdue" },
-            { value: "draft", label: "Draft" },
-            { value: "open", label: "Open" },
-            { value: "partial", label: "Partially paid" },
-            { value: "paid", label: "Paid" },
-            { value: "void", label: "Void" },
-          ]}
-        />
       </FilterBar>
       <DataTable<BillWithVendor>
         rowKey="id"
@@ -319,59 +354,74 @@ export default function BillsClient({
             : "Enter a vendor bill to track Accounts Payable and due dates."
         }
         columns={[
-          { title: "Bill Number", dataIndex: "bill_number", width: COLUMN.CODE, render: (v) => v ?? <StatusTag status="draft" /> },
           {
-            // The elastic column. Its second line carries the vendor's own
-            // reference and the journal entry, which were columns of their own
-            // and are read far less often than they cost.
+            title: "Bill Number",
+            dataIndex: "bill_number",
+            width: BILL_LIST_FIXED_WIDTHS[0],
+            // No default sort: the list opens in attention order (sortBillsByAttention).
+            // Sorted by number, drafts (no number yet) come first.
+            sorter: (a, b) => (a.bill_number ?? "\uffff").localeCompare(b.bill_number ?? "\uffff"),
+            render: (v) => v ?? <StatusTag status="draft" />,
+          },
+          {
+            // The elastic column, one line (3.0.44): the vendor, then their own
+            // reference after it in grey when there is one, cut together when the
+            // column is narrow. The journal entry moved to the row's menu; it had
+            // made every row two lines tall.
             ...flexColumn<BillWithVendor>({
               title: "Vendor",
               key: "vendor_name",
               render: (_: unknown, r: BillWithVendor) => (
-                <div style={{ minWidth: 0 }}>
-                  <span title={r.vendor_name}>{r.vendor_name}</span>
-                  {secondaryLine(
-                    <>
-                      {r.vendor_ref ? `Ref ${r.vendor_ref}` : "No vendor reference"}
-                      {r.entry_number ? (
-                        <>
-                          {" · "}
-                          <Link href={`/journal?entry=${r.journal_entry_id}`}>{r.entry_number}</Link>
-                        </>
-                      ) : null}
-                    </>,
-                    [r.vendor_ref ? `Ref ${r.vendor_ref}` : "No vendor reference", r.entry_number].filter(Boolean).join(" · "),
-                  )}
-                </div>
+                <span title={r.vendor_ref ? `${r.vendor_name} · Ref ${r.vendor_ref}` : r.vendor_name}>
+                  {r.vendor_name}
+                  {r.vendor_ref ? <span style={{ color: tokenVar("text.secondary") }}> · Ref {r.vendor_ref}</span> : null}
+                </span>
               ),
             }),
+            sorter: (a: BillWithVendor, b: BillWithVendor) => a.vendor_name.localeCompare(b.vendor_name),
           },
-          { title: "Date", dataIndex: "bill_date", width: COLUMN.DATE, render: (v: string) => formatDate(v) },
-          { title: "Due", dataIndex: "due_date", width: COLUMN.DATE, render: (v: string | null) => formatDate(v) },
+          {
+            title: "Date",
+            dataIndex: "bill_date",
+            width: BILL_LIST_FIXED_WIDTHS[1],
+            render: (v: string) => formatDate(v),
+            sorter: (a, b) => a.bill_date.localeCompare(b.bill_date),
+          },
+          {
+            title: "Due",
+            dataIndex: "due_date",
+            width: BILL_LIST_FIXED_WIDTHS[2],
+            render: (v: string | null) => (v ? formatDate(v) : "—"),
+            sorter: (a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""),
+          },
           {
             title: "Total",
             dataIndex: "total_minor",
-            width: COLUMN.MONEY,
+            width: BILL_LIST_FIXED_WIDTHS[3],
             align: "right",
+            sorter: (a, b) => a.total_minor - b.total_minor,
             render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
             title: "Balance",
             dataIndex: "balance_due_minor",
-            width: COLUMN.MONEY,
+            width: BILL_LIST_FIXED_WIDTHS[4],
             align: "right",
+            sorter: (a, b) => a.balance_due_minor - b.balance_due_minor,
             render: (v: number, r) => formatMoney(v, r.currency_code, decimalsOf(r.currency_code)),
           },
           {
+            // A row that needs attention says so in its status, "200 days late"
+            // or "Due in 5 days"; the rest show the bill's own status.
             title: "Status",
             dataIndex: "status",
-            width: COLUMN.STATUS,
-            render: (s: string) => <StatusTag status={s} labels={PAID_LABELS} />,
+            width: BILL_LIST_FIXED_WIDTHS[5],
+            render: (_: unknown, r: BillWithVendor) => <BillStatusTag bill={r} today={today} />,
           },
           {
             title: "Actions",
             key: "actions",
-            width: 140,
+            width: BILL_LIST_FIXED_WIDTHS[6],
             // The same shape Payments settled on: the paperclip, the one
             // state-advancing action a draft has, and everything else behind
             // one ⋯ menu. This column used to spread up to five coloured
@@ -379,6 +429,16 @@ export default function BillsClient({
             // two rows lined up and Void sat mid-sentence in red.
             render: (_, r) => {
               const menu: MenuProps["items"] = [
+                // The entry the bill posted, which the row's second line used to link to.
+                ...(r.journal_entry_id && r.entry_number
+                  ? [
+                      {
+                        key: "entry",
+                        label: `Journal entry ${r.entry_number}`,
+                        onClick: () => router.push(`/journal?entry=${r.journal_entry_id}`),
+                      },
+                    ]
+                  : []),
                 ...(r.status !== "draft"
                   ? [{ key: "payments", label: "Payments", onClick: () => openHistory(r) }]
                   : []),
