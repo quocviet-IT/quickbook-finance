@@ -27,8 +27,9 @@ function leftOut(invoicesMinor: number, billsMinor: number, money: (minor: numbe
 /**
  * Cash flow, the wide card of Overview: cash today and its change this month,
  * the last 6 or 12 months of month-end cash with money in and out under it,
- * and the next 30 days if customers pay on their due dates. No forecast while
- * the books are behind: it would start from a balance that is out of date.
+ * and the next 30, 60 or 90 days if customers pay on their due dates. No
+ * forecast while the books are behind: it would start from a balance that is
+ * out of date.
  */
 export default function CashFlowWidget({
   cash,
