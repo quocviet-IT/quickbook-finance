@@ -72,7 +72,8 @@ import { envelopeOf } from "@/lib/services/work-surface/envelope";
  *
  * Each read is started once and shared: the ledger before the window and each
  * month's activity in it, each month's transfers between the company's own
- * bank accounts (3.0.40), the three "same days" comparisons, both aging
+ * bank accounts (3.0.40), the three "same days" comparisons, the periods of
+ * whole months that reach back past the window (3.0.41), both aging
  * reports (one memo, so their control read is made once), the chart of
  * accounts, and the bank reads. Each section waits only for the reads it is
  * built from, inside its own envelope, so a read that fails makes the
@@ -385,6 +386,11 @@ function monthsIn(books: Books, range: Pick<HomePeriodRange, "from" | "to">): Le
   return sumLedgerRows(books.months.filter((m) => m.key >= first && m.key <= last).map((m) => books.byMonth.get(m.key)));
 }
 
+/** The period a range is compared with, as a range of its own. */
+function priorOf(range: HomePeriodRange): Pick<HomePeriodRange, "from" | "to"> {
+  return { from: range.priorFrom, to: range.priorTo };
+}
+
 function homePeriod(key: HomePeriodKey, range: HomePeriodRange, rows: LedgerBalance[], prior: LedgerBalance[] | null): HomePeriod {
   const pnl = buildProfitAndLoss(rows);
   return {
@@ -418,6 +424,26 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
   const priorMonth = orNull(getLedgerBalances(sb, ranges.month.priorFrom, ranges.month.priorTo));
   const priorQuarter = orNull(getLedgerBalances(sb, ranges.quarter.priorFrom, ranges.quarter.priorTo));
   const priorYear = orNull(getLedgerBalances(sb, ranges.year.priorFrom, ranges.year.priorTo));
+  /**
+   * A range of whole months (3.0.41): summed from the window's months when it
+   * lies wholly inside them, otherwise one read of its own, started now with
+   * the others. Null when that read failed. Two periods asking for the same
+   * range share it: in a fiscal year's first month the last twelve months are
+   * last year, and their comparisons the year before.
+   */
+  const wholeMonthReads = new Map<string, Promise<LedgerBalance[] | null>>();
+  const wholeMonths = (range: Pick<HomePeriodRange, "from" | "to">): Promise<LedgerBalance[] | null> => {
+    const key = `${range.from}..${range.to}`;
+    const seen = wholeMonthReads.get(key);
+    if (seen) return seen;
+    const read = orNull(range.from >= windowMonths[0].from ? books.then((b) => monthsIn(b, range)) : getLedgerBalances(sb, range.from, range.to));
+    wholeMonthReads.set(key, read);
+    return read;
+  };
+  // The last three months and their comparison, and the last twelve, are always inside the window.
+  const last12Prior = wholeMonths(priorOf(ranges.last12));
+  const lastYear = wholeMonths(ranges.lastYear);
+  const lastYearPrior = wholeMonths(priorOf(ranges.lastYear));
   const receivablesAging = shared(agingRead(sb, "receivables", asOf, memo));
   const payablesAging = shared(agingRead(sb, "payables", asOf, memo));
   const accounts = shared(listAccounts(sb));
@@ -514,7 +540,16 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
   };
 
   const profit = async (): Promise<HomeProfit> => {
-    const [b, { postedThrough }, month, quarter, year] = await Promise.all([books, posted, priorMonth, priorQuarter, priorYear]);
+    const [b, { postedThrough }, month, quarter, year, last12Before, lastYearRows, lastYearBefore] = await Promise.all([
+      books,
+      posted,
+      priorMonth,
+      priorQuarter,
+      priorYear,
+      last12Prior,
+      lastYear,
+      lastYearPrior,
+    ]);
     const current = windowMonths[windowMonths.length - 1].key;
     const previous = windowMonths[windowMonths.length - 2].key;
     const beforePrevious = windowMonths[windowMonths.length - 3].key;
@@ -527,8 +562,12 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
       periods: {
         month: homePeriod("month", ranges.month, b.byMonth.get(current) ?? [], month),
         lastMonth: homePeriod("lastMonth", ranges.lastMonth, b.byMonth.get(previous) ?? [], b.byMonth.get(beforePrevious) ?? null),
+        last3: homePeriod("last3", ranges.last3, monthsIn(b, ranges.last3), monthsIn(b, priorOf(ranges.last3))),
         quarter: homePeriod("quarter", ranges.quarter, monthsIn(b, ranges.quarter), quarter),
         year: homePeriod("year", ranges.year, monthsIn(b, ranges.year), year),
+        last12: homePeriod("last12", ranges.last12, monthsIn(b, ranges.last12), last12Before),
+        // Its own read failed: only this period is missing, and the card says so.
+        lastYear: lastYearRows ? homePeriod("lastYear", ranges.lastYear, lastYearRows, lastYearBefore) : null,
       },
     };
   };

@@ -11,7 +11,7 @@ import Donut, { type DonutLine } from "./charts/Donut";
 import GroupedBars from "./charts/GroupedBars";
 import { sharePercent } from "./charts/geometry";
 import styles from "./dashboard-home.module.css";
-import { formatChange, lastPostedIndex, percentChange } from "./view";
+import { formatChange, lastPostedIndex, percentChange, periodUnread } from "./view";
 import { Delta, Empty, LinkButton, PercentDelta, PeriodSelect, Swatch, TextLink, Unavailable, Widget } from "./Widget";
 
 const INCOME = tokenVar("series.income");
@@ -88,6 +88,14 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    // Only this period's own read failed: the select stays, so another period is one choice away.
+    return (
+      <Widget title="Profit and loss" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const hero = (
     <div className={styles.hero}>
       <span className={styles.heroValue}>{money(period.netMinor)}</span>
@@ -136,6 +144,8 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
   return (
     <Widget title="Profit and loss" extra={extra} footer={footer}>
       {hero}
+      {/* The bars are always the last six months; the select chooses the figures above and beside them. */}
+      <p className={styles.caption}>Income and expenses by month, last 6 months</p>
       <GroupedBars
         months={data.months}
         series={[
@@ -189,6 +199,13 @@ export function ExpensesWidget({ profit, status, money, compact }: ProfitProps) 
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    return (
+      <Widget title="Expenses" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const hero = (
     <div className={styles.hero}>
       <span className={styles.heroValue}>{money(period.expenseMinor)}</span>
@@ -299,6 +316,13 @@ export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    return (
+      <Widget title="Sales" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const missing = unpostedMonth(data.months, key);
   const change = missing ? null : percentChange(period.salesMinor, period.prior?.salesMinor);
   return (
@@ -318,6 +342,8 @@ export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
           </span>
         )}
       </div>
+      {/* Six months of bars whatever the period above. */}
+      <p className={styles.caption}>Sales by month, last 6 months</p>
       <GroupedBars
         months={data.months}
         series={[{ key: "sales", label: "Sales", values: data.salesMinor, color: INCOME }]}

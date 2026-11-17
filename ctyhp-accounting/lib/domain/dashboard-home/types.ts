@@ -130,11 +130,14 @@ export interface HomePeriodFigures {
 
 export interface HomePeriod extends HomePeriodFigures {
   key: HomePeriodKey;
-  /** "This month" | "Last month" | "This quarter" | "This year" */
+  /** "This month" | "Last month" | "Last 3 months" | "This quarter" | "This year" | "Last 12 months" | "Last year" */
   label: string;
   from: string;
   to: string;
-  /** "vs same days in Oct" | "vs Sep 2026" | "vs same days last quarter" | "vs same days last year" */
+  /**
+   * "vs same days in Oct" | "vs Sep 2026" | "vs May – Jul 2026" | "vs same days last quarter" |
+   * "vs same days last year" | "vs Nov 2024 – Oct 2025" | "vs 2024" or "vs FY Jul 2024 – Jun 2025"
+   */
   compareLabel: string;
   /** Gross profit over income, ×100; null when there is no income. */
   grossMarginPercent: number | null;
@@ -151,7 +154,13 @@ export interface HomeProfit {
   expenseMinor: number[];
   /** Income alone per month (income.total, without other income). */
   salesMinor: number[];
-  periods: Record<HomePeriodKey, HomePeriod>;
+  /**
+   * Every period a card offers, all read with the page. Only a period that
+   * needs a read of its own (last12's comparison, lastYear and its comparison)
+   * can go missing: lastYear is null when its read failed, and a comparison's
+   * failed read leaves that period's `prior` null. The others are never null.
+   */
+  periods: Record<HomePeriodKey, HomePeriod | null>;
 }
 
 export interface HomeOpenSide {

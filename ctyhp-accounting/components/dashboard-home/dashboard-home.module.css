@@ -435,8 +435,16 @@
   font-weight: 600;
 }
 
+/*
+ * A choice in a card's head (a period, a number of months, a due window).
+ * 148px leaves the longest, "Last 12 months" (94px in Segoe UI at 14px, 96px
+ * in Arial), 114px inside the select's border, padding and arrow. A card's
+ * head never wraps: at its narrowest four-column width (about 330px, on a
+ * screen near 1330px wide with the menu open; below that the grid gives
+ * narrow cards half the row) the title keeps 148px beside it.
+ */
 .period {
-  width: 136px;
+  width: 148px;
 }
 
 /* --- Headline figure in a card ------------------------------------------ */

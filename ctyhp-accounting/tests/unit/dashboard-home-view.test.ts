@@ -18,10 +18,13 @@ import {
   payablesLine,
   PERIOD_OPTIONS,
   percentChange,
+  periodLabel,
+  periodUnread,
   receivablesLine,
   stepsDone,
   tiesToLedger,
 } from "@/components/dashboard-home/view";
+import { homePeriodRanges } from "@/lib/domain/dashboard-home/ranges";
 import type { HomeBank, HomeBankAccount, HomeMonth, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import { formatMoney } from "@/lib/format";
 
@@ -60,9 +63,25 @@ describe("the Dashboard's tabs (3.0.38)", () => {
 });
 
 describe("the period a card shows", () => {
-  it("offers the four periods the service reads", () => {
-    expect(PERIOD_OPTIONS.map((option) => option.value)).toEqual(["month", "lastMonth", "quarter", "year"]);
-    expect(PERIOD_OPTIONS.map((option) => option.label)).toEqual(["This month", "Last month", "This quarter", "This year"]);
+  it("offers the seven periods the service reads, in the agreed order (3.0.41)", () => {
+    expect(PERIOD_OPTIONS.map((option) => option.value)).toEqual(["month", "lastMonth", "last3", "quarter", "year", "last12", "lastYear"]);
+    expect(PERIOD_OPTIONS.map((option) => option.label)).toEqual([
+      "This month",
+      "Last month",
+      "Last 3 months",
+      "This quarter",
+      "This year",
+      "Last 12 months",
+      "Last year",
+    ]);
+    // Each option is named as the service names the period.
+    const ranges = homePeriodRanges("2026-11-17", 1);
+    for (const option of PERIOD_OPTIONS) expect(ranges[option.value].label, option.value).toBe(option.label);
+  });
+
+  it("says which period could not be read", () => {
+    expect(periodLabel("last12")).toBe("Last 12 months");
+    expect(periodUnread("lastYear")).toBe("Last year could not be read.");
   });
 
   it("measures a change against the size of the prior figure, and refuses a zero or missing one", () => {

@@ -48,9 +48,22 @@ export function homeTabHref(tab: HomeTab): string {
 export const PERIOD_OPTIONS: readonly { value: HomePeriodKey; label: string }[] = [
   { value: "month", label: "This month" },
   { value: "lastMonth", label: "Last month" },
+  { value: "last3", label: "Last 3 months" },
   { value: "quarter", label: "This quarter" },
   { value: "year", label: "This year" },
+  { value: "last12", label: "Last 12 months" },
+  { value: "lastYear", label: "Last year" },
 ];
+
+/** A period's name in the select: "Last 12 months". */
+export function periodLabel(key: HomePeriodKey): string {
+  return PERIOD_OPTIONS.find((option) => option.value === key)?.label ?? key;
+}
+
+/** What a card says when the period chosen could not be read: "Last year could not be read." */
+export function periodUnread(key: HomePeriodKey): string {
+  return `${periodLabel(key)} could not be read.`;
+}
 
 /** Change from a prior figure as a percentage of its size; null when there is nothing to compare with. */
 export function percentChange(current: number, prior: number | null | undefined): number | null {

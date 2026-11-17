@@ -237,6 +237,11 @@ describe("the Dashboard's figures on every company's books", () => {
         ]);
         const period = profit.data.periods[key];
         checked += 1;
+        // A period the service could not read is a failure here, never skipped.
+        if (!period) {
+          disagree += 1;
+          continue;
+        }
         if (!sameFigures(period, figuresOf(rows))) disagree += 1;
         if (period.expenses.reduce((sum, line) => sum + line.amountMinor, 0) !== period.expenseMinor) disagree += 1;
         const expectedPrior = hasActivity(priorRows) ? figuresOf(priorRows) : null;
