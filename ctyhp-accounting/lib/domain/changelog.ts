@@ -48,6 +48,20 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.43",
+    date: "2026-11-17",
+    headline: "Undo import is no longer blocked by a match Banking only suggested.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "A statement import can be undone while its lines have only suggested matches",
+        detail:
+          "Banking suggests a match for a line as soon as it is imported, and Undo used to count that suggestion as a match, so an import could not be undone almost from the start. Only a line that is matched, coded or ignored, or has an approved match, now stops the undo; suggested and rejected matches go with their lines. A line the ledger points at still has to be unmatched first, as before.",
+        route: "/banking",
+      },
+    ],
+  },
+  {
     version: "3.0.42",
     date: "2026-11-17",
     headline: "Next.js updated to 16.4.6 with its security fix.",
