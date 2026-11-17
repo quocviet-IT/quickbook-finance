@@ -229,6 +229,8 @@ describe("the server decides whose choices and which company", () => {
       ["saveOverviewLayoutAction", "layout: unknown"],
       ["saveWatchlistAction", "accountIds: unknown"],
       ["setPrivacyAction", "on: unknown"],
+      // Each card's choice (3.0.41).
+      ["saveCardChoicesAction", "choices: unknown"],
     ]);
     // An account must be in the open company's own chart.
     expect(actions).toMatch(/createSupabaseServerClient\(\);\s*const \{ data, error \} = await books\.from\("acc_account"\)\.select\("id"\)\.in\("id", ids\)/);

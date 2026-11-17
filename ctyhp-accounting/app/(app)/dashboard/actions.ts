@@ -2,13 +2,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveActiveCompany } from "@/lib/db/company";
 import { createSupabaseServerClient, createSupabaseServerClientForSchema } from "@/lib/db/server";
+import { normalizeCardChoices } from "@/lib/domain/dashboard-home/card-choices";
 import { isStandard, normalizeOverview } from "@/lib/domain/dashboard-home/layout";
 import { WATCHLIST_MAX } from "@/lib/domain/dashboard-home/watchlist";
-import { saveDashboardPreference } from "@/lib/services/dashboard-preferences";
+import { saveDashboardCards, saveDashboardPreference } from "@/lib/services/dashboard-preferences";
 
 /**
  * Each person's own Dashboard (3.0.39): the Overview's layout, the account
- * watchlist and Privacy.
+ * watchlist and Privacy; and each card's choice (3.0.41).
  *
  * Thin wrappers: each resolves the signed-in person and the open company on the
  * server, never from the browser, checks what it was given, then calls the
@@ -82,6 +83,18 @@ export async function setPrivacyAction(on: unknown): Promise<DashboardActionResu
   if (typeof on !== "boolean") return { ok: false, error: "Privacy is either on or off." };
   return withPreference(async (sb, companyId) => {
     await saveDashboardPreference(sb, companyId, { privacy: on });
+    return { ok: true };
+  });
+}
+
+/**
+ * Keeps each card's choice for the person in the open company. Whatever
+ * arrives is read as choices first: what no card offers is dropped and the
+ * defaults fill the rest, so only choices the screen can draw are saved.
+ */
+export async function saveCardChoicesAction(choices: unknown): Promise<DashboardActionResult> {
+  return withPreference(async (sb, companyId) => {
+    await saveDashboardCards(sb, companyId, normalizeCardChoices(choices));
     return { ok: true };
   });
 }

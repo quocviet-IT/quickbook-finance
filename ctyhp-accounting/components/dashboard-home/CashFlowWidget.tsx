@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { tokenVar } from "@/lib/design/tokens";
 import { listWords } from "@/lib/domain/dashboard-home/insights";
 import { longMonthName } from "@/lib/domain/dashboard-home/ranges";
@@ -36,15 +35,23 @@ export default function CashFlowWidget({
   status,
   money,
   compact,
+  months: span,
+  onMonthsChange,
+  horizon,
+  onHorizonChange,
 }: {
   cash: SectionEnvelope<HomeCash>;
   status: HomeStatus | null;
   money: (minor: number) => string;
   compact: (minor: number) => string;
+  /** How many months the chart draws, chosen in the card's head and kept for the person (3.0.41). */
+  months: 6 | 12;
+  onMonthsChange: (next: 6 | 12) => void;
+  /** How far ahead the forecast looks, chosen beside its sentence and kept for the person. */
+  horizon: HomeHorizon;
+  onHorizonChange: (next: HomeHorizon) => void;
 }) {
-  const [span, setSpan] = useState<6 | 12>(6);
-  const [horizon, setHorizon] = useState<HomeHorizon>(30);
-  const extra = <ChoiceSelect value={span} onChange={setSpan} options={CASH_MONTH_OPTIONS} label="Months of Cash flow" />;
+  const extra = <ChoiceSelect value={span} onChange={onMonthsChange} options={CASH_MONTH_OPTIONS} label="Months of Cash flow" />;
   const footer = (
     <>
       <TextLink href="/reports/cash-flow">Cash flow report</TextLink>
@@ -141,7 +148,7 @@ export default function CashFlowWidget({
             </p>
             <ChoiceSelect
               value={horizon}
-              onChange={setHorizon}
+              onChange={onHorizonChange}
               options={HORIZON_OPTIONS}
               label="How far ahead the cash forecast looks"
               className={styles.horizon}

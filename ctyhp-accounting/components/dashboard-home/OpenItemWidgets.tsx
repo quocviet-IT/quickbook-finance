@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import StatusTag from "@/components/ui/StatusTag";
 import { tokenVar } from "@/lib/design/tokens";
 import type { HomeDueDays, HomeOpenSide, HomePayables, HomePayment, HomeReceivables, HomeStatus } from "@/lib/domain/dashboard-home/types";
@@ -98,15 +97,19 @@ export function InvoicesWidget({
   asOf,
   money,
   currencyCode,
+  due: days,
+  onDueChange,
 }: {
   receivables: SectionEnvelope<HomeReceivables>;
   status: HomeStatus | null;
   asOf: string;
   money: Money;
   currencyCode: string;
+  /** What falls due in 7 or 30 days, chosen in the card's head and kept for the person (3.0.41). */
+  due: HomeDueDays;
+  onDueChange: (next: HomeDueDays) => void;
 }) {
-  const [days, setDays] = useState<HomeDueDays>(7);
-  const extra = <ChoiceSelect value={days} onChange={setDays} options={DUE_OPTIONS} label="Due window for Invoices" />;
+  const extra = <ChoiceSelect value={days} onChange={onDueChange} options={DUE_OPTIONS} label="Due window for Invoices" />;
   const footer = (
     <>
       <TextLink href="/reports/ar-aging">A/R Aging</TextLink>
@@ -199,14 +202,18 @@ export function BillsWidget({
   status,
   money,
   currencyCode,
+  due: days,
+  onDueChange,
 }: {
   payables: SectionEnvelope<HomePayables>;
   status: HomeStatus | null;
   money: Money;
   currencyCode: string;
+  /** What falls due in 7 or 30 days, chosen in the card's head and kept for the person (3.0.41). */
+  due: HomeDueDays;
+  onDueChange: (next: HomeDueDays) => void;
 }) {
-  const [days, setDays] = useState<HomeDueDays>(7);
-  const extra = <ChoiceSelect value={days} onChange={setDays} options={DUE_OPTIONS} label="Due window for Bills" />;
+  const extra = <ChoiceSelect value={days} onChange={onDueChange} options={DUE_OPTIONS} label="Due window for Bills" />;
   const footer = (
     <>
       <TextLink href="/reports/ap-aging">A/P Aging</TextLink>

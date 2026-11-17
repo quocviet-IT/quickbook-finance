@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { Button } from "antd";
 import { tokenVar } from "@/lib/design/tokens";
 import { listWords } from "@/lib/domain/dashboard-home/insights";
@@ -32,6 +31,9 @@ interface ProfitProps {
   status: HomeStatus | null;
   money: Money;
   compact: Money;
+  /** The period chosen in the card's head, kept for the person (3.0.41). */
+  period: HomePeriodKey;
+  onPeriodChange: (next: HomePeriodKey) => void;
 }
 
 /** "November 2026" */
@@ -66,9 +68,8 @@ function ChangeLine({ current, prior, period, good }: { current: number; prior: 
  * the period before, six months of income and expenses, and each with its
  * change. A month not entered yet says so rather than reading as a zero.
  */
-export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Profit and loss" />;
+export function ProfitAndLossWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Profit and loss" />;
   const footer = <TextLink href="/reports?report=pnl">Profit and loss</TextLink>;
   const data = profit.data;
   if (!data) {
@@ -121,7 +122,7 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
           title={`${longMonthName(missing.key)} is not posted`}
           action={
             canShowLastMonth ? (
-              <Button size="small" onClick={() => setKey("lastMonth")}>
+              <Button size="small" onClick={() => onPeriodChange("lastMonth")}>
                 Show last month
               </Button>
             ) : null
@@ -179,9 +180,8 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
  * (a discount account larger than the small expenses): the ring draws only
  * what is above zero, the list shows every line, and the total is the real one.
  */
-export function ExpensesWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Expenses" />;
+export function ExpensesWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Expenses" />;
   const footer = <TextLink href="/reports?report=pnl">Profit and loss</TextLink>;
   const data = profit.data;
   if (!data) {
@@ -294,9 +294,8 @@ function LegendRow({ color, name, share, amount }: { color?: string; name: strin
 /* --------------------------------------------------------------------- sales */
 
 /** Sales: income from sales (other income left out) for the chosen period, and six months of it. */
-export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Sales" />;
+export function SalesWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Sales" />;
   const footer = <TextLink href="/reports/sales-by-customer">Sales by customer</TextLink>;
   const data = profit.data;
   if (!data) {

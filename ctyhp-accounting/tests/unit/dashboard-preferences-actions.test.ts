@@ -46,7 +46,8 @@ vi.mock("@/lib/db/company", () => ({
   resolveActiveCompany: async () => ({ active: state.active, options: [] }),
 }));
 
-import { saveOverviewLayoutAction, saveWatchlistAction, setPrivacyAction } from "@/app/(app)/dashboard/actions";
+import { saveCardChoicesAction, saveOverviewLayoutAction, saveWatchlistAction, setPrivacyAction } from "@/app/(app)/dashboard/actions";
+import { DEFAULT_CARD_CHOICES } from "@/lib/domain/dashboard-home/card-choices";
 import { presetLayout, standardLayout, toggleShown } from "@/lib/domain/dashboard-home/layout";
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -158,5 +159,35 @@ describe("setPrivacyAction", () => {
   it("refuses anything but a boolean", async () => {
     for (const bad of ["true", 1, null, undefined]) expect((await setPrivacyAction(bad)).ok).toBe(false);
     expect(state.rpcs).toEqual([]);
+  });
+});
+
+describe("saveCardChoicesAction (3.0.41)", () => {
+  it("saves every card's choice for the open company, through the register's client and its own function", async () => {
+    const choices = { ...DEFAULT_CARD_CHOICES, pnl: "last12", cashMonths: 12, horizon: 90, billsDue: 30 };
+    expect(await saveCardChoicesAction(choices)).toEqual({ ok: true });
+    expect(state.schemas).toEqual(["onebook"]);
+    expect(state.rpcs).toEqual([["save_dashboard_cards", { p_company: "c-1", p_cards: choices }]]);
+  });
+
+  it("reads what arrives as choices first: what no card offers is dropped and the defaults fill the rest", async () => {
+    await saveCardChoicesAction({ sales: "last3", horizon: 45, cashMonths: "12", user_id: "u-2", company: "c-9" });
+    expect(state.rpcs[0][1]).toEqual({ p_company: "c-1", p_cards: { ...DEFAULT_CARD_CHOICES, sales: "last3" } });
+    await saveCardChoicesAction("last12");
+    expect(state.rpcs[1][1]).toEqual({ p_company: "c-1", p_cards: DEFAULT_CARD_CHOICES });
+  });
+
+  it("refuses a signed-out person and one with no company open, without saving", async () => {
+    state.user = null;
+    expect(await saveCardChoicesAction(DEFAULT_CARD_CHOICES)).toEqual({ ok: false, error: "Sign in to change your dashboard." });
+    state.user = { id: "u-1" };
+    state.active = null;
+    expect(await saveCardChoicesAction(DEFAULT_CARD_CHOICES)).toEqual({ ok: false, error: "Open a company to change your dashboard." });
+    expect(state.rpcs).toEqual([]);
+  });
+
+  it("never throws: a database refusal comes back as a sentence, not its words", async () => {
+    state.rpcError = "function onebook.save_dashboard_cards does not exist";
+    expect(await saveCardChoicesAction(DEFAULT_CARD_CHOICES)).toEqual({ ok: false, error: "Your dashboard could not be saved. Try again in a moment." });
   });
 });
