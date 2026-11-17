@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { tokenVar } from "@/lib/design/tokens";
 import { listWords } from "@/lib/domain/dashboard-home/insights";
 import { longMonthName } from "@/lib/domain/dashboard-home/ranges";
@@ -7,8 +8,8 @@ import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import { formatDate } from "@/lib/format";
 import CashFlowChart from "./charts/CashFlowChart";
 import styles from "./dashboard-home.module.css";
-import { lastPostedDay } from "./view";
-import { Delta, Empty, LinkButton, Spacer, Swatch, TextLink, Unavailable, Widget } from "./Widget";
+import { CASH_MONTH_OPTIONS, cashMonthsLabel, lastPostedDay } from "./view";
+import { ChoiceSelect, Delta, Empty, LinkButton, Spacer, Swatch, TextLink, Unavailable, Widget } from "./Widget";
 
 const TITLE = "Cash flow";
 const INCOME = tokenVar("series.income");
@@ -26,9 +27,9 @@ function leftOut(invoicesMinor: number, billsMinor: number, money: (minor: numbe
 
 /**
  * Cash flow, the wide card of Overview: cash today and its change this month,
- * six months of month-end cash with money in and out under it, and the next
- * 30 days if customers pay on their due dates. No forecast while the books are
- * behind: it would start from a balance that is out of date.
+ * the last 6 or 12 months of month-end cash with money in and out under it,
+ * and the next 30 days if customers pay on their due dates. No forecast while
+ * the books are behind: it would start from a balance that is out of date.
  */
 export default function CashFlowWidget({
   cash,
@@ -41,17 +42,19 @@ export default function CashFlowWidget({
   money: (minor: number) => string;
   compact: (minor: number) => string;
 }) {
+  const [span, setSpan] = useState<6 | 12>(6);
+  const extra = <ChoiceSelect value={span} onChange={setSpan} options={CASH_MONTH_OPTIONS} label="Months of Cash flow" />;
   const footer = (
     <>
       <TextLink href="/reports/cash-flow">Cash flow report</TextLink>
       <Spacer />
-      <span className={styles.caption}>Last 6 months</span>
+      <span className={styles.caption}>{cashMonthsLabel(span)}</span>
     </>
   );
   const data = cash.data;
   if (!data) {
     return (
-      <Widget title={TITLE} footer={footer}>
+      <Widget title={TITLE} extra={extra} footer={footer}>
         <Unavailable reason={cash.unavailableReason ?? "Cash flow could not be read."} />
       </Widget>
     );
@@ -65,6 +68,8 @@ export default function CashFlowWidget({
       </Widget>
     );
   }
+  // The chart draws the chosen number of months from the end; the figures above it are today's.
+  const chartFrom = Math.max(0, data.months.length - span);
   const last = data.months.length - 1;
   const today = data.balanceMinor[last] ?? 0;
   const change = last > 0 ? today - data.balanceMinor[last - 1] : 0;
@@ -73,7 +78,7 @@ export default function CashFlowWidget({
   const month = data.months[last];
 
   return (
-    <Widget title={TITLE} footer={footer}>
+    <Widget title={TITLE} extra={extra} footer={footer}>
       <div className={styles.hero}>
         <span className={styles.heroValue}>{money(today)}</span>
         <span className={styles.heroSub}>
@@ -112,10 +117,10 @@ export default function CashFlowWidget({
         ) : null}
       </div>
       <CashFlowChart
-        months={data.months}
-        balance={data.balanceMinor}
-        inflow={data.inMinor}
-        outflow={data.outMinor}
+        months={data.months.slice(chartFrom)}
+        balance={data.balanceMinor.slice(chartFrom)}
+        inflow={data.inMinor.slice(chartFrom)}
+        outflow={data.outMinor.slice(chartFrom)}
         projection={projection ? { date: projection.through, valueMinor: projection.projectedMinor } : null}
         money={money}
         compact={compact}

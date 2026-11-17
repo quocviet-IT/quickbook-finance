@@ -99,6 +99,36 @@ export function labelWidth(text: string): number {
   return text.length * 6.6;
 }
 
+/**
+ * How many months apart the names under a chart are written so that no two
+ * touch: 1 when each fits its band with `gap` pixels to spare, 2 when they
+ * would touch (twelve months on a phone), and so on. The chart counts back
+ * from its last month, so the month to date is always named.
+ */
+export function labelStride(step: number, labels: readonly string[], gap = 6): number {
+  if (step <= 0 || labels.length === 0) return 1;
+  const widest = Math.max(...labels.map(labelWidth));
+  return Math.max(1, Math.ceil((widest + gap) / step));
+}
+
+/**
+ * Where a label under a chart goes beside the last month's name: centered on
+ * `center`; moved left to end at `right` when it would cross the chart's
+ * edge; null when it would then begin before `leftLimit` (the end of the
+ * last month's name, and a gap), and so cannot be written without touching it.
+ */
+export function placeEdgeLabel(
+  center: number,
+  text: string,
+  right: number,
+  leftLimit: number,
+): { x: number; anchor: "middle" | "end" } | null {
+  const width = labelWidth(text);
+  if (center + width / 2 <= right && center - width / 2 >= leftLimit) return { x: px(center), anchor: "middle" };
+  if (right - width >= leftLimit) return { x: px(right), anchor: "end" };
+  return null;
+}
+
 /** A sparkline: the posted months as points across the width, an unposted month as no point at all. */
 export function sparkPoints(
   values: readonly number[],

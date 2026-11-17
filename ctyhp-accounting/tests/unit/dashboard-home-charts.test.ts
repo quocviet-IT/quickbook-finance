@@ -5,6 +5,8 @@ import {
   barSpan,
   donutSlices,
   labelFitsAcross,
+  labelStride,
+  placeEdgeLabel,
   runs,
   sharePercent,
   smoothPath,
@@ -129,6 +131,30 @@ describe("the Dashboard's chart arithmetic (3.0.38)", () => {
     expect(stackShares([25, 25, 50])).toEqual([25, 25, 50]);
     expect(stackShares([0, 0, 0])).toEqual([0, 0, 0]);
     expect(stackShares([-10, 10, 30])).toEqual([0, 25, 75]);
+  });
+
+  it("names every month when the names fit, and every other one when twelve would touch (3.0.41)", () => {
+    const names = ["Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"];
+    // Cash flow's drawing: 52px of axis on the left, 8px on the right, and 0.9 of a month for the projected point.
+    const step = (width: number, count: number) => bands(count, 52, width - 8, 0.9).step;
+    // An eight-column card at its narrowest (a 641px chart): twelve names fit.
+    expect(labelStride(step(641, 12), names)).toBe(1);
+    // A phone (a 302px chart): every other one; six months still fit.
+    expect(labelStride(step(302, 12), names)).toBe(2);
+    expect(labelStride(step(302, 6), names.slice(6))).toBe(1);
+    // A band of nothing names every month rather than dividing by zero.
+    expect(labelStride(0, names)).toBe(1);
+  });
+
+  it("keeps the projected day inside the chart and clear of the last month's name, or leaves it out", () => {
+    // Centered under the point when it fits.
+    expect(placeEdgeLabel(612, "Feb 15", 639, 583)).toEqual({ x: 612, anchor: "middle" });
+    // Ended at the chart's edge when centered it would cross it.
+    expect(placeEdgeLabel(290, "Feb 15", 300, 250)).toEqual({ x: 300, anchor: "end" });
+    // Moved right to the edge when centered it would touch the last month's name.
+    expect(placeEdgeLabel(278.2, "Dec 17", 300, 259)).toEqual({ x: 300, anchor: "end" });
+    // Twelve months on a phone: no room either way, so the sentence under the chart says the day instead.
+    expect(placeEdgeLabel(285.6, "Feb 15", 300, 281.6)).toBeNull();
   });
 
   it("names a month in a tooltip, and the projected day under the chart", () => {

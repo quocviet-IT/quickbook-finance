@@ -86,8 +86,10 @@ import { envelopeOf } from "@/lib/services/work-surface/envelope";
 
 export class DashboardHomeError extends Error {}
 
-/** Months on the charts. */
+/** Months on the figures band, Profit and loss and Sales. */
 export const HOME_MONTHS = 6;
+/** Months the Cash flow card can show (3.0.41): the last 6 or all 12. */
+export const CASH_MONTHS = 12;
 /** Months read from the ledger: enough for a fiscal year to date and the month before last. */
 export const HOME_WINDOW_MONTHS = 14;
 /** Payments listed under Recent payments. */
@@ -414,6 +416,7 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
   const windowMonths = homeMonthRanges(asOf, HOME_WINDOW_MONTHS);
   const ranges = homePeriodRanges(asOf, fiscalStartMonth);
   const shownFrom = windowMonths.length - HOME_MONTHS;
+  const cashFrom = windowMonths.length - CASH_MONTHS;
 
   // The shared reads, each started once.
   const opening = shared(getLedgerBalances(sb, null, addIsoDays(windowMonths[0].from, -1)));
@@ -529,11 +532,12 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
         flow = gross;
       }
     }
+    // Twelve months, so the card can show six or twelve without reading again.
     return {
-      months: postedMonths(b, postedThrough).slice(shownFrom),
-      balanceMinor: b.cash.slice(shownFrom),
-      inMinor: flow.inMinor.slice(shownFrom),
-      outMinor: flow.outMinor.slice(shownFrom),
+      months: postedMonths(b, postedThrough).slice(cashFrom),
+      balanceMinor: b.cash.slice(cashFrom),
+      inMinor: flow.inMinor.slice(cashFrom),
+      outMinor: flow.outMinor.slice(cashFrom),
       transfersExcluded: excluded,
       projection: ar && ap ? projection(b.cashToday, ar.rows, ap.rows, asOf) : null,
     };

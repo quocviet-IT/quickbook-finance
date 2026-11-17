@@ -86,6 +86,7 @@ export interface HomeProjection {
 }
 
 export interface HomeCash {
+  /** Twelve months, oldest first; the last is the month to date (3.0.41). The card shows the last 6 or all 12. */
   months: HomeMonth[];
   /** Month-end cash (bank-type accounts); the last is today's. */
   balanceMinor: number[];

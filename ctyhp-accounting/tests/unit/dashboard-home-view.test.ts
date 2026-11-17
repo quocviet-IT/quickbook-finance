@@ -4,6 +4,8 @@ import {
   billDueLook,
   booksNote,
   cardBalance,
+  CASH_MONTH_OPTIONS,
+  cashMonthsLabel,
   daysLate,
   earlierOpenSentence,
   formatChange,
@@ -82,6 +84,15 @@ describe("the period a card shows", () => {
   it("says which period could not be read", () => {
     expect(periodLabel("last12")).toBe("Last 12 months");
     expect(periodUnread("lastYear")).toBe("Last year could not be read.");
+  });
+
+  it("offers Cash flow six or twelve months, and its footer says which", () => {
+    expect(CASH_MONTH_OPTIONS).toEqual([
+      { value: 6, label: "Last 6 months" },
+      { value: 12, label: "Last 12 months" },
+    ]);
+    expect(cashMonthsLabel(6)).toBe("Last 6 months");
+    expect(cashMonthsLabel(12)).toBe("Last 12 months");
   });
 
   it("measures a change against the size of the prior figure, and refuses a zero or missing one", () => {

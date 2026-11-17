@@ -231,8 +231,12 @@ async function load(
 const SECTIONS = ["status", "figures", "cash", "profit", "receivables", "payables", "payments", "bank", "activity", "insights"] as const;
 const states = (home: DashboardHome) => Object.fromEntries(SECTIONS.map((key) => [key, home[key].dataState]));
 
-/** Cash at the end of May 2026, the month before the six on the chart: the opening's 80,500, nothing moved since. */
+/** Cash at the end of November 2025, the month before the twelve Cash flow returns: the opening's 80,500, nothing moved since. */
 const CASH_BEFORE_CHART = 80_500_00;
+/** December 2025 to May 2026, the first six of Cash flow's twelve months: no bank account moved. */
+const QUIET = [0, 0, 0, 0, 0, 0];
+/** Cash at each of those six month ends. */
+const QUIET_CASH = [80_500_00, 80_500_00, 80_500_00, 80_500_00, 80_500_00, 80_500_00];
 
 /** Each month's money in minus money out, beside its change in cash on hand. */
 function flowAgainstBalance(cash: NonNullable<DashboardHome["cash"]["data"]>): { flow: number[]; change: number[] } {
@@ -272,15 +276,19 @@ describe("getDashboardHome", () => {
     expect(bank.otherCash).toEqual({ accounts: 1, bookMinor: 500_00 });
     const listed = bank.accounts.filter((a) => !a.isCard).reduce((sum, a) => sum + a.bookMinor, 0);
     expect(listed + bank.otherCash!.bookMinor).toBe(bank.totalBookMinor);
-    expect(home.cash.data!.balanceMinor).toEqual(cash.series);
+    // Cash flow returns twelve months (3.0.41); its last six are the figure's series.
+    expect(home.cash.data!.balanceMinor).toEqual([...QUIET_CASH, ...cash.series]);
+    expect(home.cash.data!.months.map((m) => m.key)).toEqual([
+      "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11",
+    ]);
   });
 
   it("charts money in and out of the bank-type accounts, and says transfers between them are left out", async () => {
     const { home } = await load();
     // Nothing here moved between two bank accounts: money in and out are the bank debits and credits.
     expect(home.cash.data).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
       transfersExcluded: true,
     });
     const { flow, change } = flowAgainstBalance(home.cash.data!);
@@ -299,12 +307,12 @@ describe("getDashboardHome", () => {
     expect(home.cash.dataState).toBe("fresh");
     // October's bank debits are 53,000 and credits 49,000; the 5,000 transfer comes off both.
     expect(cash).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
       transfersExcluded: true,
     });
     // Moving money between two bank accounts does not change cash on hand.
-    expect(cash.balanceMinor).toEqual([84_500_00, 88_500_00, 92_500_00, 96_500_00, 100_500_00, 103_500_00]);
+    expect(cash.balanceMinor).toEqual([...QUIET_CASH, 84_500_00, 88_500_00, 92_500_00, 96_500_00, 100_500_00, 103_500_00]);
     const { flow, change } = flowAgainstBalance(cash);
     expect(flow).toEqual(change);
   });
@@ -320,8 +328,8 @@ describe("getDashboardHome", () => {
     expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
     const cash = home.cash.data!;
     expect(cash).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 53_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 49_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 53_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 49_000_00, 15_000_00],
       transfersExcluded: false,
     });
     const { flow, change } = flowAgainstBalance(cash);

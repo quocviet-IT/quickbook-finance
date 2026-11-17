@@ -160,7 +160,38 @@ export function PercentDelta({ percent, good = "up" }: { percent: number; good?:
   );
 }
 
-/** The period a card shows, chosen in its head. Changing it reads nothing: every period is already here. */
+/**
+ * A small choice in a card: its period, its months, its window. Changing it
+ * reads nothing: every choice's figures are already here.
+ */
+export function ChoiceSelect<T extends string | number>({
+  value,
+  onChange,
+  options,
+  label,
+  className = styles.period,
+}: {
+  value: T;
+  onChange: (next: T) => void;
+  options: readonly { value: T; label: string }[];
+  /** The select's name for a screen reader: "Period for Sales". */
+  label: string;
+  className?: string;
+}) {
+  return (
+    <Select<T>
+      size="small"
+      className={className}
+      value={value}
+      onChange={onChange}
+      options={options.map((option) => ({ value: option.value, label: option.label }))}
+      aria-label={label}
+      popupMatchSelectWidth={false}
+    />
+  );
+}
+
+/** The period a card shows, chosen in its head. */
 export function PeriodSelect({
   value,
   onChange,
@@ -170,17 +201,7 @@ export function PeriodSelect({
   onChange: (next: HomePeriodKey) => void;
   label: string;
 }) {
-  return (
-    <Select
-      size="small"
-      className={styles.period}
-      value={value}
-      onChange={onChange}
-      options={PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-      aria-label={label}
-      popupMatchSelectWidth={false}
-    />
-  );
+  return <ChoiceSelect value={value} onChange={onChange} options={PERIOD_OPTIONS} label={label} />;
 }
 
 /** A color key: a small square, or a short line for a balance, in a `var(--ob-…)` color. */

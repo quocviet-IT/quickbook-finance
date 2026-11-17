@@ -65,6 +65,17 @@ export function periodUnread(key: HomePeriodKey): string {
   return `${periodLabel(key)} could not be read.`;
 }
 
+/** How many months Cash flow charts (3.0.41); the footer says the same words. */
+export const CASH_MONTH_OPTIONS: readonly { value: 6 | 12; label: string }[] = [
+  { value: 6, label: "Last 6 months" },
+  { value: 12, label: "Last 12 months" },
+];
+
+/** "Last 12 months": what Cash flow's footer says under the chart. */
+export function cashMonthsLabel(months: 6 | 12): string {
+  return CASH_MONTH_OPTIONS.find((option) => option.value === months)?.label ?? `Last ${months} months`;
+}
+
 /** Change from a prior figure as a percentage of its size; null when there is nothing to compare with. */
 export function percentChange(current: number, prior: number | null | undefined): number | null {
   if (prior === null || prior === undefined || prior === 0) return null;
