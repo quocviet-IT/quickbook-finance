@@ -100,11 +100,9 @@
   padding: 9px 12px;
   color: var(--ob-text-secondary);
   background: var(--ob-surface-muted);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.35;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
 }
 
 /* No dividers between the head cells. Ant Design's own rule chains four :not()s,
@@ -172,10 +170,8 @@
 
 .groupTitle {
   color: var(--ob-text-strong);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -183,7 +179,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ob-text-faint);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -191,7 +187,7 @@
 .groupCount {
   margin-left: auto;
   color: var(--ob-text-faint);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }

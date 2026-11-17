@@ -20,6 +20,7 @@ import {
   listOpenInvoicesAction,
 } from "./actions";
 import type { CreditMemoRow, CreditStatus, CustomerRow, AccountRow, TaxCodeRow } from "@/lib/db/types";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface Props {
   canWrite: boolean;
@@ -120,7 +121,8 @@ export default function CreditMemosClient({
   };
 
   const submit = async () => {
-    const h = await form.validateFields();
+    const h = await validateOrFocus(form);
+    if (!h) return;
     const payload = {
       customer_id: h.customer_id,
       currency_code: baseCurrency,

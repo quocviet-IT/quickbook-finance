@@ -92,6 +92,7 @@ import {
   setAccountStatusAction,
 } from "./actions";
 import styles from "./accounts.module.css";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 const STATUS_LABELS: Record<AccountStatus, { text: string; color: string }> = {
   draft: { text: "Draft", color: "default" },
@@ -400,7 +401,8 @@ export default function AccountsClient({
   }
 
   async function onSubmit() {
-    const fields = await form.validateFields();
+    const fields = await validateOrFocus(form);
+    if (!fields) return;
     // The tick is not rendered for a type that cannot clear, so validateFields leaves it out; say it outright.
     const values = { ...fields, is_clearing: canBeClearing(fields.account_type) && fields.is_clearing === true };
     setSaving(true);
@@ -825,7 +827,7 @@ export default function AccountsClient({
         cancelText="Cancel"
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form form={form} layout="vertical">
           <Form.Item name="account_code" label="Account code" rules={[{ required: true, message: "Enter an account code" }]}>
             <Input disabled={!!editing} placeholder="e.g. 4000" />
           </Form.Item>

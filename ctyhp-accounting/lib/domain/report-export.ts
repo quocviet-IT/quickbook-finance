@@ -13,6 +13,12 @@ export interface ReportExportColumn {
 export interface ReportExportSheet {
   fileName: string;
   companyName: string;
+  /**
+   * How to reach the company (address, phone, email), printed under its name at
+   * the top of the PDF. Only a report sent outside the company, the customer
+   * statement, carries them (3.0.45). CSV and Excel leave them out.
+   */
+  companyLines?: string[];
   title: string;
   subtitle: string;
   currencyCode: string;

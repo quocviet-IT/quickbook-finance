@@ -22,6 +22,7 @@ import {
   listOpenBillsAction,
 } from "./actions";
 import type { CreditStatus, VendorCreditRow, VendorRow, AccountRow } from "@/lib/db/types";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface Props {
   canWrite: boolean;
@@ -124,7 +125,8 @@ export default function VendorCreditsClient({
   };
 
   const submit = async () => {
-    const h = await form.validateFields();
+    const h = await validateOrFocus(form);
+    if (!h) return;
     const payload = {
       vendor_id: h.vendor_id,
       currency_code: baseCurrency,

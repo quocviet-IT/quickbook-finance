@@ -9,6 +9,7 @@ import {
 } from "@/lib/domain/bank-account-detail";
 import { createBankAccountAction } from "@/app/(app)/banking/actions";
 import type { UnbankedRef } from "@/lib/services/import-preflight";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface AddBankRecordFromImportProps {
   target: UnbankedRef | null;
@@ -39,7 +40,8 @@ export default function AddBankRecordFromImport({
 
   const submit = async () => {
     if (!target) return;
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setBusy(true);
     const result = await createBankAccountAction({
       account_id: target.accountId,

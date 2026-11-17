@@ -17,6 +17,7 @@ import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, type StatusLook } from "@/lib/domain/status-label";
 import RowActionsMenu from "@/components/ui/RowActionsMenu";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 const STATUS_LOOKS: Record<string, StatusLook> = {
   invited: { tone: "neutral", label: "Pending" },
@@ -343,7 +344,8 @@ function AddExistingUserModal({
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setSaving(true);
     setError(null);
     const res = await addExistingUserAction({ email: v.email, role: v.role });
@@ -397,7 +399,8 @@ function CreateUserModal({
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setSaving(true);
     const res = await createUserAction({
       email: v.email,

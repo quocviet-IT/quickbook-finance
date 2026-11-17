@@ -26,6 +26,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { createSalesReceiptAction } from "./actions";
 import { SALES_RECEIPT_STATUS_TONES } from "./sales-receipt-columns";
 import styles from "./sales-receipts.module.css";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /** A saved receipt, with its lines, as the dialog shows it. */
 export interface SalesReceiptDetailView {
@@ -193,12 +194,8 @@ function SalesReceiptFormBody({
   }
 
   async function submit() {
-    let values: FormValues;
-    try {
-      values = await form.validateFields();
-    } catch {
-      return;
-    }
+    const values: FormValues | null = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     setError(null);
     const res = await createSalesReceiptAction({
@@ -290,7 +287,6 @@ function SalesReceiptFormBody({
       <Form<FormValues>
         form={form}
         layout="vertical"
-        requiredMark={false}
         disabled={readOnly}
         initialValues={initialValues}
       >

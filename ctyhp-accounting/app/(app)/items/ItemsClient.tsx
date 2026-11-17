@@ -36,6 +36,7 @@ import { formatMoney } from "@/lib/format";
 import { createItemAction, updateItemAction, setItemActiveAction } from "./actions";
 import AdjustInventoryModal from "./AdjustInventoryModal";
 import ItemMovementsModal from "./ItemMovementsModal";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface Props {
   items: ItemRow[];
@@ -135,7 +136,8 @@ export default function ItemsClient({
   }
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     const payload = {
       item_code: v.item_code || null,
       name: v.name,

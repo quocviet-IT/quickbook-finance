@@ -122,6 +122,7 @@ import {
   syncBankConnectionAction,
 } from "./actions";
 import type { BankingView, OpeningBankingView } from "./banking-view";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface PlaidLinkAccount {
   id: string;
@@ -422,7 +423,8 @@ export default function BankingClient({
   }, [reload, selectedId, loadHints]);
 
   async function submitAccount() {
-    const values = await acctForm.validateFields();
+    const values = await validateOrFocus(acctForm);
+    if (!values) return;
     const result = await createBankAccountAction(values);
     if (result.ok) {
       message.success("Bank account created");
@@ -1285,7 +1287,7 @@ function CreateAccountModal({
       cancelText="Cancel"
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" requiredMark={false}>
+      <Form form={form} layout="vertical">
         <Form.Item
           name="detail_type"
           label="What kind of account is this?"

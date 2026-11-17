@@ -12,6 +12,7 @@ import styles from "./report-paper.module.css";
  */
 export function ReportPaper({
   companyName,
+  companyLines,
   title,
   range,
   basis = "Accrual basis",
@@ -19,6 +20,8 @@ export function ReportPaper({
   children,
 }: {
   companyName: string;
+  /** How to reach the company, under its name, on a report sent outside it such as a customer statement (3.0.45). */
+  companyLines?: readonly string[];
   title: string;
   range: string;
   basis?: string;
@@ -29,6 +32,9 @@ export function ReportPaper({
     <section className={styles.paper} aria-label={title}>
       <header className={styles.head}>
         <div className={styles.company}>{companyName}</div>
+        {companyLines && companyLines.length > 0 ? (
+          <div className={styles.companyLines}>{companyLines.join(" · ")}</div>
+        ) : null}
         <div className={styles.reportName}>{title}</div>
         <div className={styles.range}>{range}</div>
         <div className={styles.basis}>

@@ -417,9 +417,7 @@
 
 .insightChipLabel {
   color: var(--ob-text-faint);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 12px;
 }
 
 .insightAction {

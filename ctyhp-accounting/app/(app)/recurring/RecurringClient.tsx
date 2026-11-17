@@ -676,7 +676,6 @@ export default function RecurringClient({
         <Form
           form={form}
           layout="vertical"
-          requiredMark={false}
           onFinish={(values) => void submitTemplate(values)}
         >
           <Row gutter={16}>

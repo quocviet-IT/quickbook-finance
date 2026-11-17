@@ -28,6 +28,7 @@ import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import FilterBar from "@/components/ui/FilterBar";
 import TableEmpty from "@/components/ui/TableEmpty";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -169,7 +170,8 @@ export default function SalesTaxClient(props: Props) {
   }
 
   async function submitTaxCode() {
-    const v = await tcForm.validateFields();
+    const v = await validateOrFocus(tcForm);
+    if (!v) return;
     const payload = {
       code: v.code, name: v.name, rate_percent: Number(v.rate_percent),
       direction: v.direction, tax_account_id: v.tax_account_id ?? null, is_active: v.is_active ?? true,

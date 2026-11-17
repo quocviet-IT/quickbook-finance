@@ -9,6 +9,7 @@ import { USD_CURRENCY_CODE } from "@/lib/domain/currency";
 import { formatDate, formatMoney, plural } from "@/lib/format";
 import type { RulePreview } from "@/lib/services/coding";
 import { previewBankRuleAction, saveBankRuleAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface RuleFormValues {
   matchKind: "words" | "regex";
@@ -117,7 +118,8 @@ export default function RuleFormModal({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await saveBankRuleAction(ruleId, toRuleInput({ ...EMPTY_RULE, ...values }));
     setSaving(false);
@@ -142,7 +144,7 @@ export default function RuleFormModal({
       destroyOnHidden
       width={620}
     >
-      <Form form={form} layout="vertical" requiredMark={false} initialValues={initial}>
+      <Form form={form} layout="vertical" initialValues={initial}>
         <Form.Item label="Looks for" required>
           <Space.Compact style={{ width: "100%" }}>
             <Form.Item

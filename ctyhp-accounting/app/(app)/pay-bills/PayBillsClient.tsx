@@ -30,6 +30,7 @@ import TableEmpty from "@/components/ui/TableEmpty";
 import { clientTablePagination, pageSizeOptionsFor } from "@/components/ui/table-pagination";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -145,7 +146,8 @@ export default function PayBillsClient({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const allocations = openBills
       .map((b) => ({
         bill_id: b.id,

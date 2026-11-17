@@ -7,6 +7,7 @@ import { seedDigits, seedWords, type InterestMethod, type RepaymentKind } from "
 import type { RepaymentStats } from "@/lib/services/repayments";
 import { previewRepaymentAction, saveRepaymentAction } from "./actions";
 import styles from "./repayments.module.css";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface RepaymentFormValues {
   accountId: string | null;
@@ -132,7 +133,8 @@ export default function RepaymentFormModal({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await saveRepaymentAction(repaymentId, toRepaymentInput(kind, { ...EMPTY_REPAYMENT, ...values }));
     setSaving(false);
@@ -156,7 +158,7 @@ export default function RepaymentFormModal({
       destroyOnHidden
       width={620}
     >
-      <Form form={form} layout="vertical" requiredMark={false} initialValues={initial} onValuesChange={onValuesChange}>
+      <Form form={form} layout="vertical" initialValues={initial} onValuesChange={onValuesChange}>
         <Form.Item
           name="accountId"
           label={kind === "card" ? "Card account" : "Loan account"}

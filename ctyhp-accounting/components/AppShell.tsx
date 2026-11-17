@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import IntentLink from "./IntentLink";
 import { usePathname, useRouter } from "next/navigation";
@@ -94,6 +94,28 @@ function storeValue(key: string, value: string): void {
   } catch {
     // Private browsing or a restrictive policy may disable storage.
   }
+}
+
+/**
+ * Keep --app-header-height equal to the app header's height, so a sticky table
+ * header stops just under it (globals.css, `.ant-table-sticky-holder`). The
+ * header is 56px on a computer and wraps to two rows on a phone, and its height
+ * changes with the window, so it is measured rather than written down.
+ */
+function useHeaderHeightVariable(): void {
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>(".app-shell__header");
+    if (!header || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const write = () => root.style.setProperty("--app-header-height", `${Math.round(header.getBoundingClientRect().height)}px`);
+    write();
+    const observer = new ResizeObserver(write);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--app-header-height");
+    };
+  }, []);
 }
 
 function useStoredValue(key: string, serverValue = ""): string {
@@ -291,6 +313,7 @@ export default function AppShell({
   const collapsed =
     useStoredValue(SIDEBAR_COLLAPSED_STORAGE_KEY, "false") === "true";
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  useHeaderHeightVariable();
 
   const visibleNavigation = useMemo(
     () => navigationForAccess({ role, permissionKeys }),

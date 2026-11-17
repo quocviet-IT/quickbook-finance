@@ -27,6 +27,7 @@ import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import StatusTag from "@/components/ui/StatusTag";
 import { humanizeStatus, statusLabel } from "@/lib/domain/status-label";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 // humanizeStatus would spell the LLC classification "Llc".
 const classificationLabel = (c: string) => (c === "llc" ? "LLC" : humanizeStatus(c));
@@ -109,7 +110,8 @@ function VendorTaxDrawerBody({ vendor, boxes, canManage, onClose }: Props & { ve
   }, [vendor.id, form, message]);
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setSaving(true);
     const res = await saveVendorTaxProfileAction(vendor.id, {
       w9_status: v.w9_status,

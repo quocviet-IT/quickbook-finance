@@ -214,16 +214,26 @@ export async function buildReportPdf(
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(11);
   doc.text(sheet.companyName, 40, 42);
+  // How to reach the company, under its name (a customer statement, 3.0.45).
+  // Everything below moves down by the lines it takes.
+  let shift = 0;
+  if (sheet.companyLines?.length) {
+    doc.setTextColor(71, 85, 105);
+    doc.setFontSize(9);
+    const lines: string[] = doc.splitTextToSize(sheet.companyLines.join(" · "), doc.internal.pageSize.getWidth() - 80);
+    doc.text(lines, 40, 55);
+    shift = lines.length * 11 + 2;
+  }
   doc.setTextColor(15, 118, 110);
   doc.setFontSize(18);
-  doc.text(sheet.title, 40, 66);
+  doc.text(sheet.title, 40, 66 + shift);
   doc.setTextColor(71, 85, 105);
   doc.setFontSize(9);
-  doc.text(sheet.subtitle, 40, 84);
-  doc.text(`Currency: ${sheet.currencyCode}`, 40, 98);
+  doc.text(sheet.subtitle, 40, 84 + shift);
+  doc.text(`Currency: ${sheet.currencyCode}`, 40, 98 + shift);
 
   autoTable(doc, {
-    startY: 112,
+    startY: 112 + shift,
     head: [sheet.columns.map((column) => column.header)],
     body: sheet.rows.map((row) =>
       sheet.columns.map((column) =>

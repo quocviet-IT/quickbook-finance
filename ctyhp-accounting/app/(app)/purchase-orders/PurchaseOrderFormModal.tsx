@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/format";
 import { useCompanyClock } from "@/components/CompanyClock";
 import NewVendorButton from "@/components/NewVendorButton";
 import { savePurchaseOrderAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface LineForm {
   item_id?: string | null;
@@ -105,7 +106,8 @@ function PurchaseOrderFormModalBody({
   );
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await savePurchaseOrderAction(order?.id ?? null, {
       vendor_id: values.vendor_id,

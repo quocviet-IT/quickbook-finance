@@ -20,6 +20,7 @@ import {
 } from "@/lib/domain/inventory-review";
 import { inventoryReviewAction, writeDownInventoryAction } from "./actions";
 import { tokenVar } from "@/lib/design/tokens";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 const VERDICT_COLOR: Record<StockVerdict, string> = {
   above_nrv: "red",
@@ -109,7 +110,8 @@ export default function InventoryReviewClient({
 
   async function submitWriteDown() {
     if (!writeDownFor) return;
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const res = await writeDownInventoryAction({
       itemId: writeDownFor.itemId,
       date: asOf,
@@ -332,7 +334,7 @@ export default function InventoryReviewClient({
                 </>
               }
             />
-            <Form form={form} layout="vertical" requiredMark={false}>
+            <Form form={form} layout="vertical">
               <Form.Item
                 name="nrv"
                 label={`Net realizable value (${baseCurrency})`}

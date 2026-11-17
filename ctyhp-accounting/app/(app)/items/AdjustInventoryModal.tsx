@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import { useCompanyClock } from "@/components/CompanyClock";
 import type { AccountRow, ItemRow } from "@/lib/db/types";
 import { adjustInventoryAction } from "./inventory-actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface Props {
   open: boolean;
@@ -39,7 +40,8 @@ function AdjustInventoryModalBody({
   const qtyDelta = Form.useWatch("qty_delta", form) as number | undefined;
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setSaving(true);
     const res = await adjustInventoryAction({
       item_id: item.id,

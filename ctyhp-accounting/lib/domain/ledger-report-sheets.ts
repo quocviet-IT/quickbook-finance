@@ -21,6 +21,8 @@ interface SheetContext {
   companyName: string;
   currencyCode: string;
   baseDecimals: number;
+  /** How to reach the company; a customer statement prints it under the name (3.0.45). */
+  companyLines?: readonly string[];
 }
 
 /** Customer Statement or Vendor Statement: opening balance, each document, closing balance. */
@@ -36,9 +38,13 @@ export function partyStatementSheet(
   const money = (minor: number) => fromMinor(minor, ctx.baseDecimals);
   const customer = kind === "customer";
   const howToPay = statementPayNote(kind, report.closingMinor, payNote);
+  // A customer statement is sent to the customer, so it says how to reach the
+  // company. A vendor statement is the company's own working paper.
+  const companyLines = customer && ctx.companyLines?.length ? [...ctx.companyLines] : null;
   return {
     fileName: sanitizeExportFileName(`${customer ? "customer" : "vendor"}-statement-${partyName}-${when.to}`),
     companyName: ctx.companyName,
+    ...(companyLines ? { companyLines } : {}),
     title: customer ? "Customer Statement" : "Vendor Statement",
     subtitle: `${partyName} · ${formatDateRange(when.from, when.to)}`,
     currencyCode: ctx.currencyCode,

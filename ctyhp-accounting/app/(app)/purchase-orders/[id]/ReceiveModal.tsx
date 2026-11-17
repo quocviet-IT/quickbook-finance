@@ -9,6 +9,7 @@ import { receivePurchaseOrderAction } from "../actions";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /** The dialog's width; its body, where the lines sit, is 48px less. */
 export const RECEIVE_MODAL_WIDTH = 720;
@@ -56,7 +57,8 @@ function ReceiveModalBody({ onClose, onDone, purchaseOrderId, lines }: Props) {
   );
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const payload = Object.entries(quantities)
       .filter(([, qty]) => qty > 0)
       .map(([id, qty]) => ({ purchase_order_line_id: id, quantity: qty }));

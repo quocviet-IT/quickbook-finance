@@ -357,7 +357,7 @@ export function CashFlowBridgeChart({
         <div className={cash.netChangeMinor < 0 ? "amount-negative" : "amount-positive"}>
           <span aria-hidden="true">→</span>
           <Typography.Text strong>{formatMoney(cash.netChangeMinor)}</Typography.Text>
-          <small>net change</small>
+          <small>Net change</small>
         </div>
         <div>
           <Typography.Text type="secondary">Closing cash</Typography.Text>

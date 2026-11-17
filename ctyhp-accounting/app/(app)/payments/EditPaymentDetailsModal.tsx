@@ -4,6 +4,7 @@ import { App, Form, Input, Modal, Select, Typography } from "antd";
 import type { PaymentRow } from "@/lib/db/types";
 import { humanizeStatus } from "@/lib/domain/status-label";
 import { updatePaymentDetailsAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface EditPaymentDetailsModalProps {
   payment: (PaymentRow & { customer_name: string }) | null;
@@ -31,7 +32,8 @@ export default function EditPaymentDetailsModal({
 
   async function submit() {
     if (!payment) return;
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     try {
       const result = await updatePaymentDetailsAction({ payment_id: payment.id, ...values });
@@ -68,7 +70,6 @@ export default function EditPaymentDetailsModal({
           <Form
             form={form}
             layout="vertical"
-            requiredMark={false}
             initialValues={{
               method: payment.method ?? undefined,
               reference: payment.reference ?? undefined,
