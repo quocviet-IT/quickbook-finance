@@ -171,6 +171,17 @@ export interface HomeProfit {
   periods: Record<HomePeriodKey, HomePeriod | null>;
 }
 
+/** How far ahead the Invoices and Bills cards look for what falls due, in days (3.0.41). */
+export type HomeDueDays = 7 | 30;
+
+/** What falls due within a window from asOf, and what is due after it. */
+export interface HomeDueWindow {
+  dueMinor: number;
+  dueDocuments: number;
+  laterMinor: number;
+  laterDocuments: number;
+}
+
 export interface HomeOpenSide {
   /** What the aging report totals: credits and unapplied payments net it. */
   totalMinor: number;
@@ -181,8 +192,15 @@ export interface HomeOpenSide {
   /** Due from asOf through asOf + 7 days. */
   dueSoonMinor: number;
   dueSoonDocuments: number;
+  /** Due after asOf + 7 days. */
   laterMinor: number;
   laterDocuments: number;
+  /**
+   * Due from asOf through asOf + 30 days, and after that (3.0.41). Overdue and
+   * the credits are the same for both windows, so overdue + due + later +
+   * credits is totalMinor here too.
+   */
+  within30: HomeDueWindow;
   /** The negative rows (credits, unapplied payments) as a negative number; 0 when none. */
   creditsMinor: number;
   /** The aging report's buckets; they sum to totalMinor. */

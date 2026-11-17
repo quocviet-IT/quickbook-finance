@@ -7,6 +7,9 @@ import {
   CASH_MONTH_OPTIONS,
   cashMonthsLabel,
   daysLate,
+  DUE_OPTIONS,
+  dueLabel,
+  dueWindowOf,
   earlierOpenSentence,
   formatChange,
   homeTabHref,
@@ -95,6 +98,29 @@ describe("the period a card shows", () => {
     ]);
     expect(cashMonthsLabel(6)).toBe("Last 6 months");
     expect(cashMonthsLabel(12)).toBe("Last 12 months");
+  });
+
+  it("offers Invoices and Bills what falls due in 7 or 30 days, and reads the matching fields", () => {
+    expect(DUE_OPTIONS).toEqual([
+      { value: 7, label: "Due in 7 days" },
+      { value: 30, label: "Due in 30 days" },
+    ]);
+    for (const option of DUE_OPTIONS) expect(dueLabel(option.value)).toBe(option.label);
+    const side = {
+      totalMinor: 20_000_00,
+      documents: 4,
+      overdueMinor: 12_550_00,
+      overdueDocuments: 2,
+      dueSoonMinor: 3_000_00,
+      dueSoonDocuments: 1,
+      laterMinor: 4_700_00,
+      laterDocuments: 1,
+      within30: { dueMinor: 7_700_00, dueDocuments: 2, laterMinor: 0, laterDocuments: 0 },
+      creditsMinor: -250_00,
+      buckets: { current: 7_700_00, d1_30: 0, d31_60: 5_150_00, d61_90: 7_400_00, d90_plus: -250_00 },
+    };
+    expect(dueWindowOf(side, 7)).toEqual({ dueMinor: 3_000_00, dueDocuments: 1, laterMinor: 4_700_00, laterDocuments: 1 });
+    expect(dueWindowOf(side, 30)).toEqual(side.within30);
   });
 
   it("offers the forecast 30, 60 or 90 days ahead, and opens its sentence with the same words", () => {

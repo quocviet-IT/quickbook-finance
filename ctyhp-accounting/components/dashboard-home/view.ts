@@ -10,9 +10,12 @@ import { longMonthName, monthYearLabel } from "@/lib/domain/dashboard-home/range
 import type {
   HomeBank,
   HomeBankAccount,
+  HomeDueDays,
+  HomeDueWindow,
   HomeFigures,
   HomeHorizon,
   HomeMonth,
+  HomeOpenSide,
   HomePeriodKey,
   HomeStatus,
   HomeTab,
@@ -213,6 +216,23 @@ export function netIncomeLabel(months: readonly HomeMonth[]): string {
 }
 
 /* ---------------------------------------------------- invoices and bills */
+
+/** How far ahead the Invoices and Bills cards look for what falls due (3.0.41). */
+export const DUE_OPTIONS: readonly { value: HomeDueDays; label: string }[] = [
+  { value: 7, label: "Due in 7 days" },
+  { value: 30, label: "Due in 30 days" },
+];
+
+/** "Due in 30 days": the middle figure's name on the Invoices and Bills cards. */
+export function dueLabel(days: HomeDueDays): string {
+  return `Due in ${days} days`;
+}
+
+/** What falls due within the chosen window, and after it: the 7-day fields, or `within30`. */
+export function dueWindowOf(side: HomeOpenSide, days: HomeDueDays): HomeDueWindow {
+  if (days === 30) return side.within30;
+  return { dueMinor: side.dueSoonMinor, dueDocuments: side.dueSoonDocuments, laterMinor: side.laterMinor, laterDocuments: side.laterDocuments };
+}
 
 /** "97 days late", "1 day late". */
 export function daysLate(days: number): string {

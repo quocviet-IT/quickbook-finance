@@ -1,7 +1,7 @@
 /**
  * What customers owe and what the company owes, split the way the Dashboard
- * speaks about it: overdue, due within a week, due later, and the credits that
- * net the total.
+ * speaks about it: overdue, due within a week (or within 30 days), due later,
+ * and the credits that net the total.
  *
  * Pure: the aging report's rows in (`getArAging` / `getApAging`), already in
  * base currency at today's rate. Credits and unapplied payments arrive as
@@ -12,10 +12,12 @@
 import { bucketOf } from "@/lib/domain/aging";
 import { addIsoDays, calendarDayDifference } from "@/lib/domain/work-queue";
 import type { AgingReportRow } from "@/lib/services/aging";
-import type { HomeHorizon, HomeNextBill, HomeOpenSide, HomeOwesLongest, HomeProjection } from "./types";
+import type { HomeDueWindow, HomeHorizon, HomeNextBill, HomeOpenSide, HomeOwesLongest, HomeProjection } from "./types";
 
 /** "Due soon" runs from asOf through this many days later, as the bills queue's `through` does. */
 export const DUE_SOON_DAYS = 7;
+/** The wider due window the Invoices and Bills cards offer (3.0.41). */
+export const DUE_WIDE_DAYS = 30;
 /** The cash projection's horizon when none is named. */
 export const PROJECTION_DAYS = 30;
 /** The horizons the Cash flow card offers (3.0.41). */
@@ -34,50 +36,92 @@ function bucketKeyOf(row: OpenItemRow, asOf: string): BucketKey {
   return key as BucketKey;
 }
 
+/** One side split by due date at one window: what `splitByHorizon` returns. */
+export interface HorizonSplit extends HomeDueWindow {
+  totalMinor: number;
+  documents: number;
+  overdueMinor: number;
+  overdueDocuments: number;
+  creditsMinor: number;
+}
+
 /**
- * One side of the books, split by due date.
+ * One side of the books split by due date at a window of `days` (3.0.41).
  *
- * Overdue is due before asOf; due soon is due from asOf through asOf + 7 days;
+ * Overdue is due before asOf; due is due from asOf through asOf + `days`;
  * later is after that. Negative rows go to `creditsMinor` whatever their date.
  * Only rows of `documentType` count as documents. `totalMinor` is the sum of
  * every row, which is what the aging report totals, and it always equals
- * overdue + due soon + later + credits.
+ * overdue + due + later + credits, whatever the window.
  */
-export function splitOpenSide(rows: readonly OpenItemRow[], asOf: string, documentType: "invoice" | "bill"): HomeOpenSide {
-  const soonThrough = addIsoDays(asOf, DUE_SOON_DAYS);
-  const side: HomeOpenSide = {
+export function splitByHorizon(
+  rows: readonly OpenItemRow[],
+  asOf: string,
+  documentType: "invoice" | "bill",
+  days: number,
+): HorizonSplit {
+  const through = addIsoDays(asOf, days);
+  const split: HorizonSplit = {
     totalMinor: 0,
     documents: 0,
     overdueMinor: 0,
     overdueDocuments: 0,
-    dueSoonMinor: 0,
-    dueSoonDocuments: 0,
+    dueMinor: 0,
+    dueDocuments: 0,
     laterMinor: 0,
     laterDocuments: 0,
     creditsMinor: 0,
-    buckets: { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0 },
   };
   for (const row of rows) {
-    side.totalMinor += row.balanceMinor;
-    side.buckets[bucketKeyOf(row, asOf)] += row.balanceMinor;
+    split.totalMinor += row.balanceMinor;
     if (row.balanceMinor < 0) {
-      side.creditsMinor += row.balanceMinor;
+      split.creditsMinor += row.balanceMinor;
       continue;
     }
     const document = row.docType === documentType ? 1 : 0;
-    side.documents += document;
+    split.documents += document;
     if (row.dueDate < asOf) {
-      side.overdueMinor += row.balanceMinor;
-      side.overdueDocuments += document;
-    } else if (row.dueDate <= soonThrough) {
-      side.dueSoonMinor += row.balanceMinor;
-      side.dueSoonDocuments += document;
+      split.overdueMinor += row.balanceMinor;
+      split.overdueDocuments += document;
+    } else if (row.dueDate <= through) {
+      split.dueMinor += row.balanceMinor;
+      split.dueDocuments += document;
     } else {
-      side.laterMinor += row.balanceMinor;
-      side.laterDocuments += document;
+      split.laterMinor += row.balanceMinor;
+      split.laterDocuments += document;
     }
   }
-  return side;
+  return split;
+}
+
+function dueWindow(split: HorizonSplit): HomeDueWindow {
+  return { dueMinor: split.dueMinor, dueDocuments: split.dueDocuments, laterMinor: split.laterMinor, laterDocuments: split.laterDocuments };
+}
+
+/**
+ * One side of the books, split by due date, the way the Invoices and Bills
+ * cards show it: overdue, due within 7 days ("due soon") and later, and the
+ * same within 30 days (3.0.41), with the aging report's buckets. Each window
+ * adds back to `totalMinor` with the overdue and the credits.
+ */
+export function splitOpenSide(rows: readonly OpenItemRow[], asOf: string, documentType: "invoice" | "bill"): HomeOpenSide {
+  const week = splitByHorizon(rows, asOf, documentType, DUE_SOON_DAYS);
+  const month = splitByHorizon(rows, asOf, documentType, DUE_WIDE_DAYS);
+  const buckets: HomeOpenSide["buckets"] = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0 };
+  for (const row of rows) buckets[bucketKeyOf(row, asOf)] += row.balanceMinor;
+  return {
+    totalMinor: week.totalMinor,
+    documents: week.documents,
+    overdueMinor: week.overdueMinor,
+    overdueDocuments: week.overdueDocuments,
+    dueSoonMinor: week.dueMinor,
+    dueSoonDocuments: week.dueDocuments,
+    laterMinor: week.laterMinor,
+    laterDocuments: week.laterDocuments,
+    within30: dueWindow(month),
+    creditsMinor: week.creditsMinor,
+    buckets,
+  };
 }
 
 export interface OverdueParty {

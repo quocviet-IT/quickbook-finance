@@ -366,6 +366,23 @@ describe("getDashboardHome", () => {
     expect([figures.payables.ledgerMinor, payables.ledgerMinor]).toEqual([12_000_00, 12_000_00]);
   });
 
+  it("carries what falls due in 30 days beside what falls due in 7 (3.0.41), each adding back to the aging total", async () => {
+    const { home } = await load();
+    const receivables = home.receivables.data!;
+    const payables = home.payables.data!;
+    // INV-3 (November 16) falls due within 30 days; INV-4 (December 20) after them.
+    expect(receivables.within30).toEqual({ dueMinor: 3_000_00, dueDocuments: 1, laterMinor: 4_700_00, laterDocuments: 1 });
+    // B-3 (December 5) moves from later into the 30 days.
+    expect(payables).toMatchObject({ dueSoonMinor: 2_750_00, dueSoonDocuments: 1, laterMinor: 6_450_00, laterDocuments: 1 });
+    expect(payables.within30).toEqual({ dueMinor: 9_200_00, dueDocuments: 2, laterMinor: 0, laterDocuments: 0 });
+    for (const side of [receivables, payables]) {
+      expect(side.overdueMinor + side.dueSoonMinor + side.laterMinor + side.creditsMinor).toBe(side.totalMinor);
+      expect(side.overdueMinor + side.within30.dueMinor + side.within30.laterMinor + side.creditsMinor).toBe(side.totalMinor);
+    }
+    // The figures band stays at 7 days.
+    expect(home.figures.data!.payables).toMatchObject({ dueSoonMinor: 2_750_00, dueSoonBills: 1 });
+  });
+
   it("sums only base-currency payments and counts the others apart", async () => {
     const { home } = await load();
     expect(home.receivables.data!.receivedLast30).toEqual({ baseMinor: 4_000_00, count: 2, otherCurrencyCount: 1 });
