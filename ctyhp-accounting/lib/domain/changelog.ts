@@ -48,6 +48,34 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.44",
+    date: "2026-11-17",
+    headline: "Bills opens with what is overdue, says how late each is, and keeps every row to one line.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Overdue bills come first",
+        detail:
+          "Bills used to open in the order they were read, so the bill longest past due could be anywhere in the list. It now opens as Invoices does: overdue bills (the oldest due date first), then those due within a week, then drafts waiting to be posted, then the rest, newest first. Clicking a column heading sorts by that column.",
+        route: "/bills",
+      },
+      {
+        kind: "changed",
+        title: "The status says how late, and every row is one line",
+        detail:
+          "An overdue bill's status reads \"200 days late\" and one due within a week reads \"Due in 5 days\" or \"Due today\"; others show their own status. The vendor's reference now follows the vendor's name on the same line, and the journal entry the bill posted is in the row's menu, so each row is one line.",
+        route: "/bills",
+      },
+      {
+        kind: "changed",
+        title: "Status tabs with counts",
+        detail:
+          "The status filter is now a row of tabs that show how many bills each holds: All, Overdue, Draft, Open, Partially paid, Paid and Void.",
+        route: "/bills",
+      },
+    ],
+  },
+  {
     version: "3.0.43",
     date: "2026-11-17",
     headline: "Undo import is no longer blocked by a match Banking only suggested.",
