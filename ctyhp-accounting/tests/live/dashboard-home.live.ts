@@ -3,30 +3,39 @@
  *
  * For every company the smoke user belongs to, at the company's today:
  *  (a) every section of the Dashboard can be read;
- *  (b) Cash on hand, today and at each month end on the chart, equals the bank
- *      accounts' balance on the balance sheet at that date, read here straight
- *      from `getLedgerBalances`;
- *  (c) net income, each month on the charts and each of the four periods
+ *  (b) Cash on hand, today and at each of the twelve month ends Cash flow
+ *      returns (3.0.41; the figures band's six are the last of them), equals
+ *      the bank accounts' balance on the balance sheet at that date, read here
+ *      straight from `getLedgerBalances`;
+ *  (c) net income, each month on the charts and each of the seven periods
  *      (with the period it is compared with) equal the Profit and Loss over
- *      the same dates;
+ *      the same dates; a period the service could not read is a failure;
  *  (d) Owed to you and You owe equal the A/R and A/P Aging totals, bucket by
- *      bucket, the overdue, due soon, later and credits add back to them, and
- *      the ledger balance said beside each is the report's control account;
+ *      bucket, the overdue, due soon, later and credits add back to them (at
+ *      7 days and at 30), and the ledger balance said beside each is the
+ *      report's control account;
  *  (e) the Bank accounts rows add up to Cash on hand;
  *  (f) the account watchlist (3.0.39), given up to 10 accounts whose Chart of
  *      Accounts figure is not zero: each Balance equals that figure
  *      (`getChartBalances`), and This month and Last month equal the
  *      account's natural activity from `getLedgerBalances` over the month to
  *      date and the whole previous month;
- *  (g) Cash flow's money in and money out (3.0.40): each month, money in
- *      minus money out is the change in cash on hand, the first month's from
- *      the bank-type balance at the end of the month before; and an
+ *  (g) Cash flow's money in and money out (3.0.40), over all twelve months
+ *      (3.0.41): each month, money in minus money out is the change in cash
+ *      on hand, the first month's from the bank-type balance at the end of the
+ *      month before; and an
  *      independent recount of the transfers between the company's own bank
  *      accounts, from the posted journal lines on bank-type accounts (per
  *      entry, the smaller of its bank debits and bank credits), taken off the
  *      gross bank debits and credits, gives money in and money out exactly.
  *      The gross from the lines is also checked against the ledger, so a
- *      line the recount missed cannot agree by accident.
+ *      line the recount missed cannot agree by accident;
+ *  (h) the forecast 30, 60 and 90 days ahead (3.0.41): at each horizon, the
+ *      invoices and bills due are the A/R and A/P Aging rows of type invoice
+ *      and bill, positive, due from asOf through asOf + the horizon, and the
+ *      projection is cash today plus one less the other; none is made while
+ *      the books are behind. The same holds for what Invoices and Bills say
+ *      falls due in 7 and in 30 days.
  * Counts and agree/disagree are logged; names and amounts never are.
  * Nothing is written: every call is a select or a read-only RPC.
  *
@@ -42,7 +51,8 @@ import { naturalBalanceMinor } from "@/lib/domain/chart-groups";
 import { totalExpenses } from "@/lib/domain/dashboard-home/expenses";
 import { homeMonthRanges, homePeriodRanges } from "@/lib/domain/dashboard-home/ranges";
 import { hasActivity } from "@/lib/domain/dashboard-home/series";
-import type { HomeOpenSide, HomePeriodFigures, HomePeriodKey } from "@/lib/domain/dashboard-home/types";
+import type { HomeDueDays, HomeHorizon, HomeOpenSide, HomePeriodFigures, HomePeriodKey } from "@/lib/domain/dashboard-home/types";
+import type { AgingReportRow } from "@/lib/services/aging";
 import { buildProfitAndLoss, type LedgerBalance } from "@/lib/domain/reports";
 import { addIsoDays } from "@/lib/domain/work-queue";
 import { listAccounts } from "@/lib/services/accounts";
@@ -50,7 +60,7 @@ import { getApAging, getArAging, type AgingReport } from "@/lib/services/aging";
 import { getChartBalances, type ChartBalances } from "@/lib/services/chart-balances";
 import { getCurrentCompanySettings } from "@/lib/services/company";
 import { todayInTimeZone } from "@/lib/services/dashboard";
-import { getDashboardHome, HOME_MONTHS, type DashboardHome } from "@/lib/services/dashboard-home";
+import { CASH_MONTHS, getDashboardHome, HOME_MONTHS, type DashboardHome } from "@/lib/services/dashboard-home";
 import { readAllPages } from "@/lib/services/paging";
 import { listCurrencies } from "@/lib/services/reference";
 import { getLedgerBalances } from "@/lib/services/reports";
@@ -68,7 +78,9 @@ interface Company {
 }
 
 const companies: Company[] = [];
-const PERIODS: readonly HomePeriodKey[] = ["month", "lastMonth", "quarter", "year"];
+const PERIODS: readonly HomePeriodKey[] = ["month", "lastMonth", "last3", "quarter", "year", "last12", "lastYear"];
+const HORIZONS: readonly HomeHorizon[] = [30, 60, 90];
+const DUE_WINDOWS: readonly HomeDueDays[] = [7, 30];
 
 beforeAll(async () => {
   const s = await smokeSession();
@@ -190,13 +202,15 @@ describe("the Dashboard's figures on every company's books", () => {
     for (const c of companies) {
       const { figures, cash, bank } = c.home;
       if (!figures.data || !cash.data) throw new Error(`${c.name}: figures or cash unavailable`);
-      const months = homeMonthRanges(c.today, HOME_MONTHS);
+      // Cash flow's twelve month ends; the figures band shows the last six of them.
+      const months = homeMonthRanges(c.today, CASH_MONTHS);
       const sheets = await Promise.all(months.map((month) => getLedgerBalances(c.sb, null, month.to)));
       const expected = sheets.map(bankTotal);
-      let disagree = 0;
+      const bandFrom = CASH_MONTHS - HOME_MONTHS;
+      let disagree = cash.data.balanceMinor.length === CASH_MONTHS && figures.data.cash.series.length === HOME_MONTHS ? 0 : 1;
       expected.forEach((value, index) => {
         if (cash.data!.balanceMinor[index] !== value) disagree += 1;
-        if (figures.data!.cash.series[index] !== value) disagree += 1;
+        if (index >= bandFrom && figures.data!.cash.series[index - bandFrom] !== value) disagree += 1;
       });
       const today = expected[expected.length - 1];
       if (figures.data.cash.valueMinor !== today) disagree += 1;
@@ -262,6 +276,7 @@ describe("the Dashboard's figures on every company's books", () => {
       let disagree = 0;
       if (side.totalMinor !== report.total) disagree += 1;
       if (side.overdueMinor + side.dueSoonMinor + side.laterMinor + side.creditsMinor !== side.totalMinor) disagree += 1;
+      if (side.overdueMinor + side.within30.dueMinor + side.within30.laterMinor + side.creditsMinor !== side.totalMinor) disagree += 1;
       for (const [bucket, amount] of Object.entries(side.buckets)) {
         if ((report.buckets[bucket] ?? 0) !== amount) disagree += 1;
       }
@@ -339,7 +354,8 @@ describe("the Dashboard's figures on every company's books", () => {
     for (const c of companies) {
       const cash = c.home.cash.data;
       if (!cash) throw new Error(`${c.name}: cash flow unavailable`);
-      const months = homeMonthRanges(c.today, HOME_MONTHS);
+      const months = homeMonthRanges(c.today, CASH_MONTHS);
+      if (cash.months.length !== CASH_MONTHS) throw new Error(`${c.name}: cash flow has ${cash.months.length} months, not ${CASH_MONTHS}`);
       const [opening, monthly, recount] = await Promise.all([
         getLedgerBalances(c.sb, null, addIsoDays(months[0].from, -1)),
         Promise.all(months.map((month) => getLedgerBalances(c.sb, month.from, month.to))),
@@ -370,6 +386,63 @@ describe("the Dashboard's figures on every company's books", () => {
           (disagree === 0 ? "all agree" : `${flowDisagree} flow, ${recountDisagree} recount, ${grossDisagree} gross DISAGREE`),
       );
       expect(cash.transfersExcluded, c.name).toBe(true);
+      expect(disagree, c.name).toBe(0);
+    }
+  });
+
+  it("the forecast at 30, 60 and 90 days, and what Invoices and Bills say falls due, are the aging rows due in each window", async () => {
+    /** The positive rows of one document type due from asOf through `through`: their sum and how many. */
+    const dueIn = (rows: readonly AgingReportRow[], docType: string, from: string, through: string) => {
+      const due = rows.filter((row) => row.docType === docType && row.balanceMinor > 0 && from <= row.dueDate && row.dueDate <= through);
+      return { minor: due.reduce((sum, row) => sum + row.balanceMinor, 0), count: due.length };
+    };
+    for (const c of companies) {
+      const { cash, receivables, payables, status } = c.home;
+      if (!cash.data || !receivables.data || !payables.data || !status.data) throw new Error(`${c.name}: cash flow, open items or status unavailable`);
+      const [ar, ap] = await Promise.all([
+        getArAging(c.sb, c.today, { reconcileAsOf: c.today }),
+        getApAging(c.sb, c.today, { reconcileAsOf: c.today }),
+      ]);
+      let checked = 0;
+      let disagree = 0;
+
+      // The forecast: none while the books are behind, every horizon otherwise.
+      const projections = cash.data.projections;
+      if (status.data.behind) {
+        if (projections !== null) disagree += 1;
+      } else if (!projections) {
+        disagree += 1;
+      } else {
+        const cashToday = cash.data.balanceMinor[cash.data.balanceMinor.length - 1];
+        for (const days of HORIZONS) {
+          const projection = projections[days];
+          const through = addIsoDays(c.today, days);
+          const invoices = dueIn(ar.rows, "invoice", c.today, through).minor;
+          const bills = dueIn(ap.rows, "bill", c.today, through).minor;
+          checked += 1;
+          if (projection.through !== through) disagree += 1;
+          if (projection.invoicesDueMinor !== invoices) disagree += 1;
+          if (projection.billsDueMinor !== bills) disagree += 1;
+          if (projection.projectedMinor !== cashToday + invoices - bills) disagree += 1;
+        }
+      }
+
+      // What Invoices and Bills say falls due in 7 and in 30 days.
+      for (const days of DUE_WINDOWS) {
+        const through = addIsoDays(c.today, days);
+        for (const [side, rows, docType] of [
+          [receivables.data, ar.rows, "invoice"],
+          [payables.data, ap.rows, "bill"],
+        ] as const) {
+          const due = dueIn(rows, docType, c.today, through);
+          const shown = days === 30 ? side.within30 : { dueMinor: side.dueSoonMinor, dueDocuments: side.dueSoonDocuments };
+          checked += 1;
+          if (shown.dueMinor !== due.minor) disagree += 1;
+          if (shown.dueDocuments !== due.count) disagree += 1;
+        }
+      }
+      const forecast = status.data.behind ? "no forecast (books behind)" : `${HORIZONS.length} horizons`;
+      console.log(`${c.name}: ${forecast}, ${checked} windows checked, ${disagree === 0 ? "all agree" : `${disagree} DISAGREE`}`);
       expect(disagree, c.name).toBe(0);
     }
   });
