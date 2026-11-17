@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.41",
+    date: "2026-11-17",
+    headline: "More periods on the dashboard, a year of cash flow, and a forecast up to 90 days ahead.",
+    changes: [
+      {
+        kind: "added",
+        title: "Profit and loss, Expenses and Sales can show the last 3 months, the last 12 months or last year",
+        detail:
+          "The period list on each of these cards now also offers Last 3 months, Last 12 months and Last year. They are whole months, so the month in progress is never part of them, and each is compared with the same length of time just before it; Last year is your previous fiscal year. The figures are the Profit and Loss report's over the same dates. The bars under Profit and loss and Sales still show the last six months.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "Cash flow can show the last 12 months",
+        detail:
+          "Choose Last 6 months or Last 12 months at the top of the Cash flow card. The chart draws cash at each month end and money in and out for every month chosen; when twelve months do not fit across, every other month is named, and pointing at a month still shows its figures.",
+        route: "/dashboard",
+      },
+      {
+        kind: "added",
+        title: "The cash forecast looks 30, 60 or 90 days ahead, and Invoices and Bills show what falls due in 7 or 30 days",
+        detail:
+          "Beside the forecast on Cash flow, choose Next 30 days, Next 60 days or Next 90 days: cash today, plus the invoices and less the bills due by then, gives the projected cash, and the dashed point on the chart moves with it. On Invoices and Bills, choose Due in 7 days or Due in 30 days to see what falls due in that time and what comes after it. The figure above the tabs and Needs attention still speak of the next 7 days.",
+        route: "/dashboard",
+      },
+      {
+        kind: "changed",
+        title: "Each card keeps your choice of period",
+        detail:
+          "The period, months, forecast or due window you choose on a card is kept for you in this company, and the dashboard opens with it next time. Other people keep their own. Expenses has one choice for Overview and Money out.",
+        route: "/dashboard",
+      },
+    ],
+  },
+  {
     version: "3.0.40",
     date: "2026-11-16",
     headline: "Money in and money out leave out transfers between your own bank accounts, and the dashboard loads in the shape you arranged.",
