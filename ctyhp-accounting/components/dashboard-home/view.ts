@@ -10,8 +10,12 @@ import { longMonthName, monthYearLabel } from "@/lib/domain/dashboard-home/range
 import type {
   HomeBank,
   HomeBankAccount,
+  HomeDueDays,
+  HomeDueWindow,
   HomeFigures,
+  HomeHorizon,
   HomeMonth,
+  HomeOpenSide,
   HomePeriodKey,
   HomeStatus,
   HomeTab,
@@ -48,9 +52,45 @@ export function homeTabHref(tab: HomeTab): string {
 export const PERIOD_OPTIONS: readonly { value: HomePeriodKey; label: string }[] = [
   { value: "month", label: "This month" },
   { value: "lastMonth", label: "Last month" },
+  { value: "last3", label: "Last 3 months" },
   { value: "quarter", label: "This quarter" },
   { value: "year", label: "This year" },
+  { value: "last12", label: "Last 12 months" },
+  { value: "lastYear", label: "Last year" },
 ];
+
+/** A period's name in the select: "Last 12 months". */
+export function periodLabel(key: HomePeriodKey): string {
+  return PERIOD_OPTIONS.find((option) => option.value === key)?.label ?? key;
+}
+
+/** What a card says when the period chosen could not be read: "Last year could not be read." */
+export function periodUnread(key: HomePeriodKey): string {
+  return `${periodLabel(key)} could not be read.`;
+}
+
+/** How many months Cash flow charts (3.0.41); the footer says the same words. */
+export const CASH_MONTH_OPTIONS: readonly { value: 6 | 12; label: string }[] = [
+  { value: 6, label: "Last 6 months" },
+  { value: 12, label: "Last 12 months" },
+];
+
+/** "Last 12 months": what Cash flow's footer says under the chart. */
+export function cashMonthsLabel(months: 6 | 12): string {
+  return CASH_MONTH_OPTIONS.find((option) => option.value === months)?.label ?? `Last ${months} months`;
+}
+
+/** How far ahead the cash forecast looks (3.0.41). */
+export const HORIZON_OPTIONS: readonly { value: HomeHorizon; label: string }[] = [
+  { value: 30, label: "Next 30 days" },
+  { value: 60, label: "Next 60 days" },
+  { value: 90, label: "Next 90 days" },
+];
+
+/** "Next 60 days": the words that open the forecast's sentence. */
+export function horizonLabel(days: HomeHorizon): string {
+  return `Next ${days} days`;
+}
 
 /** Change from a prior figure as a percentage of its size; null when there is nothing to compare with. */
 export function percentChange(current: number, prior: number | null | undefined): number | null {
@@ -176,6 +216,23 @@ export function netIncomeLabel(months: readonly HomeMonth[]): string {
 }
 
 /* ---------------------------------------------------- invoices and bills */
+
+/** How far ahead the Invoices and Bills cards look for what falls due (3.0.41). */
+export const DUE_OPTIONS: readonly { value: HomeDueDays; label: string }[] = [
+  { value: 7, label: "Due in 7 days" },
+  { value: 30, label: "Due in 30 days" },
+];
+
+/** "Due in 30 days": the middle figure's name on the Invoices and Bills cards. */
+export function dueLabel(days: HomeDueDays): string {
+  return `Due in ${days} days`;
+}
+
+/** What falls due within the chosen window, and after it: the 7-day fields, or `within30`. */
+export function dueWindowOf(side: HomeOpenSide, days: HomeDueDays): HomeDueWindow {
+  if (days === 30) return side.within30;
+  return { dueMinor: side.dueSoonMinor, dueDocuments: side.dueSoonDocuments, laterMinor: side.laterMinor, laterDocuments: side.laterDocuments };
+}
 
 /** "97 days late", "1 day late". */
 export function daysLate(days: number): string {

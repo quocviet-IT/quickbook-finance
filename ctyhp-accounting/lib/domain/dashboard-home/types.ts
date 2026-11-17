@@ -70,8 +70,11 @@ export interface HomeFigures {
   };
 }
 
+/** How far ahead the cash forecast looks, in days (3.0.41). */
+export type HomeHorizon = 30 | 60 | 90;
+
 export interface HomeProjection {
-  /** asOf + 30 days. */
+  /** asOf + the horizon's days: asOf + 30 for the next 30 days. */
   through: string;
   /** Open invoices due from asOf through `through`; credits and overdue invoices are not in it. */
   invoicesDueMinor: number;
@@ -86,6 +89,7 @@ export interface HomeProjection {
 }
 
 export interface HomeCash {
+  /** Twelve months, oldest first; the last is the month to date (3.0.41). The card shows the last 6 or all 12. */
   months: HomeMonth[];
   /** Month-end cash (bank-type accounts); the last is today's. */
   balanceMinor: number[];
@@ -100,11 +104,20 @@ export interface HomeCash {
    * Either way, money in minus money out is the month's change in cash.
    */
   transfersExcluded: boolean;
-  /** Null while the books are behind (status.behind). */
-  projection: HomeProjection | null;
+  /**
+   * The forecast 30, 60 and 90 days ahead, all from the same aging rows, so
+   * the card changes horizon without reading again. Null while the books are
+   * behind (status.behind).
+   */
+  projections: Record<HomeHorizon, HomeProjection> | null;
 }
 
-export type HomePeriodKey = "month" | "lastMonth" | "quarter" | "year";
+/**
+ * The periods a card can show (3.0.41 added the last three): this month to
+ * date, last month, the last three whole months, this quarter to date, this
+ * fiscal year to date, the last twelve whole months and the previous fiscal year.
+ */
+export type HomePeriodKey = "month" | "lastMonth" | "last3" | "quarter" | "year" | "last12" | "lastYear";
 
 export interface HomeExpenseLine {
   /** Null for "Everything else". */
@@ -125,11 +138,14 @@ export interface HomePeriodFigures {
 
 export interface HomePeriod extends HomePeriodFigures {
   key: HomePeriodKey;
-  /** "This month" | "Last month" | "This quarter" | "This year" */
+  /** "This month" | "Last month" | "Last 3 months" | "This quarter" | "This year" | "Last 12 months" | "Last year" */
   label: string;
   from: string;
   to: string;
-  /** "vs same days in Oct" | "vs Sep 2026" | "vs same days last quarter" | "vs same days last year" */
+  /**
+   * "vs same days in Oct" | "vs Sep 2026" | "vs May – Jul 2026" | "vs same days last quarter" |
+   * "vs same days last year" | "vs Nov 2024 – Oct 2025" | "vs 2024" or "vs FY Jul 2024 – Jun 2025"
+   */
   compareLabel: string;
   /** Gross profit over income, ×100; null when there is no income. */
   grossMarginPercent: number | null;
@@ -146,7 +162,24 @@ export interface HomeProfit {
   expenseMinor: number[];
   /** Income alone per month (income.total, without other income). */
   salesMinor: number[];
-  periods: Record<HomePeriodKey, HomePeriod>;
+  /**
+   * Every period a card offers, all read with the page. Only a period that
+   * needs a read of its own (last12's comparison, lastYear and its comparison)
+   * can go missing: lastYear is null when its read failed, and a comparison's
+   * failed read leaves that period's `prior` null. The others are never null.
+   */
+  periods: Record<HomePeriodKey, HomePeriod | null>;
+}
+
+/** How far ahead the Invoices and Bills cards look for what falls due, in days (3.0.41). */
+export type HomeDueDays = 7 | 30;
+
+/** What falls due within a window from asOf, and what is due after it. */
+export interface HomeDueWindow {
+  dueMinor: number;
+  dueDocuments: number;
+  laterMinor: number;
+  laterDocuments: number;
 }
 
 export interface HomeOpenSide {
@@ -159,8 +192,15 @@ export interface HomeOpenSide {
   /** Due from asOf through asOf + 7 days. */
   dueSoonMinor: number;
   dueSoonDocuments: number;
+  /** Due after asOf + 7 days. */
   laterMinor: number;
   laterDocuments: number;
+  /**
+   * Due from asOf through asOf + 30 days, and after that (3.0.41). Overdue and
+   * the credits are the same for both windows, so overdue + due + later +
+   * credits is totalMinor here too.
+   */
+  within30: HomeDueWindow;
   /** The negative rows (credits, unapplied payments) as a negative number; 0 when none. */
   creditsMinor: number;
   /** The aging report's buckets; they sum to totalMinor. */

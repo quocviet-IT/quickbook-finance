@@ -104,6 +104,11 @@ const STANDING = (id: string, book: number, closing: number | null, completed: s
 
 const LAST_LINE: Record<string, string> = { "b-checking": "2026-11-12", "b-savings": "2026-09-01", "b-card": "2026-11-10" };
 
+/** The ranges no month of the window holds: the year before the last twelve months, last year, and the year before it. */
+const LAST_12_PRIOR = { from: "2024-11-01", to: "2025-10-31" };
+const LAST_YEAR = { from: "2025-01-01", to: "2025-12-31" };
+const LAST_YEAR_PRIOR = { from: "2024-01-01", to: "2024-12-31" };
+
 function handlers(over: { rpc?: FakeHandlers["rpc"]; tables?: FakeHandlers["tables"] } = {}): FakeHandlers {
   const ledgerBalances = (args: Record<string, unknown>): Answer => {
     if (args.p_from === null && args.p_to === "2025-09-30") return { data: OPENING };
@@ -123,6 +128,12 @@ function handlers(over: { rpc?: FakeHandlers["rpc"]; tables?: FakeHandlers["tabl
     if (args.p_from === "2026-10-01" && args.p_to === "2026-10-13") return { data: ledger({ "4000": [0, 18_000_00], "5000": [7_000_00, 0], "6100": [9_000_00, 0] }) };
     if (args.p_from === "2026-07-01" && args.p_to === "2026-08-13") return { data: ledger({ "4000": [0, 70_000_00], "5000": [28_000_00, 0], "6100": [36_000_00, 0] }) };
     if (args.p_from === "2025-01-01" && args.p_to === "2025-11-13") return { data: ledger({}) };
+    // The periods of whole months that reach back past the window (3.0.41).
+    if (args.p_from === LAST_12_PRIOR.from && args.p_to === LAST_12_PRIOR.to) return { data: ledger({ "4000": [0, 300_000_00], "6100": [250_000_00, 0] }) };
+    if (args.p_from === LAST_YEAR.from && args.p_to === LAST_YEAR.to) {
+      return { data: ledger({ "4000": [0, 400_000_00], "5000": [150_000_00, 0], "6100": [200_000_00, 0] }) };
+    }
+    if (args.p_from === LAST_YEAR_PRIOR.from && args.p_to === LAST_YEAR_PRIOR.to) return { data: ledger({ "4000": [0, 320_000_00], "6100": [300_000_00, 0] }) };
     throw new Error(`unexpected ledger read ${JSON.stringify(args)}`);
   };
   return {
@@ -220,8 +231,12 @@ async function load(
 const SECTIONS = ["status", "figures", "cash", "profit", "receivables", "payables", "payments", "bank", "activity", "insights"] as const;
 const states = (home: DashboardHome) => Object.fromEntries(SECTIONS.map((key) => [key, home[key].dataState]));
 
-/** Cash at the end of May 2026, the month before the six on the chart: the opening's 80,500, nothing moved since. */
+/** Cash at the end of November 2025, the month before the twelve Cash flow returns: the opening's 80,500, nothing moved since. */
 const CASH_BEFORE_CHART = 80_500_00;
+/** December 2025 to May 2026, the first six of Cash flow's twelve months: no bank account moved. */
+const QUIET = [0, 0, 0, 0, 0, 0];
+/** Cash at each of those six month ends. */
+const QUIET_CASH = [80_500_00, 80_500_00, 80_500_00, 80_500_00, 80_500_00, 80_500_00];
 
 /** Each month's money in minus money out, beside its change in cash on hand. */
 function flowAgainstBalance(cash: NonNullable<DashboardHome["cash"]["data"]>): { flow: number[]; change: number[] } {
@@ -261,15 +276,19 @@ describe("getDashboardHome", () => {
     expect(bank.otherCash).toEqual({ accounts: 1, bookMinor: 500_00 });
     const listed = bank.accounts.filter((a) => !a.isCard).reduce((sum, a) => sum + a.bookMinor, 0);
     expect(listed + bank.otherCash!.bookMinor).toBe(bank.totalBookMinor);
-    expect(home.cash.data!.balanceMinor).toEqual(cash.series);
+    // Cash flow returns twelve months (3.0.41); its last six are the figure's series.
+    expect(home.cash.data!.balanceMinor).toEqual([...QUIET_CASH, ...cash.series]);
+    expect(home.cash.data!.months.map((m) => m.key)).toEqual([
+      "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11",
+    ]);
   });
 
   it("charts money in and out of the bank-type accounts, and says transfers between them are left out", async () => {
     const { home } = await load();
     // Nothing here moved between two bank accounts: money in and out are the bank debits and credits.
     expect(home.cash.data).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
       transfersExcluded: true,
     });
     const { flow, change } = flowAgainstBalance(home.cash.data!);
@@ -288,12 +307,12 @@ describe("getDashboardHome", () => {
     expect(home.cash.dataState).toBe("fresh");
     // October's bank debits are 53,000 and credits 49,000; the 5,000 transfer comes off both.
     expect(cash).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 15_000_00],
       transfersExcluded: true,
     });
     // Moving money between two bank accounts does not change cash on hand.
-    expect(cash.balanceMinor).toEqual([84_500_00, 88_500_00, 92_500_00, 96_500_00, 100_500_00, 103_500_00]);
+    expect(cash.balanceMinor).toEqual([...QUIET_CASH, 84_500_00, 88_500_00, 92_500_00, 96_500_00, 100_500_00, 103_500_00]);
     const { flow, change } = flowAgainstBalance(cash);
     expect(flow).toEqual(change);
   });
@@ -309,8 +328,8 @@ describe("getDashboardHome", () => {
     expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
     const cash = home.cash.data!;
     expect(cash).toMatchObject({
-      inMinor: [48_000_00, 48_000_00, 48_000_00, 48_000_00, 53_000_00, 18_000_00],
-      outMinor: [44_000_00, 44_000_00, 44_000_00, 44_000_00, 49_000_00, 15_000_00],
+      inMinor: [...QUIET, 48_000_00, 48_000_00, 48_000_00, 48_000_00, 53_000_00, 18_000_00],
+      outMinor: [...QUIET, 44_000_00, 44_000_00, 44_000_00, 44_000_00, 49_000_00, 15_000_00],
       transfersExcluded: false,
     });
     const { flow, change } = flowAgainstBalance(cash);
@@ -347,6 +366,23 @@ describe("getDashboardHome", () => {
     expect([figures.payables.ledgerMinor, payables.ledgerMinor]).toEqual([12_000_00, 12_000_00]);
   });
 
+  it("carries what falls due in 30 days beside what falls due in 7 (3.0.41), each adding back to the aging total", async () => {
+    const { home } = await load();
+    const receivables = home.receivables.data!;
+    const payables = home.payables.data!;
+    // INV-3 (November 16) falls due within 30 days; INV-4 (December 20) after them.
+    expect(receivables.within30).toEqual({ dueMinor: 3_000_00, dueDocuments: 1, laterMinor: 4_700_00, laterDocuments: 1 });
+    // B-3 (December 5) moves from later into the 30 days.
+    expect(payables).toMatchObject({ dueSoonMinor: 2_750_00, dueSoonDocuments: 1, laterMinor: 6_450_00, laterDocuments: 1 });
+    expect(payables.within30).toEqual({ dueMinor: 9_200_00, dueDocuments: 2, laterMinor: 0, laterDocuments: 0 });
+    for (const side of [receivables, payables]) {
+      expect(side.overdueMinor + side.dueSoonMinor + side.laterMinor + side.creditsMinor).toBe(side.totalMinor);
+      expect(side.overdueMinor + side.within30.dueMinor + side.within30.laterMinor + side.creditsMinor).toBe(side.totalMinor);
+    }
+    // The figures band stays at 7 days.
+    expect(home.figures.data!.payables).toMatchObject({ dueSoonMinor: 2_750_00, dueSoonBills: 1 });
+  });
+
   it("sums only base-currency payments and counts the others apart", async () => {
     const { home } = await load();
     expect(home.receivables.data!.receivedLast30).toEqual({ baseMinor: 4_000_00, count: 2, otherCurrencyCount: 1 });
@@ -374,15 +410,14 @@ describe("getDashboardHome", () => {
     ]);
   });
 
-  it("projects 30 days of cash from invoices and bills due, leaving out what is already late", async () => {
+  it("projects cash 30, 60 and 90 days ahead from invoices and bills due, leaving out what is already late", async () => {
     const { home } = await load();
-    expect(home.cash.data!.projection).toEqual({
-      through: "2026-12-13",
-      invoicesDueMinor: 3_000_00,
-      billsDueMinor: 9_200_00,
-      projectedMinor: 103_500_00 + 3_000_00 - 9_200_00,
-      overdueLeftOutMinor: 12_550_00,
-      overdueBillsLeftOutMinor: 2_800_00,
+    const late = { overdueLeftOutMinor: 12_550_00, overdueBillsLeftOutMinor: 2_800_00 };
+    expect(home.cash.data!.projections).toEqual({
+      30: { through: "2026-12-13", invoicesDueMinor: 3_000_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 3_000_00 - 9_200_00, ...late },
+      // INV-4, due December 20, comes in at 60 days; nothing more falls due before February 11.
+      60: { through: "2027-01-12", invoicesDueMinor: 7_700_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 7_700_00 - 9_200_00, ...late },
+      90: { through: "2027-02-11", invoicesDueMinor: 7_700_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 7_700_00 - 9_200_00, ...late },
     });
   });
 
@@ -405,18 +440,91 @@ describe("getDashboardHome", () => {
     expect(profit.periods.quarter).toMatchObject({ incomeMinor: 70_000_00, expenseMinor: 62_800_00, prior: { incomeMinor: 70_000_00, netMinor: 6_000_00 } });
     // January's 10,000, five months of 50,000 and November's 20,000; nothing posted in the same days last year.
     expect(profit.periods.year).toMatchObject({ from: "2026-01-01", incomeMinor: 280_000_00, prior: null });
-    const expenses = profit.periods.month.expenses;
+    const expenses = profit.periods.month!.expenses;
     expect(expenses.map((e) => [e.name, e.amountMinor])).toEqual([
       ["Rent", 9_000_00],
       ["Cost of Goods Sold", 8_800_00],
     ]);
-    expect(expenses.reduce((s, e) => s + e.amountMinor, 0)).toBe(profit.periods.month.expenseMinor);
+    expect(expenses.reduce((s, e) => s + e.amountMinor, 0)).toBe(profit.periods.month!.expenseMinor);
     expect(home.figures.data!.netIncome).toEqual({
       valueMinor: 2_200_00,
       series: [5_000_00, 5_000_00, 5_000_00, 5_000_00, 5_000_00, 2_200_00],
       priorSameDaysMinor: 2_000_00,
       compareLabel: "vs same days in Oct",
     });
+  });
+
+  it("builds the three periods of whole months from the window where it holds them, and from a read of their own where it does not (3.0.41)", async () => {
+    const { home } = await load();
+    const { last3, last12, lastYear } = home.profit.data!.periods;
+    // August to October: three months of 50,000 in and 45,000 out; compared with May to July, of which June and July are posted.
+    expect(last3).toMatchObject({
+      key: "last3",
+      label: "Last 3 months",
+      from: "2026-08-01",
+      to: "2026-10-31",
+      incomeMinor: 150_000_00,
+      expenseMinor: 135_000_00,
+      netMinor: 15_000_00,
+      salesMinor: 150_000_00,
+      prior: { incomeMinor: 100_000_00, expenseMinor: 90_000_00, netMinor: 10_000_00, salesMinor: 100_000_00 },
+      compareLabel: "vs May – Jul 2026",
+    });
+    // November 2025 to October 2026, November's month to date left out: January's 10,000 less 2,000 of rent, and five whole months.
+    expect(last12).toMatchObject({
+      from: "2025-11-01",
+      to: "2026-10-31",
+      incomeMinor: 260_000_00,
+      expenseMinor: 227_000_00,
+      netMinor: 33_000_00,
+      salesMinor: 260_000_00,
+      prior: { incomeMinor: 300_000_00, expenseMinor: 250_000_00, netMinor: 50_000_00, salesMinor: 300_000_00 },
+      compareLabel: "vs Nov 2024 – Oct 2025",
+    });
+    // 2025 and 2024, each read on its own: the window starts in October 2025.
+    expect(lastYear).toMatchObject({
+      from: "2025-01-01",
+      to: "2025-12-31",
+      incomeMinor: 400_000_00,
+      expenseMinor: 350_000_00,
+      netMinor: 50_000_00,
+      grossMarginPercent: 62.5,
+      prior: { incomeMinor: 320_000_00, expenseMinor: 300_000_00, netMinor: 20_000_00, salesMinor: 320_000_00 },
+      compareLabel: "vs 2024",
+    });
+    // Every period carries its expenses by account, adding up to its total.
+    for (const period of [last3, last12, lastYear]) expect(period!.expenses.reduce((s, e) => s + e.amountMinor, 0)).toBe(period!.expenseMinor);
+    expect(lastYear!.expenses.map((e) => [e.name, e.amountMinor])).toEqual([
+      ["Rent", 200_000_00],
+      ["Cost of Goods Sold", 150_000_00],
+    ]);
+  });
+
+  it("sums last year from the window when the window holds it, and reads a range two periods share once", async () => {
+    // January 20, 2027: the window runs from December 2025, so all of 2026 is in it; last year and
+    // the last twelve months are both 2026, and both are compared with 2025.
+    const asOf = "2027-01-20";
+    const reads: string[] = [];
+    const base = handlers();
+    const { sb } = fakeSupabase({
+      rpc: {
+        ...base.rpc,
+        acc_monthly_ledger_balances: () => ({ data: MONTHLY }),
+        acc_monthly_bank_transfers: () => ({ data: [] }),
+        acc_ledger_balances: (args) => {
+          reads.push(`${args.p_from}..${args.p_to}`);
+          return { data: args.p_from === null ? OPENING : ledger({}) };
+        },
+      },
+      tables: { ...base.tables, acc_payment: () => ({ data: [] }) },
+    });
+    const home = await getDashboardHome(sb, { ...INPUT, asOf });
+    const { last12, lastYear } = home.profit.data!.periods;
+    // January's 10,000, five months of 50,000 and November's 20,000; 2,000, 225,000 and 17,800 spent.
+    expect(lastYear).toMatchObject({ from: "2026-01-01", to: "2026-12-31", incomeMinor: 280_000_00, expenseMinor: 244_800_00, netMinor: 35_200_00, prior: null });
+    expect(last12).toMatchObject({ from: "2026-01-01", to: "2026-12-31", incomeMinor: 280_000_00, expenseMinor: 244_800_00, netMinor: 35_200_00, prior: null });
+    expect(reads).not.toContain("2026-01-01..2026-12-31");
+    expect(reads.filter((read) => read === "2025-01-01..2025-12-31")).toHaveLength(1);
   });
 
   it("says how far the books are posted and what each bank account needs", async () => {
@@ -456,15 +564,16 @@ describe("getDashboardHome", () => {
     ]);
   });
 
-  it("makes the requests it is budgeted for: 20 plus one per bank account, one more for a payment in another currency", async () => {
+  it("makes the requests it is budgeted for: 23 plus one per bank account, one more for a payment in another currency", async () => {
     const { requests } = await load();
     // 3 bank accounts and one euro payment among the recent ones.
-    expect(requests).toHaveLength(24);
-    // The ledger as of asOf is read once for both aging reports' control balance.
-    expect(requests.filter((r) => r === "rpc:acc_ledger_balances")).toHaveLength(5);
+    expect(requests).toHaveLength(27);
+    // The opening, the three "same days" comparisons, the year before the last twelve months, last year and
+    // the year before it (3.0.41), and the ledger as of asOf, read once for both aging reports' control balance.
+    expect(requests.filter((r) => r === "rpc:acc_ledger_balances")).toHaveLength(8);
     const tally = requests.reduce<Record<string, number>>((all, r) => ({ ...all, [r]: (all[r] ?? 0) + 1 }), {});
     expect(tally).toEqual({
-      "rpc:acc_ledger_balances": 5,
+      "rpc:acc_ledger_balances": 8,
       "rpc:acc_monthly_ledger_balances": 1,
       "rpc:acc_monthly_bank_transfers": 1,
       "rpc:acc_ar_ageing": 1,
@@ -532,8 +641,29 @@ describe("one failing read costs only the sections built on it", () => {
       },
     });
     expect(home.profit.dataState).toBe("fresh");
-    expect(home.profit.data!.periods.quarter.prior).toBeNull();
-    expect(home.profit.data!.periods.month.prior).not.toBeNull();
+    expect(home.profit.data!.periods.quarter!.prior).toBeNull();
+    expect(home.profit.data!.periods.month!.prior).not.toBeNull();
+  });
+
+  it("a whole-month period's own read: only that period, or only its comparison, is left out (3.0.41)", async () => {
+    const failing = (range: { from: string; to: string }): Parameters<typeof load>[0] => ({
+      rpc: {
+        acc_ledger_balances: (args) =>
+          args.p_from === range.from && args.p_to === range.to ? { error: { message: "statement timeout" } } : handlers().rpc!.acc_ledger_balances(args),
+      },
+    });
+    const current = await load(failing(LAST_YEAR));
+    expect(states(current.home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
+    expect(current.home.profit.data!.periods.lastYear).toBeNull();
+    expect(current.home.profit.data!.periods.last12).toMatchObject({ incomeMinor: 260_000_00, prior: { netMinor: 50_000_00 } });
+    expect(JSON.stringify(current.home)).not.toContain("statement timeout");
+
+    const lastYearPrior = await load(failing(LAST_YEAR_PRIOR));
+    expect(lastYearPrior.home.profit.data!.periods.lastYear).toMatchObject({ incomeMinor: 400_000_00, prior: null });
+
+    const last12Prior = await load(failing(LAST_12_PRIOR));
+    expect(last12Prior.home.profit.data!.periods.last12).toMatchObject({ incomeMinor: 260_000_00, prior: null });
+    expect(last12Prior.home.profit.data!.periods.lastYear).toMatchObject({ prior: { netMinor: 20_000_00 } });
   });
 
   it("the bank standing: only the bank widget goes", async () => {
@@ -552,7 +682,7 @@ describe("books behind and a new company", () => {
     const { home } = await load({ tables: { acc_journal_entry: () => ({ data: [{ entry_date: "2026-09-30" }] }) } });
     expect(home.status.data).toMatchObject({ postedThrough: "2026-09-30", behind: true, missingMonths: ["October", "November"] });
     // With the books behind no projection is made.
-    expect(home.cash.data!.projection).toBeNull();
+    expect(home.cash.data!.projections).toBeNull();
     expect(home.insights.data![0].key).toBe("books-behind");
   });
 
@@ -587,7 +717,7 @@ describe("the account watchlist", () => {
     const { requests: without } = await load({ tables: chart() });
     const { home, requests } = await load({ tables: chart() }, WATCHED);
     expect(home.watchlist.dataState).toBe("fresh");
-    expect(requests).toHaveLength(24);
+    expect(requests).toHaveLength(27);
     expect([...requests].sort()).toEqual([...without].sort());
   });
 
@@ -633,7 +763,7 @@ describe("the account watchlist", () => {
     const { home, requests } = await load({ tables: chart() }, null);
     expect(states(home)).toEqual(Object.fromEntries(SECTIONS.map((key) => [key, "fresh"])));
     expect(home.watchlist).toMatchObject({ dataState: "unavailable", data: null, unavailableReason: "Your watchlist could not be read." });
-    expect(requests).toHaveLength(24);
+    expect(requests).toHaveLength(27);
   });
 
   it("goes with the ledger: when the monthly read fails, it is unavailable too", async () => {

@@ -435,8 +435,16 @@
   font-weight: 600;
 }
 
+/*
+ * A choice in a card's head (a period, a number of months, a due window).
+ * 148px leaves the longest, "Last 12 months" (94px in Segoe UI at 14px, 96px
+ * in Arial), 114px inside the select's border, padding and arrow. A card's
+ * head never wraps: at its narrowest four-column width (about 330px, on a
+ * screen near 1330px wide with the menu open; below that the grid gives
+ * narrow cards half the row) the title keeps 148px beside it.
+ */
 .period {
-  width: 136px;
+  width: 148px;
 }
 
 /* --- Headline figure in a card ------------------------------------------ */
@@ -702,7 +710,32 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Next 30 days ------------------------------------------------------- */
+/* --- The next 30, 60 or 90 days ----------------------------------------- */
+/*
+ * The forecast's sentence with its horizon beside it. Below 400px of card
+ * (a phone, a narrow card) the sentence keeps the row and the select drops
+ * under it, still at the right.
+ */
+.forecastHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+}
+
+.forecastHead > p {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* "Next 90 days" is 80px in Segoe UI at 14px; 128px leaves it 94px inside the select. */
+.horizon {
+  flex: none;
+  width: 128px;
+  margin-inline-start: auto;
+}
+
 .forecast {
   display: flex;
   flex-wrap: wrap;

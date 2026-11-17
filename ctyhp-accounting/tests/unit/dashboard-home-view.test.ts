@@ -4,12 +4,19 @@ import {
   billDueLook,
   booksNote,
   cardBalance,
+  CASH_MONTH_OPTIONS,
+  cashMonthsLabel,
   daysLate,
+  DUE_OPTIONS,
+  dueLabel,
+  dueWindowOf,
   earlierOpenSentence,
   formatChange,
   homeTabHref,
   homeTabOf,
   HOME_TABS,
+  HORIZON_OPTIONS,
+  horizonLabel,
   lastPostedIndex,
   ledgerDifference,
   missingMonthsSentence,
@@ -18,10 +25,13 @@ import {
   payablesLine,
   PERIOD_OPTIONS,
   percentChange,
+  periodLabel,
+  periodUnread,
   receivablesLine,
   stepsDone,
   tiesToLedger,
 } from "@/components/dashboard-home/view";
+import { homePeriodRanges } from "@/lib/domain/dashboard-home/ranges";
 import type { HomeBank, HomeBankAccount, HomeMonth, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import { formatMoney } from "@/lib/format";
 
@@ -60,9 +70,63 @@ describe("the Dashboard's tabs (3.0.38)", () => {
 });
 
 describe("the period a card shows", () => {
-  it("offers the four periods the service reads", () => {
-    expect(PERIOD_OPTIONS.map((option) => option.value)).toEqual(["month", "lastMonth", "quarter", "year"]);
-    expect(PERIOD_OPTIONS.map((option) => option.label)).toEqual(["This month", "Last month", "This quarter", "This year"]);
+  it("offers the seven periods the service reads, in the agreed order (3.0.41)", () => {
+    expect(PERIOD_OPTIONS.map((option) => option.value)).toEqual(["month", "lastMonth", "last3", "quarter", "year", "last12", "lastYear"]);
+    expect(PERIOD_OPTIONS.map((option) => option.label)).toEqual([
+      "This month",
+      "Last month",
+      "Last 3 months",
+      "This quarter",
+      "This year",
+      "Last 12 months",
+      "Last year",
+    ]);
+    // Each option is named as the service names the period.
+    const ranges = homePeriodRanges("2026-11-17", 1);
+    for (const option of PERIOD_OPTIONS) expect(ranges[option.value].label, option.value).toBe(option.label);
+  });
+
+  it("says which period could not be read", () => {
+    expect(periodLabel("last12")).toBe("Last 12 months");
+    expect(periodUnread("lastYear")).toBe("Last year could not be read.");
+  });
+
+  it("offers Cash flow six or twelve months, and its footer says which", () => {
+    expect(CASH_MONTH_OPTIONS).toEqual([
+      { value: 6, label: "Last 6 months" },
+      { value: 12, label: "Last 12 months" },
+    ]);
+    expect(cashMonthsLabel(6)).toBe("Last 6 months");
+    expect(cashMonthsLabel(12)).toBe("Last 12 months");
+  });
+
+  it("offers Invoices and Bills what falls due in 7 or 30 days, and reads the matching fields", () => {
+    expect(DUE_OPTIONS).toEqual([
+      { value: 7, label: "Due in 7 days" },
+      { value: 30, label: "Due in 30 days" },
+    ]);
+    for (const option of DUE_OPTIONS) expect(dueLabel(option.value)).toBe(option.label);
+    const side = {
+      totalMinor: 20_000_00,
+      documents: 4,
+      overdueMinor: 12_550_00,
+      overdueDocuments: 2,
+      dueSoonMinor: 3_000_00,
+      dueSoonDocuments: 1,
+      laterMinor: 4_700_00,
+      laterDocuments: 1,
+      within30: { dueMinor: 7_700_00, dueDocuments: 2, laterMinor: 0, laterDocuments: 0 },
+      creditsMinor: -250_00,
+      buckets: { current: 7_700_00, d1_30: 0, d31_60: 5_150_00, d61_90: 7_400_00, d90_plus: -250_00 },
+    };
+    expect(dueWindowOf(side, 7)).toEqual({ dueMinor: 3_000_00, dueDocuments: 1, laterMinor: 4_700_00, laterDocuments: 1 });
+    expect(dueWindowOf(side, 30)).toEqual(side.within30);
+  });
+
+  it("offers the forecast 30, 60 or 90 days ahead, and opens its sentence with the same words", () => {
+    expect(HORIZON_OPTIONS.map((option) => option.value)).toEqual([30, 60, 90]);
+    for (const option of HORIZON_OPTIONS) expect(horizonLabel(option.value)).toBe(option.label);
+    expect(horizonLabel(90)).toBe("Next 90 days");
   });
 
   it("measures a change against the size of the prior figure, and refuses a zero or missing one", () => {

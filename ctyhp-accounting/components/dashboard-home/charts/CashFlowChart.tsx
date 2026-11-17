@@ -4,7 +4,20 @@ import type { HomeMonth } from "@/lib/domain/dashboard-home/types";
 import { formatDate } from "@/lib/format";
 import styles from "../dashboard-home.module.css";
 import { ChartTip, FiguresTable, useChartHover, useChartWidth } from "./ChartFrame";
-import { bands, barSlots, labelFitsAcross, labelWidth, px, runs, smoothPath, valueAxis, yScale, type Point } from "./geometry";
+import {
+  bands,
+  barSlots,
+  labelFitsAcross,
+  labelStride,
+  labelWidth,
+  placeEdgeLabel,
+  px,
+  runs,
+  smoothPath,
+  valueAxis,
+  yScale,
+  type Point,
+} from "./geometry";
 import { monthDayLabel, monthName } from "./labels";
 
 /*
@@ -23,6 +36,8 @@ const AREA_BOTTOM = TOP + AREA;
 const BASE = AREA_BOTTOM + GAP + BARS;
 /** The room after the last month for the projected point, as a share of a month's width. */
 const PROJECTION_ROOM = 0.9;
+/** The least room between the last month's name and the projected day under it. */
+const DAY_LABEL_GAP = 4;
 
 const INCOME = tokenVar("series.income");
 const SECONDARY = tokenVar("series.secondary");
@@ -37,6 +52,13 @@ export interface CashProjectionPoint {
  * Cash flow: the month-end cash balance as a line over a faint fill, a dashed
  * step to the projected balance, and each month's money in and out as bars
  * under it. A month not entered yet is a dashed "Not posted" block.
+ *
+ * Six or twelve months (3.0.41). When the months' names would touch (twelve
+ * on a phone or a narrow card), every other one is written, counting back
+ * from the month to date; each month keeps its tooltip and its row in the
+ * table. The projected day is written under its point, kept inside the
+ * chart, and left out when it would touch the last month's name: the
+ * sentence under the chart says it.
  */
 export default function CashFlowChart({
   months,
@@ -79,6 +101,15 @@ export default function CashFlowChart({
   // Kept inside the drawing: a long figure near the right edge is right-aligned to it.
   const projectionLabelAtEdge = projectionX + labelWidth(projectionLabel) / 2 > width - 2;
 
+  // Every month named when the names fit; otherwise every other one (or fewer), the last always.
+  const stride = labelStride(step, months.map((month) => month.label));
+  const named = (index: number) => (count - 1 - index) % stride === 0;
+  const lastName = months[count - 1]?.label ?? "";
+  const dayLabel = projected ? monthDayLabel(projected.date) : "";
+  const dayPlace = projected
+    ? placeEdgeLabel(projectionX, dayLabel, width - 2, centers[count - 1] + labelWidth(lastName) / 2 + DAY_LABEL_GAP)
+    : null;
+
   const tipLines = (index: number): string[] | null => {
     if (index === count && projected) return [`Projected for ${formatDate(projected.date)}`, money(projected.valueMinor)];
     const month = months[index];
@@ -90,7 +121,7 @@ export default function CashFlowChart({
 
   const today = lastPosted ? money(balance[count - 1]) : null;
   const label = [
-    "Cash balance at each month end, and money in and out by month, for the last six months.",
+    `Cash balance at each month end, and money in and out by month, for the last ${count} months.`,
     today ? `Cash today ${today}.` : null,
     projected ? `Projected ${money(projected.valueMinor)} on ${formatDate(projected.date)}.` : null,
   ]
@@ -163,9 +194,11 @@ export default function CashFlowChart({
               >
                 {projectionLabel}
               </text>
-              <text className={styles.chartText} x={projectionX} y={BASE + 18} textAnchor="middle">
-                {monthDayLabel(projected.date)}
-              </text>
+              {dayPlace ? (
+                <text className={styles.chartText} x={dayPlace.x} y={BASE + 18} textAnchor={dayPlace.anchor}>
+                  {dayLabel}
+                </text>
+              ) : null}
             </g>
           ) : null}
 
@@ -227,11 +260,13 @@ export default function CashFlowChart({
           <text className={styles.chartText} x={LEFT - 8} y={BASE - BARS / 2 + 4} textAnchor="end">
             In, out
           </text>
-          {months.map((month, i) => (
-            <text key={`label-${month.key}`} className={styles.chartText} x={px(centers[i])} y={BASE + 18} textAnchor="middle">
-              {month.label}
-            </text>
-          ))}
+          {months.map((month, i) =>
+            named(i) ? (
+              <text key={`label-${month.key}`} className={styles.chartText} x={px(centers[i])} y={BASE + 18} textAnchor="middle">
+                {month.label}
+              </text>
+            ) : null,
+          )}
 
           {/* The pointer's targets: one whole column a month, and the projected point's own. */}
           {months.map((month, i) => (

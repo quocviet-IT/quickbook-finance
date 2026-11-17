@@ -3,11 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 vi.mock("server-only", () => ({}));
 
+import { DEFAULT_CARD_CHOICES } from "@/lib/domain/dashboard-home/card-choices";
 import { presetLayout, standardLayout } from "@/lib/domain/dashboard-home/layout";
 import {
   DashboardPreferenceError,
   defaultDashboardPreference,
   readDashboardPreference,
+  saveDashboardCards,
   saveDashboardPreference,
 } from "@/lib/services/dashboard-preferences";
 
@@ -44,24 +46,31 @@ describe("readDashboardPreference", () => {
   it("reads the person's row in the open company, and nothing else", async () => {
     const { sb, reads } = fakeClient();
     await readDashboardPreference(sb, COMPANY);
-    expect(reads).toEqual([{ table: "dashboard_preference", select: "overview, watchlist, privacy", eq: [["company_id", COMPANY]] }]);
+    expect(reads).toEqual([{ table: "dashboard_preference", select: "overview, watchlist, privacy, cards", eq: [["company_id", COMPANY]] }]);
   });
 
-  it("gives the Standard layout, an empty watchlist and Privacy off to someone who has saved nothing", async () => {
+  it("gives the Standard layout, an empty watchlist, Privacy off and every card's default to someone who has saved nothing", async () => {
     const { sb } = fakeClient({ row: null });
     expect(await readDashboardPreference(sb, COMPANY)).toEqual({
       overview: standardLayout(),
       overviewSaved: false,
       watchlist: [],
       privacy: false,
+      cards: DEFAULT_CARD_CHOICES,
     });
     expect(defaultDashboardPreference()).toEqual(await readDashboardPreference(sb, COMPANY));
   });
 
   it("reads back a saved layout, watchlist and Privacy", async () => {
     const owner = presetLayout("owner");
-    const { sb } = fakeClient({ row: { overview: owner, watchlist: ["a-2", "a-1"], privacy: true } });
-    expect(await readDashboardPreference(sb, COMPANY)).toEqual({ overview: owner, overviewSaved: true, watchlist: ["a-2", "a-1"], privacy: true });
+    const { sb } = fakeClient({ row: { overview: owner, watchlist: ["a-2", "a-1"], privacy: true, cards: {} } });
+    expect(await readDashboardPreference(sb, COMPANY)).toEqual({
+      overview: owner,
+      overviewSaved: true,
+      watchlist: ["a-2", "a-1"],
+      privacy: true,
+      cards: DEFAULT_CARD_CHOICES,
+    });
   });
 
   it("keeps a row whose layout was reset: Standard, and not one of the person's own", async () => {
@@ -77,6 +86,18 @@ describe("readDashboardPreference", () => {
     expect(read.overview.order.slice(0, 2)).toEqual(["pnl", "cash"]);
     expect(read.overview.order).toHaveLength(14);
     expect(read.overview.shown).toEqual(["pnl"]);
+  });
+
+  it("reads back the card choices (3.0.41), dropping what no card offers and filling the defaults", async () => {
+    const { sb } = fakeClient({
+      row: { overview: null, watchlist: [], privacy: false, cards: { pnl: "last12", horizon: 90, billsDue: 30, cashMonths: 24, retired: "x" } },
+    });
+    expect((await readDashboardPreference(sb, COMPANY)).cards).toEqual({ ...DEFAULT_CARD_CHOICES, pnl: "last12", horizon: 90, billsDue: 30 });
+  });
+
+  it("gives every card its default for a row saved before the choices existed", async () => {
+    const { sb } = fakeClient({ row: { overview: null, watchlist: [], privacy: true } });
+    expect((await readDashboardPreference(sb, COMPANY)).cards).toEqual(DEFAULT_CARD_CHOICES);
   });
 
   it("throws when the read fails, so the page can say so", async () => {
@@ -125,5 +146,20 @@ describe("saveDashboardPreference", () => {
   it("throws when the database refuses", async () => {
     const { sb } = fakeClient({ rpcError: "Not a member of this company" });
     await expect(saveDashboardPreference(sb, COMPANY, { privacy: true })).rejects.toBeInstanceOf(DashboardPreferenceError);
+  });
+});
+
+describe("saveDashboardCards (3.0.41)", () => {
+  it("saves every card's choice for the open company through its own function, and nothing else", async () => {
+    const { sb, rpcs, reads } = fakeClient();
+    const cards = { ...DEFAULT_CARD_CHOICES, sales: "last3" as const, horizon: 60 as const };
+    await saveDashboardCards(sb, COMPANY, cards);
+    expect(rpcs).toEqual([["save_dashboard_cards", { p_company: COMPANY, p_cards: cards }]]);
+    expect(reads).toEqual([]);
+  });
+
+  it("throws when the database refuses", async () => {
+    const { sb } = fakeClient({ rpcError: "Not a member of this company" });
+    await expect(saveDashboardCards(sb, COMPANY, { ...DEFAULT_CARD_CHOICES })).rejects.toBeInstanceOf(DashboardPreferenceError);
   });
 });

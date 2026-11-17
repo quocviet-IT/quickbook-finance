@@ -1,14 +1,14 @@
 "use client";
 import StatusTag from "@/components/ui/StatusTag";
 import { tokenVar } from "@/lib/design/tokens";
-import type { HomeOpenSide, HomePayables, HomePayment, HomeReceivables, HomeStatus } from "@/lib/domain/dashboard-home/types";
+import type { HomeDueDays, HomeOpenSide, HomePayables, HomePayment, HomeReceivables, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import { formatDate, plural } from "@/lib/format";
 import { stackShares } from "./charts/geometry";
 import styles from "./dashboard-home.module.css";
 import { usePrivacy } from "./privacy";
-import { billDueLook, daysLate, ledgerDifference, otherCurrencies } from "./view";
-import { Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
+import { billDueLook, daysLate, DUE_OPTIONS, dueLabel, dueWindowOf, ledgerDifference, otherCurrencies } from "./view";
+import { ChoiceSelect, Empty, LinkButton, Spacer, TextLink, Unavailable, Widget } from "./Widget";
 
 type Money = (minor: number) => string;
 
@@ -17,13 +17,14 @@ const DUE_SOON = tokenVar("intent.warning");
 
 /**
  * The open invoices or bills split by due date: what is overdue, what falls
- * due in the next 7 days, and what is due later, as one bar and three figures.
+ * due in the next 7 or 30 days, and what is due later, as one bar and three figures.
  * The headline is the aging report's total, so it agrees with the figure above
  * the tabs; credits and unapplied payments are what make the two differ from
  * the three parts, and the line under the headline says by how much.
  */
 function OpenSideSummary({
   side,
+  days,
   ledger,
   noun,
   laterLabel,
@@ -31,6 +32,8 @@ function OpenSideSummary({
   money,
 }: {
   side: HomeOpenSide;
+  /** The window chosen in the card's head: it moves the middle figure, the bar and the later figure. */
+  days: HomeDueDays;
   /** The control account's name and balance, said when the open documents do not add up to it. */
   ledger: { account: string; minor: number };
   /** "invoice" or "bill" */
@@ -39,12 +42,13 @@ function OpenSideSummary({
   laterColor: string;
   money: Money;
 }) {
-  const [overdueShare, soonShare, laterShare] = stackShares([side.overdueMinor, side.dueSoonMinor, side.laterMinor]);
+  const due = dueWindowOf(side, days);
+  const [overdueShare, soonShare, laterShare] = stackShares([side.overdueMinor, due.dueMinor, due.laterMinor]);
   const ledgerNote = ledgerDifference(ledger.account, side.totalMinor, ledger.minor, money);
   const parts = [
     { key: "overdue", label: "Overdue", color: OVERDUE, minor: side.overdueMinor, count: side.overdueDocuments, share: overdueShare },
-    { key: "soon", label: "Due in 7 days", color: DUE_SOON, minor: side.dueSoonMinor, count: side.dueSoonDocuments, share: soonShare },
-    { key: "later", label: laterLabel, color: laterColor, minor: side.laterMinor, count: side.laterDocuments, share: laterShare },
+    { key: "soon", label: dueLabel(days), color: DUE_SOON, minor: due.dueMinor, count: due.dueDocuments, share: soonShare },
+    { key: "later", label: laterLabel, color: laterColor, minor: due.laterMinor, count: due.laterDocuments, share: laterShare },
   ];
   return (
     <>
@@ -93,13 +97,19 @@ export function InvoicesWidget({
   asOf,
   money,
   currencyCode,
+  due: days,
+  onDueChange,
 }: {
   receivables: SectionEnvelope<HomeReceivables>;
   status: HomeStatus | null;
   asOf: string;
   money: Money;
   currencyCode: string;
+  /** What falls due in 7 or 30 days, chosen in the card's head and kept for the person (3.0.41). */
+  due: HomeDueDays;
+  onDueChange: (next: HomeDueDays) => void;
 }) {
+  const extra = <ChoiceSelect value={days} onChange={onDueChange} options={DUE_OPTIONS} label="Due window for Invoices" />;
   const footer = (
     <>
       <TextLink href="/reports/ar-aging">A/R Aging</TextLink>
@@ -113,7 +123,7 @@ export function InvoicesWidget({
   const data = receivables.data;
   if (!data) {
     return (
-      <Widget title="Invoices" footer={footer}>
+      <Widget title="Invoices" extra={extra} footer={footer}>
         <Unavailable reason={receivables.unavailableReason ?? "Invoices could not be read."} />
       </Widget>
     );
@@ -129,11 +139,12 @@ export function InvoicesWidget({
   }
   const received = data.receivedLast30;
   return (
-    <Widget title="Invoices" footer={footer}>
+    <Widget title="Invoices" extra={extra} footer={footer}>
       <div className={styles.split}>
         <div className={styles.splitMain}>
           <OpenSideSummary
             side={data}
+            days={days}
             ledger={{ account: "Accounts Receivable", minor: data.ledgerMinor }}
             noun="invoice"
             laterLabel="Not due yet"
@@ -191,12 +202,18 @@ export function BillsWidget({
   status,
   money,
   currencyCode,
+  due: days,
+  onDueChange,
 }: {
   payables: SectionEnvelope<HomePayables>;
   status: HomeStatus | null;
   money: Money;
   currencyCode: string;
+  /** What falls due in 7 or 30 days, chosen in the card's head and kept for the person (3.0.41). */
+  due: HomeDueDays;
+  onDueChange: (next: HomeDueDays) => void;
 }) {
+  const extra = <ChoiceSelect value={days} onChange={onDueChange} options={DUE_OPTIONS} label="Due window for Bills" />;
   const footer = (
     <>
       <TextLink href="/reports/ap-aging">A/P Aging</TextLink>
@@ -210,7 +227,7 @@ export function BillsWidget({
   const data = payables.data;
   if (!data) {
     return (
-      <Widget title="Bills" footer={footer}>
+      <Widget title="Bills" extra={extra} footer={footer}>
         <Unavailable reason={payables.unavailableReason ?? "Bills could not be read."} />
       </Widget>
     );
@@ -226,11 +243,12 @@ export function BillsWidget({
   }
   const paid = data.paidLast30;
   return (
-    <Widget title="Bills" footer={footer}>
+    <Widget title="Bills" extra={extra} footer={footer}>
       <div className={styles.split}>
         <div className={styles.splitMain}>
           <OpenSideSummary
             side={data}
+            days={days}
             ledger={{ account: "Accounts Payable", minor: data.ledgerMinor }}
             noun="bill"
             laterLabel="Due later"

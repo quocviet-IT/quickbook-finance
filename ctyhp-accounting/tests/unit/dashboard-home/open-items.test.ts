@@ -6,6 +6,9 @@ import {
   overdueSummary,
   owesLongest,
   projection,
+  projections,
+  PROJECTION_HORIZONS,
+  splitByHorizon,
   splitOpenSide,
   type OpenItemRow,
 } from "@/lib/domain/dashboard-home/open-items";
@@ -68,7 +71,67 @@ describe("splitOpenSide", () => {
   });
 
   it("is all zeros with nothing open", () => {
-    expect(splitOpenSide([], AS_OF, "invoice")).toMatchObject({ totalMinor: 0, documents: 0, creditsMinor: 0 });
+    expect(splitOpenSide([], AS_OF, "invoice")).toMatchObject({
+      totalMinor: 0,
+      documents: 0,
+      creditsMinor: 0,
+      within30: { dueMinor: 0, dueDocuments: 0, laterMinor: 0, laterDocuments: 0 },
+    });
+  });
+
+  it("also splits at 30 days (3.0.41): the 7-day fields stay, and within30 holds what is due through day 30", () => {
+    const side = splitOpenSide(receivables, AS_OF, "invoice");
+    // INV-4 to INV-6 are due within 30 days (through December 13); INV-7 on December 20 is later.
+    expect(side.within30).toEqual({ dueMinor: 10_100_00, dueDocuments: 3, laterMinor: 6_100_00, laterDocuments: 1 });
+    expect(side).toMatchObject({ dueSoonMinor: 6_200_00, dueSoonDocuments: 2, laterMinor: 10_000_00, laterDocuments: 2 });
+    expect(side.overdueMinor + side.within30.dueMinor + side.within30.laterMinor + side.creditsMinor).toBe(side.totalMinor);
+  });
+});
+
+describe("splitByHorizon (3.0.41)", () => {
+  const payables = [
+    item("v1", "bill", "2026-11-01", 2_800_00, "B-1"), // late
+    item("v1", "bill", "2026-11-20", 1_000_00, "B-2"), // day 7
+    item("v2", "bill", "2026-11-21", 2_000_00, "B-3"), // day 8
+    item("v2", "bill", "2026-12-13", 3_000_00, "B-4"), // day 30
+    item("v3", "bill", "2026-12-14", 4_000_00, "B-5"), // day 31
+    item("v3", "vendor_credit", "2026-12-01", -500_00, "VC-1"),
+    item("v2", "bill_payment", "2026-11-02", -100_00, null),
+  ];
+
+  it("splits overdue, due within the window, and later, at 7 and at 30 days", () => {
+    expect(splitByHorizon(payables, AS_OF, "bill", 7)).toEqual({
+      totalMinor: 12_200_00,
+      documents: 5,
+      overdueMinor: 2_800_00,
+      overdueDocuments: 1,
+      dueMinor: 1_000_00,
+      dueDocuments: 1,
+      laterMinor: 9_000_00,
+      laterDocuments: 3,
+      creditsMinor: -600_00,
+    });
+    expect(splitByHorizon(payables, AS_OF, "bill", 30)).toMatchObject({ dueMinor: 6_000_00, dueDocuments: 3, laterMinor: 4_000_00, laterDocuments: 1 });
+  });
+
+  it("adds back to the aging report's total with the overdue and the credits, whatever the window", () => {
+    for (const rows of [receivables, payables]) {
+      const report = computeAging(rows.map((r) => ({ dueDate: r.dueDate, balanceMinor: r.balanceMinor })), AS_OF);
+      for (const days of [0, 7, 30, 365]) {
+        const split = splitByHorizon(rows, AS_OF, rows === receivables ? "invoice" : "bill", days);
+        expect(split.totalMinor, String(days)).toBe(report.total);
+        expect(split.overdueMinor + split.dueMinor + split.laterMinor + split.creditsMinor, String(days)).toBe(split.totalMinor);
+        expect(split.overdueDocuments + split.dueDocuments + split.laterDocuments, String(days)).toBe(split.documents);
+      }
+    }
+  });
+
+  it("agrees with splitOpenSide: 7 days is its due soon, 30 days its within30", () => {
+    const side = splitOpenSide(payables, AS_OF, "bill");
+    const week = splitByHorizon(payables, AS_OF, "bill", 7);
+    const month = splitByHorizon(payables, AS_OF, "bill", 30);
+    expect([side.dueSoonMinor, side.dueSoonDocuments, side.laterMinor, side.laterDocuments]).toEqual([week.dueMinor, week.dueDocuments, week.laterMinor, week.laterDocuments]);
+    expect(side.within30).toEqual({ dueMinor: month.dueMinor, dueDocuments: month.dueDocuments, laterMinor: month.laterMinor, laterDocuments: month.laterDocuments });
   });
 });
 
@@ -121,6 +184,45 @@ describe("projection", () => {
       overdueLeftOutMinor: 13_550_00,
       overdueBillsLeftOutMinor: 2_800_00,
     });
+  });
+});
+
+describe("projections (3.0.41)", () => {
+  const payables = [
+    item("v1", "bill", "2026-11-16", 2_750_00),
+    item("v2", "bill", "2026-12-13", 1_000_00), // day 30
+    item("v2", "bill", "2026-12-14", 9_000_00), // day 31
+    item("v4", "bill", "2027-02-11", 500_00), // day 90: in the last horizon only
+    item("v4", "bill", "2027-02-12", 700_00), // day 91: in none
+    item("v3", "bill", "2026-11-01", 2_800_00), // late: out, reported
+    item("v1", "vendor_credit", "2026-11-20", -300_00),
+  ];
+
+  it("looks 30, 60 and 90 days ahead from the same rows, each the open documents due in its window", () => {
+    const all = projections(100_000_00, receivables, payables, AS_OF);
+    expect(Object.keys(all)).toEqual(["30", "60", "90"]);
+    // Each is exactly projection() at its horizon.
+    for (const days of PROJECTION_HORIZONS) expect(all[days]).toEqual(projection(100_000_00, receivables, payables, AS_OF, days));
+    expect(all[30]).toMatchObject({ through: "2026-12-13", invoicesDueMinor: 10_100_00, billsDueMinor: 3_750_00 });
+    // 60 days: INV-7 (December 20) and the December 14 bill come in.
+    expect(all[60]).toMatchObject({ through: "2027-01-12", invoicesDueMinor: 16_200_00, billsDueMinor: 12_750_00, projectedMinor: 100_000_00 + 16_200_00 - 12_750_00 });
+    // 90 days: through February 11, the bill due that day included and the one due the next day not.
+    expect(all[90]).toMatchObject({ through: "2027-02-11", invoicesDueMinor: 16_200_00, billsDueMinor: 13_250_00, projectedMinor: 100_000_00 + 16_200_00 - 13_250_00 });
+    // What is late is left out of every horizon alike.
+    for (const days of PROJECTION_HORIZONS) {
+      expect(all[days]).toMatchObject({ overdueLeftOutMinor: 13_550_00, overdueBillsLeftOutMinor: 2_800_00 });
+    }
+  });
+
+  it("sums, at every horizon, the invoices and bills due from asOf through its last day, and nothing else", () => {
+    const all = projections(0, receivables, payables, AS_OF);
+    for (const days of PROJECTION_HORIZONS) {
+      const through = all[days].through;
+      const due = (rows: readonly OpenItemRow[], type: string) =>
+        rows.filter((r) => r.docType === type && r.balanceMinor > 0 && r.dueDate >= AS_OF && r.dueDate <= through).reduce((s, r) => s + r.balanceMinor, 0);
+      expect(all[days].invoicesDueMinor, String(days)).toBe(due(receivables, "invoice"));
+      expect(all[days].billsDueMinor, String(days)).toBe(due(payables, "bill"));
+    }
   });
 });
 

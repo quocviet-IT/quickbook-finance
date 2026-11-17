@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { Button } from "antd";
 import { tokenVar } from "@/lib/design/tokens";
 import { listWords } from "@/lib/domain/dashboard-home/insights";
@@ -11,7 +10,7 @@ import Donut, { type DonutLine } from "./charts/Donut";
 import GroupedBars from "./charts/GroupedBars";
 import { sharePercent } from "./charts/geometry";
 import styles from "./dashboard-home.module.css";
-import { formatChange, lastPostedIndex, percentChange } from "./view";
+import { formatChange, lastPostedIndex, percentChange, periodUnread } from "./view";
 import { Delta, Empty, LinkButton, PercentDelta, PeriodSelect, Swatch, TextLink, Unavailable, Widget } from "./Widget";
 
 const INCOME = tokenVar("series.income");
@@ -32,6 +31,9 @@ interface ProfitProps {
   status: HomeStatus | null;
   money: Money;
   compact: Money;
+  /** The period chosen in the card's head, kept for the person (3.0.41). */
+  period: HomePeriodKey;
+  onPeriodChange: (next: HomePeriodKey) => void;
 }
 
 /** "November 2026" */
@@ -66,9 +68,8 @@ function ChangeLine({ current, prior, period, good }: { current: number; prior: 
  * the period before, six months of income and expenses, and each with its
  * change. A month not entered yet says so rather than reading as a zero.
  */
-export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Profit and loss" />;
+export function ProfitAndLossWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Profit and loss" />;
   const footer = <TextLink href="/reports?report=pnl">Profit and loss</TextLink>;
   const data = profit.data;
   if (!data) {
@@ -88,6 +89,14 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    // Only this period's own read failed: the select stays, so another period is one choice away.
+    return (
+      <Widget title="Profit and loss" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const hero = (
     <div className={styles.hero}>
       <span className={styles.heroValue}>{money(period.netMinor)}</span>
@@ -113,7 +122,7 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
           title={`${longMonthName(missing.key)} is not posted`}
           action={
             canShowLastMonth ? (
-              <Button size="small" onClick={() => setKey("lastMonth")}>
+              <Button size="small" onClick={() => onPeriodChange("lastMonth")}>
                 Show last month
               </Button>
             ) : null
@@ -136,6 +145,8 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
   return (
     <Widget title="Profit and loss" extra={extra} footer={footer}>
       {hero}
+      {/* The bars are always the last six months; the select chooses the figures above and beside them. */}
+      <p className={styles.caption}>Income and expenses by month, last 6 months</p>
       <GroupedBars
         months={data.months}
         series={[
@@ -169,9 +180,8 @@ export function ProfitAndLossWidget({ profit, status, money, compact }: ProfitPr
  * (a discount account larger than the small expenses): the ring draws only
  * what is above zero, the list shows every line, and the total is the real one.
  */
-export function ExpensesWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Expenses" />;
+export function ExpensesWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Expenses" />;
   const footer = <TextLink href="/reports?report=pnl">Profit and loss</TextLink>;
   const data = profit.data;
   if (!data) {
@@ -189,6 +199,13 @@ export function ExpensesWidget({ profit, status, money, compact }: ProfitProps) 
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    return (
+      <Widget title="Expenses" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const hero = (
     <div className={styles.hero}>
       <span className={styles.heroValue}>{money(period.expenseMinor)}</span>
@@ -277,9 +294,8 @@ function LegendRow({ color, name, share, amount }: { color?: string; name: strin
 /* --------------------------------------------------------------------- sales */
 
 /** Sales: income from sales (other income left out) for the chosen period, and six months of it. */
-export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
-  const [key, setKey] = useState<HomePeriodKey>("month");
-  const extra = <PeriodSelect value={key} onChange={setKey} label="Period for Sales" />;
+export function SalesWidget({ profit, status, money, compact, period: key, onPeriodChange }: ProfitProps) {
+  const extra = <PeriodSelect value={key} onChange={onPeriodChange} label="Period for Sales" />;
   const footer = <TextLink href="/reports/sales-by-customer">Sales by customer</TextLink>;
   const data = profit.data;
   if (!data) {
@@ -299,6 +315,13 @@ export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
     );
   }
   const period = data.periods[key];
+  if (!period) {
+    return (
+      <Widget title="Sales" extra={extra} footer={footer}>
+        <Unavailable reason={periodUnread(key)} />
+      </Widget>
+    );
+  }
   const missing = unpostedMonth(data.months, key);
   const change = missing ? null : percentChange(period.salesMinor, period.prior?.salesMinor);
   return (
@@ -318,6 +341,8 @@ export function SalesWidget({ profit, status, money, compact }: ProfitProps) {
           </span>
         )}
       </div>
+      {/* Six months of bars whatever the period above. */}
+      <p className={styles.caption}>Sales by month, last 6 months</p>
       <GroupedBars
         months={data.months}
         series={[{ key: "sales", label: "Sales", values: data.salesMinor, color: INCOME }]}

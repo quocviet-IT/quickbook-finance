@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useEffect, useState, useTransition, type DragEvent, type ReactNode } from "react";
+import { Suspense, use, useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppstoreOutlined, ArrowsAltOutlined, HolderOutlined, ReloadOutlined, ShrinkOutlined } from "@ant-design/icons";
 import { App, Button, Switch, Tabs, Tag } from "antd";
@@ -19,6 +19,7 @@ import styles from "@/components/dashboard-home/dashboard-home.module.css";
 import { PrivacyProvider, usePrivacy } from "@/components/dashboard-home/privacy";
 import { HOME_TABS, homeTabHref, homeTabOf } from "@/components/dashboard-home/view";
 import { rememberOverviewLayout } from "@/lib/client/dashboard-layout-memory";
+import { DEFAULT_CARD_CHOICES, type CardChoices } from "@/lib/domain/dashboard-home/card-choices";
 import {
   moveWidgetBefore,
   overviewSpan,
@@ -32,7 +33,10 @@ import type { HomeTab } from "@/lib/domain/dashboard-home/types";
 import { formatDate, formatTime, timeZoneLabel } from "@/lib/format";
 import type { DashboardHome } from "@/lib/services/dashboard-home";
 import type { DashboardPreference } from "@/lib/services/dashboard-preferences";
-import { saveOverviewLayoutAction, setPrivacyAction } from "./actions";
+import { saveCardChoicesAction, saveOverviewLayoutAction, setPrivacyAction } from "./actions";
+
+/** How long after the last change of a card's choice it is saved: a run of changes is one save. */
+const CHOICE_SAVE_DELAY_MS = 500;
 
 /** What a card's cell does while the Overview is being customized. */
 interface CellEdit {
@@ -175,6 +179,71 @@ function DashboardScreen({
   useEffect(() => {
     if (slug !== null && layoutKnown) rememberOverviewLayout(slug, layout);
   }, [slug, layout, layoutKnown]);
+
+  /**
+   * Each card's choice (3.0.41): the person's own, or the defaults when the
+   * preference could not be read. Nothing waits on the server: every period,
+   * both cash ranges, the three horizons and both due windows are already
+   * here, so a change shows at once. It is saved in the background half a
+   * second after the last change, one save at a time, so a run of changes is
+   * one save and the last choices are the ones kept. A failed save says so,
+   * and the screen keeps the choice.
+   */
+  const [choices, setChoices] = useState<CardChoices>(() => preference?.cards ?? { ...DEFAULT_CARD_CHOICES });
+  const choiceSave = useRef<{
+    latest: CardChoices;
+    unsaved: CardChoices | null;
+    timer: ReturnType<typeof setTimeout> | null;
+    saving: boolean;
+  }>({ latest: choices, unsaved: null, timer: null, saving: false });
+
+  async function saveChoices() {
+    const save = choiceSave.current;
+    save.timer = null;
+    // The save under way sends the latest choices again when it ends.
+    if (save.saving || !save.unsaved) return;
+    const next = save.unsaved;
+    save.unsaved = null;
+    save.saving = true;
+    let ok = false;
+    try {
+      ok = (await saveCardChoicesAction(next)).ok;
+    } catch {
+      ok = false;
+    }
+    save.saving = false;
+    if (!ok) message.error("Your choice could not be saved.");
+    if (save.unsaved && save.timer === null) void saveChoices();
+  }
+
+  function changeChoice<K extends keyof CardChoices>(key: K, value: CardChoices[K]) {
+    const save = choiceSave.current;
+    const next = { ...save.latest, [key]: value };
+    save.latest = next;
+    setChoices(next);
+    // When the person's choices could not be read, the screen started from the
+    // defaults: saving them now would replace what is stored with defaults the
+    // person never chose. The change stands on screen for this visit only.
+    if (preference === null) return;
+    save.unsaved = next;
+    if (save.timer !== null) clearTimeout(save.timer);
+    save.timer = setTimeout(() => void saveChoices(), CHOICE_SAVE_DELAY_MS);
+  }
+
+  // Leaving the dashboard within that half second still saves the last change.
+  useEffect(() => {
+    const save = choiceSave.current;
+    return () => {
+      if (save.timer === null) return;
+      clearTimeout(save.timer);
+      save.timer = null;
+      // A save under way sends what is left when it ends; otherwise it goes now.
+      if (save.saving || !save.unsaved) return;
+      const next = save.unsaved;
+      save.unsaved = null;
+      void saveCardChoicesAction(next).catch(() => undefined);
+    };
+  }, []);
   const [dragged, setDragged] = useState<HomeWidgetKey | null>(null);
   const [dropOn, setDropOn] = useState<HomeWidgetKey | null>(null);
   const editing = draft !== null;
@@ -272,17 +341,75 @@ function DashboardScreen({
    * Needs attention and Month-end close are the cards the page streams in.
    */
   const cards: Record<HomeWidgetKey, (span: 4 | 6 | 8 | 12) => ReactNode> = {
-    cash: () => <CashFlowWidget cash={home.cash} status={status} money={money} compact={compact} />,
+    cash: () => (
+      <CashFlowWidget
+        cash={home.cash}
+        status={status}
+        money={money}
+        compact={compact}
+        months={choices.cashMonths}
+        onMonthsChange={(next) => changeChoice("cashMonths", next)}
+        horizon={choices.horizon}
+        onHorizonChange={(next) => changeChoice("horizon", next)}
+      />
+    ),
     needs: () => needs,
-    pnl: () => <ProfitAndLossWidget profit={home.profit} status={status} money={money} compact={compact} />,
-    expenses: () => <ExpensesWidget profit={home.profit} status={status} money={money} compact={compact} />,
+    pnl: () => (
+      <ProfitAndLossWidget
+        profit={home.profit}
+        status={status}
+        money={money}
+        compact={compact}
+        period={choices.pnl}
+        onPeriodChange={(next) => changeChoice("pnl", next)}
+      />
+    ),
+    // One choice for Expenses, on Overview and on Money out alike.
+    expenses: () => (
+      <ExpensesWidget
+        profit={home.profit}
+        status={status}
+        money={money}
+        compact={compact}
+        period={choices.expenses}
+        onPeriodChange={(next) => changeChoice("expenses", next)}
+      />
+    ),
     insights: () => <InsightsWidget insights={home.insights} />,
     bank: () => <BankAccountsWidget bank={home.bank} money={money} currencyCode={currency.code} />,
-    invoices: () => <InvoicesWidget receivables={home.receivables} status={status} asOf={home.asOf} money={money} currencyCode={currency.code} />,
-    bills: () => <BillsWidget payables={home.payables} status={status} money={money} currencyCode={currency.code} />,
+    invoices: () => (
+      <InvoicesWidget
+        receivables={home.receivables}
+        status={status}
+        asOf={home.asOf}
+        money={money}
+        currencyCode={currency.code}
+        due={choices.invoicesDue}
+        onDueChange={(next) => changeChoice("invoicesDue", next)}
+      />
+    ),
+    bills: () => (
+      <BillsWidget
+        payables={home.payables}
+        status={status}
+        money={money}
+        currencyCode={currency.code}
+        due={choices.billsDue}
+        onDueChange={(next) => changeChoice("billsDue", next)}
+      />
+    ),
     close: () => close,
     watchlist: (span) => <WatchlistWidget watchlist={home.watchlist} width={span} currencyCode={currency.code} />,
-    sales: () => <SalesWidget profit={home.profit} status={status} money={money} compact={compact} />,
+    sales: () => (
+      <SalesWidget
+        profit={home.profit}
+        status={status}
+        money={money}
+        compact={compact}
+        period={choices.sales}
+        onPeriodChange={(next) => changeChoice("sales", next)}
+      />
+    ),
     payments: () => <PaymentsWidget payments={home.payments} />,
     aging: () => <AgingWidget receivables={home.receivables} payables={home.payables} money={money} currencyCode={currency.code} />,
     activity: () => <ActivityWidget activity={home.activity} timeZone={timeZone} />,
