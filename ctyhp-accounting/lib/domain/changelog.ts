@@ -48,6 +48,19 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.42",
+    date: "2026-11-17",
+    headline: "Next.js updated to 16.4.6 with its security fix.",
+    changes: [
+      {
+        kind: "changed",
+        title: "Next.js updated to 16.4.6 with its security fix",
+        detail:
+          "The fix (GHSA-mfr8-8qww-v76h) is for a cache feature OneBook does not use, so no screen or figure changes. It keeps the app on a version with no known advisory.",
+      },
+    ],
+  },
+  {
     version: "3.0.41",
     date: "2026-11-17",
     headline: "More periods on the dashboard, a year of cash flow, and a forecast up to 90 days ahead.",
