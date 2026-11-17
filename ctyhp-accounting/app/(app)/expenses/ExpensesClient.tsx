@@ -21,6 +21,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import NewVendorButton from "@/components/NewVendorButton";
 import { useLineAccountDefault } from "@/lib/client/use-line-account-default";
 import { recordExpenseAction, voidExpenseAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface LineForm {
   description?: string;
@@ -107,7 +108,8 @@ export default function ExpensesClient({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const lines = (values.lines as LineForm[]).map((l) => ({
       description: l.description ?? "",
       expense_account_id: l.expense_account_id,

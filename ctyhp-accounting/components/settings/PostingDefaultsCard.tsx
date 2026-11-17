@@ -11,6 +11,7 @@ import {
   type PostingDefaults,
 } from "@/lib/domain/posting-defaults";
 import { savePostingDefaultsAction } from "@/app/(app)/settings/company/actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 const KEYS: PostingDefaultKey[] = ["depositAccountId", "payFromAccountId", "incomeAccountId", "expenseAccountId"];
 
@@ -43,7 +44,8 @@ export default function PostingDefaultsCard({
   };
 
   const submit = async () => {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     try {
       const res = await savePostingDefaultsAction({

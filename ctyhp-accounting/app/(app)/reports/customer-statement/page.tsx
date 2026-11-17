@@ -32,6 +32,7 @@ export default async function CustomerStatementPage({
         customers={customers.map((c) => ({ id: c.id, name: c.name }))}
         initialCustomerId={initialCustomerId}
         companyName={ctx.companyName}
+        companyLines={ctx.companyLines}
         baseCurrency={ctx.currencyCode}
         baseDecimals={ctx.decimals}
         presets={ctx.presets}

@@ -4,6 +4,7 @@ import { App, Alert, Descriptions, Form, Input, Modal } from "antd";
 import type { PaymentRow } from "@/lib/db/types";
 import { formatMoney } from "@/lib/format";
 import { voidPaymentAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface VoidPaymentModalProps {
   payment: (PaymentRow & { customer_name: string }) | null;
@@ -36,7 +37,9 @@ export default function VoidPaymentModal({
 
   async function submit() {
     if (!payment) return;
-    const { reason } = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
+    const { reason } = values;
     setSaving(true);
     try {
       const result = await voidPaymentAction(payment.id, reason);
@@ -85,7 +88,7 @@ export default function VoidPaymentModal({
             message="What voiding does"
             description="Every invoice this payment settled goes back to outstanding, and the journal entry stops counting in the ledger. The payment, its number and its history stay on record — a void cannot be undone, so correcting it means recording a replacement payment."
           />
-          <Form form={form} layout="vertical" requiredMark={false}>
+          <Form form={form} layout="vertical">
             <Form.Item
               name="reason"
               label="Reason"

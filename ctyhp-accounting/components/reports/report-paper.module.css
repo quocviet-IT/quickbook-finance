@@ -33,6 +33,14 @@
   color: var(--ob-text-heading);
 }
 
+/* Address, phone and email under the company's name, on a customer statement. */
+.companyLines {
+  font-size: 12.5px;
+  color: var(--ob-text-secondary);
+  margin: 4px 0 6px;
+  overflow-wrap: anywhere;
+}
+
 .reportName {
   font-size: 17px;
   font-weight: 500;
@@ -48,10 +56,8 @@
 }
 
 .basis {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--ob-text-secondary);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   margin-top: 9px;
   font-weight: 600;
 }
@@ -75,10 +81,8 @@
 }
 
 .statLabel {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ob-text-secondary);
 }
 
@@ -169,10 +173,8 @@
 
 .det :global(.ant-table-wrapper .ant-table-thead > tr > th) {
   background: transparent;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ob-text-secondary);
   border-bottom: 1px solid var(--ob-border-muted);
 }
@@ -255,10 +257,8 @@
 }
 
 .detTable th {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ob-text-secondary);
   text-align: left;
   padding: 0 10px 6px 0;
@@ -355,10 +355,8 @@
 }
 
 .eyebrow {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ob-text-secondary);
   margin: 24px 0 8px;
 }
@@ -553,10 +551,8 @@
 }
 
 .rpt th {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--ob-text-secondary);
   text-align: right;
   padding: 0 0 6px 20px;
@@ -640,10 +636,8 @@
 
 .rSection td {
   padding-top: 20px;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   color: var(--ob-text-heading);
 }
 

@@ -10,6 +10,7 @@ import { createBillFromPoAction } from "../actions";
 import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /** The dialog's width; its body, where the lines sit, is 48px less. */
 export const BILL_FROM_PO_MODAL_WIDTH = 860;
@@ -117,7 +118,8 @@ function BillFromPoModalBody({
   const varianceBlocked = needsReason && !canApproveVariance;
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const payload = Object.entries(state)
       .filter(([, s]) => s.quantity > 0)
       .map(([id, s]) => ({

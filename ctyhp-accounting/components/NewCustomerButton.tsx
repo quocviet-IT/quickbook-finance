@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { App, Button, Form, Input, Modal } from "antd";
 import { createCustomerAction } from "@/app/(app)/invoices/actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /**
  * Create a customer without leaving the document being written.
@@ -25,7 +26,8 @@ export default function NewCustomerButton({
   const [form] = Form.useForm<{ name: string; email?: string }>();
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await createCustomerAction(values);
     setSaving(false);
@@ -54,7 +56,7 @@ export default function NewCustomerButton({
         cancelText="Cancel"
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form form={form} layout="vertical">
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Enter a name" }]}>
             <Input />
           </Form.Item>

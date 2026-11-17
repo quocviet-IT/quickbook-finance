@@ -4,6 +4,7 @@ import { Alert, App, Form, Input, InputNumber, Modal, Radio, Switch, Typography 
 import { companySlugFromName } from "@/lib/domain/company-slug";
 import { CHART_TEMPLATES, CHART_TEMPLATE_KEYS, type ChartTemplateKey } from "@/lib/domain/chart-templates";
 import { requestCompanyAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface NewCompanyModalProps {
   open: boolean;
@@ -42,7 +43,8 @@ export default function NewCompanyModal({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     try {
       const res = await requestCompanyAction(values);
@@ -81,7 +83,6 @@ export default function NewCompanyModal({
       <Form
         form={form}
         layout="vertical"
-        requiredMark={false}
         initialValues={{ is_sample: false, display_order: 100, chart_template: "standard" }}
       >
         <Form.Item

@@ -48,6 +48,41 @@ export interface Release {
  */
 export const RELEASES: Release[] = [
   {
+    version: "3.0.45",
+    date: "2026-11-17",
+    headline: "Table headings stay in view, report labels are easier to read, and forms show which fields are required.",
+    changes: [
+      {
+        kind: "fixed",
+        title: "Column headings stay at the top as you scroll a long list",
+        detail:
+          "Invoices, Customers, Payments, Fixed assets, Banking and the other long lists were meant to keep their column headings in view while you scroll, but the headings scrolled away with the rows. On a computer they now stay just under the search and filter bar, which stays at the top as before. On a phone the filter bar now scrolls away with the page, because it was half hidden behind the top bar and took much of the screen, and the column headings stay under the top bar.",
+        route: "/invoices",
+      },
+      {
+        kind: "changed",
+        title: "Report labels are larger and no longer in capitals",
+        detail:
+          "Small labels such as \"ACCRUAL BASIS · USD\", the figures above a report, report column headings, section rows and the Settings group titles were 10px capitals. They are now 12px and written normally, as in \"Accrual basis · USD\". Section rows such as Assets and Liabilities are the size of the rows under them. No figure changed.",
+        route: "/reports",
+      },
+      {
+        kind: "changed",
+        title: "The customer statement shows how to reach you",
+        detail:
+          "The Customer Statement now prints the company's address, phone and email under its name, on screen and in its PDF, as invoices do. They come from Settings › Company.",
+        route: "/reports/customer-statement",
+      },
+      {
+        kind: "changed",
+        title: "Required fields are marked, and Save takes you to the first one missing",
+        detail:
+          "Forms across the app now put a red asterisk on each required field. When something is missing or wrong, Save moves to that field and puts the cursor in it, instead of leaving you on the button to look for the red text.",
+        route: "/bills",
+      },
+    ],
+  },
+  {
     version: "3.0.44",
     date: "2026-11-17",
     headline: "Bills opens with what is overdue, says how late each is, and keeps every row to one line.",

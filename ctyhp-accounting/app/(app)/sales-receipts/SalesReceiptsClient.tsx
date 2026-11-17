@@ -22,6 +22,7 @@ import {
   SALES_RECEIPT_STATUS_TONES,
 } from "./sales-receipt-columns";
 import styles from "./sales-receipts.module.css";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export default function SalesReceiptsClient({
   initialCreateOpen,
@@ -257,12 +258,8 @@ function VoidReceiptDialog({ receipt, onClose }: { receipt: SalesReceiptRow; onC
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
-    let values: { reason: string };
-    try {
-      values = await form.validateFields();
-    } catch {
-      return;
-    }
+    const values: { reason: string } | null = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     setError(null);
     const res = await voidSalesReceiptAction({ id: receipt.id, reason: values.reason.trim() });
@@ -294,7 +291,7 @@ function VoidReceiptDialog({ receipt, onClose }: { receipt: SalesReceiptRow; onC
         stops counting as sales and as money in {receipt.deposit_account_label || "the deposit account"}. The number is
         kept and never reused. To correct a mistake, enter the sale again as a new receipt.
       </p>
-      <Form form={form} layout="vertical" requiredMark={false}>
+      <Form form={form} layout="vertical">
         <Form.Item
           name="reason"
           label="Reason"

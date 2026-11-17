@@ -81,6 +81,7 @@ import {
   postAssetDepreciationBatchAction,
   registerFixedAssetAction,
 } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 const CATEGORIES = [
   "Jewelry Production Equipment",
@@ -426,7 +427,8 @@ export default function FixedAssetsClient({
   }, [initialBillId]);
 
   async function submitAsset() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setBusy(true);
     const result = await registerFixedAssetAction({
       name: values.name,
@@ -694,7 +696,8 @@ export default function FixedAssetsClient({
 
   async function confirmDisposal() {
     if (!disposalAsset || !disposalPreview) return;
-    const values = await disposalForm.validateFields();
+    const values = await validateOrFocus(disposalForm);
+    if (!values) return;
     if (disposalPreview.netProceedsMinor !== 0 && !values.proceeds_account_id) {
       message.error("Select the account that receives or pays the net disposal amount");
       return;
@@ -1009,7 +1012,7 @@ export default function FixedAssetsClient({
         width={860}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form form={form} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={16}>
               <Form.Item
@@ -1430,7 +1433,7 @@ export default function FixedAssetsClient({
           description="The system first posts completed depreciation through the disposal date, removes cost and accumulated depreciation, then records net proceeds and the resulting gain or loss."
           style={{ marginBottom: 16 }}
         />
-        <Form form={disposalForm} layout="vertical" requiredMark={false}>
+        <Form form={disposalForm} layout="vertical">
           <Row gutter={16}>
             <Col xs={24} md={8}>
               <Form.Item

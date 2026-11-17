@@ -5,6 +5,7 @@ import type { VendorRow } from "@/lib/db/types";
 import { parsePaymentTerms } from "@/lib/domain/payment-terms";
 import { createdVendorRow, type NewVendorInput } from "@/lib/domain/vendors";
 import { createVendorAction } from "@/app/(app)/vendors/actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /**
  * Create a vendor without leaving the document being written.
@@ -49,7 +50,8 @@ export default function NewVendorButton({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await createVendorAction(values);
     setSaving(false);
@@ -76,7 +78,7 @@ export default function NewVendorButton({
         cancelText="Cancel"
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form form={form} layout="vertical">
           <Form.Item name="name" label="Name" rules={[{ required: true, message: "Name is required" }]}>
             <Input />
           </Form.Item>

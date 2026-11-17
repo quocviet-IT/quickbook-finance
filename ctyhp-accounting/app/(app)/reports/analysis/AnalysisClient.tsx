@@ -40,6 +40,7 @@ import { fromMinor, toMinor } from "@/lib/domain/money";
 import type { LedgerBalance } from "@/lib/domain/reports";
 import { archiveAnalysisAction, freezeAnalysisAction, getAnalysisDataAction } from "./actions";
 import AnalysisReportTables, { analysisSheet } from "./AnalysisReportTables";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface LoadedData {
   pnlRows: LedgerBalance[];
@@ -172,7 +173,8 @@ export default function AnalysisClient({
   }
 
   async function saveAdjustment() {
-    const values = await editorForm.validateFields();
+    const values = await validateOrFocus(editorForm);
+    if (!values) return;
     const candidate: AnalysisAdjustment = {
       key: editing?.key ?? `adj-${Date.now()}`,
       label: values.label ?? "",
@@ -193,7 +195,8 @@ export default function AnalysisClient({
   }
 
   async function freeze() {
-    const values = await freezeForm.validateFields();
+    const values = await validateOrFocus(freezeForm);
+    if (!values) return;
     setFreezing(true);
     const res = await freezeAnalysisAction({
       title: values.title,

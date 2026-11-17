@@ -3,6 +3,7 @@ import { useState } from "react";
 import { App, Form, Input, Modal, Typography } from "antd";
 import { EDIT_BANK_ACCOUNT } from "@/lib/domain/statement-other-accounts";
 import { updateBankAccountAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /**
  * Edit account (3.0.22): correct a bank account's name or number.
@@ -44,7 +45,8 @@ export default function EditBankAccountModal({ account, onClose, onSaved }: Prop
 
   async function save() {
     if (!account || saving) return;
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     try {
       const result = await updateBankAccountAction(account.id, values);
@@ -78,7 +80,6 @@ export default function EditBankAccountModal({ account, onClose, onSaved }: Prop
           key={account.id}
           form={form}
           layout="vertical"
-          requiredMark={false}
           initialValues={{ bank_name: account.bank_name, account_number_masked: account.account_number_masked ?? "" }}
         >
           <Form.Item

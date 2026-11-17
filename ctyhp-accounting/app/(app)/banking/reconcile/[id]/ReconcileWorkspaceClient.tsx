@@ -104,6 +104,7 @@ import ReadFailure, { type WorkspacePart } from "./ReadFailure";
 /** The statement dialog Banking uses, fetched when somebody opens it. */
 const ImportStatementModal = dynamic(() => import("../../ImportStatementModal"), { ssr: false });
 import type { ConfirmedImport } from "../../ImportStatementModal";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 // See table-pagination.ts for why this has to live in state rather than as a
 // literal on `pagination`.
@@ -551,7 +552,8 @@ export default function ReconcileWorkspaceClient({
 
   const submitAdjust = async () => {
     if (adjusting) return;
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setAdjusting(true);
     try {
       const r = await recordAdjustmentAction(reconciliationId, { offset_account_id: v.offset_account_id, reason: v.reason });

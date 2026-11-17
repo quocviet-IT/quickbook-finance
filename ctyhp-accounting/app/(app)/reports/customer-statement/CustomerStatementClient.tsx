@@ -17,6 +17,8 @@ interface Props {
   /** From ?customer=: the report opens on this customer. */
   initialCustomerId?: string;
   companyName: string;
+  /** The company's address, phone and email, under its name on the statement and its PDF (3.0.45). */
+  companyLines: string[];
   baseCurrency: string;
   baseDecimals: number;
   presets: PresetContext;
@@ -24,7 +26,7 @@ interface Props {
   payNote: string | null;
 }
 
-export default function CustomerStatementClient({ customers, initialCustomerId, companyName, baseCurrency, baseDecimals, presets, payNote }: Props) {
+export default function CustomerStatementClient({ customers, initialCustomerId, companyName, companyLines, baseCurrency, baseDecimals, presets, payNote }: Props) {
   const [customerId, setCustomerId] = useState<string | undefined>(initialCustomerId);
   // Choosing another customer runs the report again over the dates last run.
   const [refreshKey, setRefreshKey] = useState(0);
@@ -41,13 +43,14 @@ export default function CustomerStatementClient({ customers, initialCustomerId, 
   );
   const sheet = useCallback(
     (data: PartyStatement, when: ReportWhen) =>
-      partyStatementSheet("customer", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals }, payNote),
-    [companyName, baseCurrency, baseDecimals, payNote],
+      partyStatementSheet("customer", data.partyName, data.report, when, { companyName, currencyCode: baseCurrency, baseDecimals, companyLines }, payNote),
+    [companyName, companyLines, baseCurrency, baseDecimals, payNote],
   );
 
   return (
     <SimpleReport<PartyStatement>
       companyName={companyName}
+      companyLines={companyLines}
       title="Customer Statement"
       currencyCode={baseCurrency}
       period={{ kind: "range", ctx: presets, preset: "year" }}

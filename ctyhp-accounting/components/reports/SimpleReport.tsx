@@ -51,6 +51,8 @@ export function reportPagination(
 
 export interface SimpleReportProps<T> {
   companyName: string;
+  /** How to reach the company, printed under its name; only a report sent outside the company passes it (3.0.45). */
+  companyLines?: readonly string[];
   /** The report's printed heading. */
   title: string;
   currencyCode: string;
@@ -228,6 +230,7 @@ export default function SimpleReport<T>(props: SimpleReportProps<T>) {
     <div className="report-print-area">
       <ReportPaper
         companyName={props.companyName}
+        companyLines={props.companyLines}
         title={props.title}
         range={caption(period, ran)}
         currencyCode={props.currencyCode}

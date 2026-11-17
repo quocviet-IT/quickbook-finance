@@ -8,6 +8,7 @@ import { formatDate, formatMoney, plural } from "@/lib/format";
 import type { RelatedPreview } from "@/lib/services/related-companies";
 import { previewRelatedCompanyAction, saveRelatedCompanyAction } from "./actions";
 import styles from "./repayments.module.css";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface RelatedFormValues {
   name: string;
@@ -83,7 +84,8 @@ export default function RelatedCompanyFormModal({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setSaving(true);
     const res = await saveRelatedCompanyAction(relatedId, toRelatedInput({ ...EMPTY_RELATED, ...values }));
     setSaving(false);
@@ -107,7 +109,7 @@ export default function RelatedCompanyFormModal({
       destroyOnHidden
       width={620}
     >
-      <Form form={form} layout="vertical" requiredMark={false} initialValues={initial} onValuesChange={onValuesChange}>
+      <Form form={form} layout="vertical" initialValues={initial} onValuesChange={onValuesChange}>
         <Form.Item
           name="name"
           label="Company name"

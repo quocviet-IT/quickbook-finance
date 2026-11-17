@@ -1307,13 +1307,40 @@ fieldset.accounting-form-section > legend {
   min-height: 36px;
 }
 
+/*
+ * The frame clips its corners with `overflow: clip`, not `hidden`. A box with
+ * `overflow: hidden` is a scroll container even though nothing in it scrolls,
+ * and a sticky header follows its nearest scroll container. So inside a
+ * `hidden` frame, the header of every `sticky` table (Invoices, Customers,
+ * Payments, Fixed assets, Banking...) scrolled away with the page (3.0.45, L8).
+ * `clip` cuts the same corners without making a scroll container, so the
+ * header follows the page.
+ */
 .accounting-data-table {
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
   background: var(--ob-surface-card);
   border: 1px solid var(--ob-chrome-headerBorder);
   border-radius: 10px;
+}
+
+/*
+ * A sticky table header stops under what is pinned above it: the app header
+ * (56px on a computer, two rows on a phone) and, on a computer, the page's
+ * filter bar. Ant Design writes `top: 0` inline (its offsetHeader), which put
+ * the table header behind the app header. AppShell measures the header into
+ * --app-header-height. FilterBar writes its height and the 8px above it into
+ * --filter-bar-space; that is 0 when the page has no filter bar.
+ */
+.accounting-data-table .ant-table-sticky-holder {
+  top: calc(var(--app-header-height, 56px) + var(--filter-bar-space, 0px)) !important;
+}
+
+@media (max-width: 767px) {
+  .accounting-data-table .ant-table-sticky-holder {
+    top: var(--app-header-height, 56px) !important;
+  }
 }
 
 .accounting-data-table .ant-table-wrapper,
@@ -2754,11 +2781,25 @@ body .ant-empty .ant-empty-description,
   }
 }
 
-/* Filter bar stays reachable while a long list scrolls. */
+/*
+ * Filter bar stays reachable while a long list scrolls, 8px under the app
+ * header. FilterBar writes its own height into --filter-bar-space, so a table
+ * header that sticks too stops under the bar instead of on top of it (3.0.45).
+ *
+ * Not on a phone. There the header is two rows and a wrapped bar can be taller
+ * than a third of the screen, so the two together would leave little room for
+ * the list. The bar also stuck at 64px under a 109px header, half hidden.
+ */
 .accounting-filter-bar {
   position: sticky;
-  top: 64px;
+  top: calc(var(--app-header-height, 56px) + 8px);
   z-index: 10;
+}
+
+@media (max-width: 767px) {
+  .accounting-filter-bar {
+    position: static;
+  }
 }
 
 .accounting-context-link {
@@ -2812,10 +2853,8 @@ body .ant-empty .ant-empty-description,
 
 .settings-hub__group-title.ant-typography {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--ob-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 .settings-hub__card-link {
@@ -2926,9 +2965,7 @@ body .ant-empty .ant-empty-description,
 
 .cash-flow-balance-strip small {
   color: var(--ob-panel-textSoft);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 12px;
 }
 
 .cash-flow-components {

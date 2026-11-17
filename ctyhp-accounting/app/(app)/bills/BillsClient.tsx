@@ -53,6 +53,7 @@ import RowActionsMenu from "@/components/ui/RowActionsMenu";
 import { MAKE_RECURRING, useMakeRecurring } from "@/components/recurring/useMakeRecurring";
 import { destructiveConfirmProps } from "@/lib/client/destructive-confirm";
 import { billVoidConfirm, billVoidOption } from "@/lib/domain/bill-void";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface LineForm {
   description?: string;
@@ -226,7 +227,8 @@ export default function BillsClient({
   }
 
   async function submit() {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     const lines = (values.lines as LineForm[]).map((l) => ({
       description: l.description ?? "",
       expense_account_id: l.expense_account_id,

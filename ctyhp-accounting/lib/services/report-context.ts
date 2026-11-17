@@ -2,6 +2,7 @@ import { DEFAULT_TIME_ZONE } from "@/lib/domain/default-time-zone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveActiveCompany } from "@/lib/db/company";
 import type { PresetContext } from "@/lib/domain/report-presets";
+import { documentSeller } from "@/lib/domain/invoice-document";
 import { getCurrentCompanySettings } from "./company";
 import { todayInTimeZone } from "./dashboard";
 import { postedEntryDateSpan } from "./exceptions";
@@ -20,6 +21,12 @@ export interface ReportPageContext {
   presets: PresetContext;
   /** How to pay (2.83), for a customer statement that closes owing something. */
   payNote: string | null;
+  /**
+   * The company's address, then its phone and email, as an invoice prints them
+   * (3.0.45). A customer statement goes to the customer, so it says how to
+   * reach the company. Empty when no settings are saved.
+   */
+  companyLines: string[];
 }
 
 /** The company's today and time zone, for a report action that needs no more. */
@@ -53,5 +60,6 @@ export async function reportPageContext(sb: SupabaseClient): Promise<ReportPageC
       lastEntryDate: span.last,
     },
     payNote: settings?.pay_note ?? null,
+    companyLines: settings ? documentSeller(settings).lines : [],
   };
 }

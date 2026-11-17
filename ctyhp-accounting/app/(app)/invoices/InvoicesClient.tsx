@@ -472,7 +472,8 @@ export default function InvoicesClient({
   }
 
   async function submitCustomer() {
-    const v = await custForm.validateFields();
+    const v = await validateOrFocus(custForm);
+    if (!v) return;
     const res = await createCustomerAction(v);
     if (res.ok && res.data) {
       const c: CustomerRow = {
@@ -583,7 +584,8 @@ export default function InvoicesClient({
 
   async function submitOverride() {
     if (!overrideFor) return;
-    const values = await overrideForm.validateFields();
+    const values = await validateOrFocus(overrideForm);
+    if (!values) return;
     const target = overrideFor;
     setOverrideFor(null);
     await issue(target.invoice.id, values.reason);

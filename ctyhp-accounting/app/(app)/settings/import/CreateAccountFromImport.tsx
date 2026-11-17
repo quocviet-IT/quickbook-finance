@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Alert, App, Form, Input, Modal, Select, Space } from "antd";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_LABEL } from "@/lib/domain/accounts";
 import { createAccountAction } from "@/app/(app)/accounts/actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface CreateAccountFromImportProps {
   /** The name in the file, which becomes the proposed account name. */
@@ -36,7 +37,8 @@ export default function CreateAccountFromImport({
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setBusy(true);
     const result = await createAccountAction({
       account_code: String(values.account_code).trim(),

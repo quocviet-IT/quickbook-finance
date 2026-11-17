@@ -23,6 +23,7 @@ import DataTable from "@/components/ui/DataTable";
 import { flexColumn } from "@/components/ui/columns";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { correctPaymentAction, getOpenInvoicesAction, recordPaymentAction } from "./actions";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /**
  * Why this form was opened on top of an existing receipt.
@@ -167,7 +168,8 @@ export default function ReceivePaymentModal({
   );
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     const dec = decimalsOf(v.currency_code);
     const allocations = Object.entries(alloc)
       .filter(([, amt]) => (amt || 0) > 0)
@@ -251,7 +253,7 @@ export default function ReceivePaymentModal({
       ) : null}
       {/* Same defaults the New payment button applies, so the top-bar New menu
           can open this modal directly. */}
-      <Form form={form} layout="vertical" requiredMark={false} initialValues={initialValues}>
+      <Form form={form} layout="vertical" initialValues={initialValues}>
         {correcting ? (
           <Form.Item
             name="reason"

@@ -36,6 +36,7 @@ import {
 import { tokenVar } from "@/lib/design/tokens";
 import { COLUMN } from "@/lib/design/table-metrics";
 import { formatDate, plural, pluralWord } from "@/lib/format";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 type View = "breaks" | "all";
 
@@ -138,7 +139,8 @@ export default function NumberSequenceClient({
 
   async function saveNote() {
     if (!noteFor || !audit) return;
-    const values = await noteForm.validateFields();
+    const values = await validateOrFocus(noteForm);
+    if (!values) return;
     setSavingNote(true);
     const res = await recordGapNoteAction({
       sequenceKey: audit.definition.sequence_key,
@@ -375,7 +377,7 @@ export default function NumberSequenceClient({
           The reason is stored against the number and audited. It closes the exception in this
           report; it does not recreate the document.
         </Typography.Paragraph>
-        <Form form={noteForm} layout="vertical" requiredMark={false}>
+        <Form form={noteForm} layout="vertical">
           <Form.Item
             name="reason"
             label="Why is this number missing?"

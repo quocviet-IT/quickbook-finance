@@ -24,6 +24,7 @@ import type { ReconcileAccountView } from "./account-view";
 import StandingCard from "./StandingCard";
 import StatementAlertsPanel from "./StatementAlertsPanel";
 import type { StatementReconciliationRow } from "@/lib/db/types";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 /**
  * Ending date, the two balances, Status, and the Open and Report links.
@@ -145,7 +146,8 @@ export default function ReconcileListClient({ canWrite, today, banks, baseCurren
   const reconciledTo = lastCompletedEnding(shownRows);
 
   const submit = async () => {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     const r = await createReconciliationAction({
       bank_account_id: bankId,
       statement_ending_date: v.ending_date.format("YYYY-MM-DD"),

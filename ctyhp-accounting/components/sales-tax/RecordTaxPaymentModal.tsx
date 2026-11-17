@@ -4,6 +4,7 @@ import { App, DatePicker, Form, Input, InputNumber, Modal, Select } from "antd";
 import dayjs from "dayjs";
 import { recordTaxPaymentAction } from "@/app/(app)/sales-tax/actions";
 import { toMinorUnits } from "@/lib/format";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface TaxPaymentAccountOption {
   id: string;
@@ -48,7 +49,8 @@ export default function RecordTaxPaymentModal({
   const [form] = Form.useForm();
 
   async function submit() {
-    const v = await form.validateFields();
+    const v = await validateOrFocus(form);
+    if (!v) return;
     setSaving(true);
     const res = await recordTaxPaymentAction({
       tax_account_id: v.tax_account_id,

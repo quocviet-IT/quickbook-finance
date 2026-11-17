@@ -16,6 +16,7 @@ import {
 } from "@/lib/domain/saved-reports";
 import { createSavedReportUploadTicketAction, registerSavedReportAction } from "./actions";
 import { tokenVar } from "@/lib/design/tokens";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 export interface SaveReportModalProps {
   open: boolean;
@@ -54,7 +55,8 @@ export default function SaveReportModal({ open, onClose, onSaved }: SaveReportMo
       message.error("Choose the report file first");
       return;
     }
-    const values = await form.validateFields();
+    const values = await validateOrFocus(form);
+    if (!values) return;
     setBusy(true);
     let uploadedPath: string | null = null;
     try {

@@ -23,6 +23,7 @@ import type { JournalEntrySummary, JournalPage } from "@/lib/services/journal";
 import { JOURNAL_DEFAULT_PAGE_SIZE, JOURNAL_PAGE_SIZES } from "@/lib/domain/journal-paging";
 import AdjustingEntryControl from "./AdjustingEntryControl";
 import type { ClosedPeriodAsk } from "@/lib/domain/adjusting-entries";
+import { validateOrFocus } from "@/lib/client/validate-or-focus";
 
 interface Account {
   id: string;
@@ -169,7 +170,8 @@ export default function JournalClient({
   };
 
   const submit = async () => {
-    const header = await form.validateFields();
+    const header = await validateOrFocus(form);
+    if (!header) return;
     const payload = {
       entry_date: header.entry_date?.format("YYYY-MM-DD"),
       description: header.description ?? null,
