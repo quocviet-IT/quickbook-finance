@@ -220,8 +220,12 @@ function DashboardScreen({
     const save = choiceSave.current;
     const next = { ...save.latest, [key]: value };
     save.latest = next;
-    save.unsaved = next;
     setChoices(next);
+    // When the person's choices could not be read, the screen started from the
+    // defaults: saving them now would replace what is stored with defaults the
+    // person never chose. The change stands on screen for this visit only.
+    if (preference === null) return;
+    save.unsaved = next;
     if (save.timer !== null) clearTimeout(save.timer);
     save.timer = setTimeout(() => void saveChoices(), CHOICE_SAVE_DELAY_MS);
   }

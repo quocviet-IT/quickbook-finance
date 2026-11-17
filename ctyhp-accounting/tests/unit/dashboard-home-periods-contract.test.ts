@@ -102,6 +102,11 @@ describe("each card's choice, kept for the person (3.0.41)", () => {
     expect(client).toContain("const [choices, setChoices] = useState<CardChoices>(() => preference?.cards ?? { ...DEFAULT_CARD_CHOICES });");
   });
 
+  it("never saves defaults over choices it could not read: a change then stands for the visit only", () => {
+    // The return comes after the screen changes and before anything is queued for saving.
+    expect(client).toMatch(/setChoices\(next\);[\s\S]*?if \(preference === null\) return;\s*save\.unsaved = next;/);
+  });
+
   it("hands every card its choice and a way to change it, Expenses one choice for both its tabs", () => {
     for (const [prop, key] of [
       ["months", "cashMonths"],
