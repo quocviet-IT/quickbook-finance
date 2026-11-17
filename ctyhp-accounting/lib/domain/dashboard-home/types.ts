@@ -70,8 +70,11 @@ export interface HomeFigures {
   };
 }
 
+/** How far ahead the cash forecast looks, in days (3.0.41). */
+export type HomeHorizon = 30 | 60 | 90;
+
 export interface HomeProjection {
-  /** asOf + 30 days. */
+  /** asOf + the horizon's days: asOf + 30 for the next 30 days. */
   through: string;
   /** Open invoices due from asOf through `through`; credits and overdue invoices are not in it. */
   invoicesDueMinor: number;
@@ -101,8 +104,12 @@ export interface HomeCash {
    * Either way, money in minus money out is the month's change in cash.
    */
   transfersExcluded: boolean;
-  /** Null while the books are behind (status.behind). */
-  projection: HomeProjection | null;
+  /**
+   * The forecast 30, 60 and 90 days ahead, all from the same aging rows, so
+   * the card changes horizon without reading again. Null while the books are
+   * behind (status.behind).
+   */
+  projections: Record<HomeHorizon, HomeProjection> | null;
 }
 
 /**

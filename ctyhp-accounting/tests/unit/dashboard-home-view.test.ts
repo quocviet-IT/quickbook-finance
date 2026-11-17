@@ -12,6 +12,8 @@ import {
   homeTabHref,
   homeTabOf,
   HOME_TABS,
+  HORIZON_OPTIONS,
+  horizonLabel,
   lastPostedIndex,
   ledgerDifference,
   missingMonthsSentence,
@@ -93,6 +95,12 @@ describe("the period a card shows", () => {
     ]);
     expect(cashMonthsLabel(6)).toBe("Last 6 months");
     expect(cashMonthsLabel(12)).toBe("Last 12 months");
+  });
+
+  it("offers the forecast 30, 60 or 90 days ahead, and opens its sentence with the same words", () => {
+    expect(HORIZON_OPTIONS.map((option) => option.value)).toEqual([30, 60, 90]);
+    for (const option of HORIZON_OPTIONS) expect(horizonLabel(option.value)).toBe(option.label);
+    expect(horizonLabel(90)).toBe("Next 90 days");
   });
 
   it("measures a change against the size of the prior figure, and refuses a zero or missing one", () => {

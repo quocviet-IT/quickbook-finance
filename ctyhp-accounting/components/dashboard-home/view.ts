@@ -11,6 +11,7 @@ import type {
   HomeBank,
   HomeBankAccount,
   HomeFigures,
+  HomeHorizon,
   HomeMonth,
   HomePeriodKey,
   HomeStatus,
@@ -74,6 +75,18 @@ export const CASH_MONTH_OPTIONS: readonly { value: 6 | 12; label: string }[] = [
 /** "Last 12 months": what Cash flow's footer says under the chart. */
 export function cashMonthsLabel(months: 6 | 12): string {
   return CASH_MONTH_OPTIONS.find((option) => option.value === months)?.label ?? `Last ${months} months`;
+}
+
+/** How far ahead the cash forecast looks (3.0.41). */
+export const HORIZON_OPTIONS: readonly { value: HomeHorizon; label: string }[] = [
+  { value: 30, label: "Next 30 days" },
+  { value: 60, label: "Next 60 days" },
+  { value: 90, label: "Next 90 days" },
+];
+
+/** "Next 60 days": the words that open the forecast's sentence. */
+export function horizonLabel(days: HomeHorizon): string {
+  return `Next ${days} days`;
 }
 
 /** Change from a prior figure as a percentage of its size; null when there is nothing to compare with. */

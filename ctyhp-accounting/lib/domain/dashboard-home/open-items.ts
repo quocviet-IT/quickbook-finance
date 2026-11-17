@@ -12,12 +12,14 @@
 import { bucketOf } from "@/lib/domain/aging";
 import { addIsoDays, calendarDayDifference } from "@/lib/domain/work-queue";
 import type { AgingReportRow } from "@/lib/services/aging";
-import type { HomeNextBill, HomeOpenSide, HomeOwesLongest, HomeProjection } from "./types";
+import type { HomeHorizon, HomeNextBill, HomeOpenSide, HomeOwesLongest, HomeProjection } from "./types";
 
 /** "Due soon" runs from asOf through this many days later, as the bills queue's `through` does. */
 export const DUE_SOON_DAYS = 7;
-/** The cash projection's horizon. */
+/** The cash projection's horizon when none is named. */
 export const PROJECTION_DAYS = 30;
+/** The horizons the Cash flow card offers (3.0.41). */
+export const PROJECTION_HORIZONS: readonly HomeHorizon[] = [30, 60, 90];
 
 export type OpenItemRow = Pick<
   AgingReportRow,
@@ -184,6 +186,17 @@ export function projection(
     overdueLeftOutMinor: sum(arRows, "invoice", late),
     overdueBillsLeftOutMinor: sum(apRows, "bill", late),
   };
+}
+
+/** The projection at every horizon the card offers, from the same rows and the same cash today. */
+export function projections(
+  cashTodayMinor: number,
+  arRows: readonly OpenItemRow[],
+  apRows: readonly OpenItemRow[],
+  asOf: string,
+): Record<HomeHorizon, HomeProjection> {
+  const at = (days: HomeHorizon) => projection(cashTodayMinor, arRows, apRows, asOf, days);
+  return { 30: at(30), 60: at(60), 90: at(90) };
 }
 
 /** Overdue documents of one type: how many, how much, and the oldest one's days late. Null when there are none. */

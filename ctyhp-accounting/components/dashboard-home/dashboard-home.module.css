@@ -710,7 +710,32 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Next 30 days ------------------------------------------------------- */
+/* --- The next 30, 60 or 90 days ----------------------------------------- */
+/*
+ * The forecast's sentence with its horizon beside it. Below 400px of card
+ * (a phone, a narrow card) the sentence keeps the row and the select drops
+ * under it, still at the right.
+ */
+.forecastHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+}
+
+.forecastHead > p {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* "Next 90 days" is 80px in Segoe UI at 14px; 128px leaves it 94px inside the select. */
+.horizon {
+  flex: none;
+  width: 128px;
+  margin-inline-start: auto;
+}
+
 .forecast {
   display: flex;
   flex-wrap: wrap;

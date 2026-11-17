@@ -3,12 +3,12 @@ import { useState } from "react";
 import { tokenVar } from "@/lib/design/tokens";
 import { listWords } from "@/lib/domain/dashboard-home/insights";
 import { longMonthName } from "@/lib/domain/dashboard-home/ranges";
-import type { HomeCash, HomeStatus } from "@/lib/domain/dashboard-home/types";
+import type { HomeCash, HomeHorizon, HomeStatus } from "@/lib/domain/dashboard-home/types";
 import type { SectionEnvelope } from "@/lib/domain/work-surface/types";
 import { formatDate } from "@/lib/format";
 import CashFlowChart from "./charts/CashFlowChart";
 import styles from "./dashboard-home.module.css";
-import { CASH_MONTH_OPTIONS, cashMonthsLabel, lastPostedDay } from "./view";
+import { CASH_MONTH_OPTIONS, cashMonthsLabel, HORIZON_OPTIONS, horizonLabel, lastPostedDay } from "./view";
 import { ChoiceSelect, Delta, Empty, LinkButton, Spacer, Swatch, TextLink, Unavailable, Widget } from "./Widget";
 
 const TITLE = "Cash flow";
@@ -43,6 +43,7 @@ export default function CashFlowWidget({
   compact: (minor: number) => string;
 }) {
   const [span, setSpan] = useState<6 | 12>(6);
+  const [horizon, setHorizon] = useState<HomeHorizon>(30);
   const extra = <ChoiceSelect value={span} onChange={setSpan} options={CASH_MONTH_OPTIONS} label="Months of Cash flow" />;
   const footer = (
     <>
@@ -74,7 +75,8 @@ export default function CashFlowWidget({
   const today = data.balanceMinor[last] ?? 0;
   const change = last > 0 ? today - data.balanceMinor[last - 1] : 0;
   const behind = status?.behind === true;
-  const projection = data.projection;
+  // The sentence, the strip and the dashed point all follow the horizon chosen.
+  const projection = data.projections ? data.projections[horizon] : null;
   const month = data.months[last];
 
   return (
@@ -132,10 +134,19 @@ export default function CashFlowWidget({
       </p>
       {projection ? (
         <div>
-          <p className={styles.caption} style={{ marginBottom: 6 }}>
-            <b>Next 30 days</b>, to {formatDate(projection.through)}, if customers pay on their due dates.
-            {leftOut(projection.overdueLeftOutMinor, projection.overdueBillsLeftOutMinor, money)}
-          </p>
+          <div className={styles.forecastHead}>
+            <p className={styles.caption}>
+              <b>{horizonLabel(horizon)}</b>, to {formatDate(projection.through)}, if customers pay on their due dates.
+              {leftOut(projection.overdueLeftOutMinor, projection.overdueBillsLeftOutMinor, money)}
+            </p>
+            <ChoiceSelect
+              value={horizon}
+              onChange={setHorizon}
+              options={HORIZON_OPTIONS}
+              label="How far ahead the cash forecast looks"
+              className={styles.horizon}
+            />
+          </div>
           <div className={styles.forecast}>
             <div className={styles.forecastItem}>
               <span>Cash today</span>
@@ -168,8 +179,8 @@ export default function CashFlowWidget({
       ) : (
         <Empty title="No forecast while the books are behind">
           {status && status.missingMonths.length > 0
-            ? `Import ${listWords(status.missingMonths)} to see the next 30 days.`
-            : "Bring the books up to date to see the next 30 days."}
+            ? `Import ${listWords(status.missingMonths)} to see the next ${horizon} days.`
+            : `Bring the books up to date to see the next ${horizon} days.`}
         </Empty>
       )}
     </Widget>

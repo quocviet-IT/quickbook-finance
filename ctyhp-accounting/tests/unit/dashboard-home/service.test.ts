@@ -393,15 +393,14 @@ describe("getDashboardHome", () => {
     ]);
   });
 
-  it("projects 30 days of cash from invoices and bills due, leaving out what is already late", async () => {
+  it("projects cash 30, 60 and 90 days ahead from invoices and bills due, leaving out what is already late", async () => {
     const { home } = await load();
-    expect(home.cash.data!.projection).toEqual({
-      through: "2026-12-13",
-      invoicesDueMinor: 3_000_00,
-      billsDueMinor: 9_200_00,
-      projectedMinor: 103_500_00 + 3_000_00 - 9_200_00,
-      overdueLeftOutMinor: 12_550_00,
-      overdueBillsLeftOutMinor: 2_800_00,
+    const late = { overdueLeftOutMinor: 12_550_00, overdueBillsLeftOutMinor: 2_800_00 };
+    expect(home.cash.data!.projections).toEqual({
+      30: { through: "2026-12-13", invoicesDueMinor: 3_000_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 3_000_00 - 9_200_00, ...late },
+      // INV-4, due December 20, comes in at 60 days; nothing more falls due before February 11.
+      60: { through: "2027-01-12", invoicesDueMinor: 7_700_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 7_700_00 - 9_200_00, ...late },
+      90: { through: "2027-02-11", invoicesDueMinor: 7_700_00, billsDueMinor: 9_200_00, projectedMinor: 103_500_00 + 7_700_00 - 9_200_00, ...late },
     });
   });
 
@@ -666,7 +665,7 @@ describe("books behind and a new company", () => {
     const { home } = await load({ tables: { acc_journal_entry: () => ({ data: [{ entry_date: "2026-09-30" }] }) } });
     expect(home.status.data).toMatchObject({ postedThrough: "2026-09-30", behind: true, missingMonths: ["October", "November"] });
     // With the books behind no projection is made.
-    expect(home.cash.data!.projection).toBeNull();
+    expect(home.cash.data!.projections).toBeNull();
     expect(home.insights.data![0].key).toBe("books-behind");
   });
 

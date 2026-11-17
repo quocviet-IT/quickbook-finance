@@ -12,7 +12,7 @@ import {
   overdueParties,
   overdueSummary,
   owesLongest,
-  projection,
+  projections,
   splitOpenSide,
 } from "@/lib/domain/dashboard-home/open-items";
 import {
@@ -539,7 +539,8 @@ export async function getDashboardHome(sb: SupabaseClient, input: DashboardHomeI
       inMinor: flow.inMinor.slice(cashFrom),
       outMinor: flow.outMinor.slice(cashFrom),
       transfersExcluded: excluded,
-      projection: ar && ap ? projection(b.cashToday, ar.rows, ap.rows, asOf) : null,
+      // 30, 60 and 90 days ahead from the same rows: the card changes horizon without reading again.
+      projections: ar && ap ? projections(b.cashToday, ar.rows, ap.rows, asOf) : null,
     };
   };
 
