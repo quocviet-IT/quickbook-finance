@@ -104,7 +104,12 @@ export interface HomeCash {
   projection: HomeProjection | null;
 }
 
-export type HomePeriodKey = "month" | "lastMonth" | "quarter" | "year";
+/**
+ * The periods a card can show (3.0.41 added the last three): this month to
+ * date, last month, the last three whole months, this quarter to date, this
+ * fiscal year to date, the last twelve whole months and the previous fiscal year.
+ */
+export type HomePeriodKey = "month" | "lastMonth" | "last3" | "quarter" | "year" | "last12" | "lastYear";
 
 export interface HomeExpenseLine {
   /** Null for "Everything else". */

@@ -48,6 +48,10 @@ describe("homePeriodRanges", () => {
         label: "This year",
         compareLabel: "vs same days last year",
       },
+      // The three periods of whole months (3.0.41), checked on their own below.
+      last3: expect.objectContaining({ label: "Last 3 months" }),
+      last12: expect.objectContaining({ label: "Last 12 months" }),
+      lastYear: expect.objectContaining({ label: "Last year" }),
     });
   });
 
@@ -91,6 +95,79 @@ describe("homePeriodRanges", () => {
     expect(before).toMatchObject({ from: "2025-07-01", priorFrom: "2024-07-01", priorTo: "2025-03-10" });
     // The quarter stays a calendar quarter whatever the fiscal year.
     expect(homePeriodRanges("2026-11-13", 7).quarter.from).toBe("2026-10-01");
+  });
+});
+
+describe("the periods of whole months (3.0.41)", () => {
+  it("are the last three months, the last twelve and last year, never the month to date", () => {
+    const ranges = homePeriodRanges("2026-11-17", 1);
+    expect(ranges.last3).toEqual({
+      from: "2026-08-01",
+      to: "2026-10-31",
+      priorFrom: "2026-05-01",
+      priorTo: "2026-07-31",
+      label: "Last 3 months",
+      compareLabel: "vs May – Jul 2026",
+    });
+    expect(ranges.last12).toEqual({
+      from: "2025-11-01",
+      to: "2026-10-31",
+      priorFrom: "2024-11-01",
+      priorTo: "2025-10-31",
+      label: "Last 12 months",
+      compareLabel: "vs Nov 2024 – Oct 2025",
+    });
+    expect(ranges.lastYear).toEqual({
+      from: "2025-01-01",
+      to: "2025-12-31",
+      priorFrom: "2024-01-01",
+      priorTo: "2024-12-31",
+      label: "Last year",
+      compareLabel: "vs 2024",
+    });
+    // Whole months: none of them reaches into November, the month to date.
+    for (const key of ["last3", "last12", "lastYear"] as const) {
+      expect(ranges[key].to < "2026-11-01", key).toBe(true);
+      expect(ranges[key].priorTo < ranges[key].from, key).toBe(true);
+    }
+  });
+
+  it("reaches back across the new year in January and February, and names each year when the months span two", () => {
+    const january = homePeriodRanges("2027-01-20", 1);
+    expect(january.last3).toMatchObject({ from: "2026-10-01", to: "2026-12-31", priorFrom: "2026-07-01", priorTo: "2026-09-30", compareLabel: "vs Jul – Sep 2026" });
+    expect(january.last12).toMatchObject({ from: "2026-01-01", to: "2026-12-31", priorFrom: "2025-01-01", priorTo: "2025-12-31", compareLabel: "vs Jan – Dec 2025" });
+    expect(january.lastYear).toMatchObject({ from: "2026-01-01", to: "2026-12-31", priorFrom: "2025-01-01", priorTo: "2025-12-31", compareLabel: "vs 2025" });
+    const february = homePeriodRanges("2027-02-10", 1);
+    expect(february.last3).toMatchObject({ from: "2026-11-01", to: "2027-01-31", priorFrom: "2026-08-01", priorTo: "2026-10-31", compareLabel: "vs Aug – Oct 2026" });
+    // The comparison itself spans the new year.
+    const may = homePeriodRanges("2026-05-04", 1);
+    expect(may.last3).toMatchObject({ from: "2026-02-01", to: "2026-04-30", priorFrom: "2025-11-01", priorTo: "2026-01-31", compareLabel: "vs Nov 2025 – Jan 2026" });
+  });
+
+  it("takes last year as the whole previous fiscal year when it starts in July, named by its months", () => {
+    const after = homePeriodRanges("2026-11-17", 7).lastYear;
+    expect(after).toEqual({
+      from: "2025-07-01",
+      to: "2026-06-30",
+      priorFrom: "2024-07-01",
+      priorTo: "2025-06-30",
+      label: "Last year",
+      compareLabel: "vs FY Jul 2024 – Jun 2025",
+    });
+    // Before July the current fiscal year began the previous July.
+    expect(homePeriodRanges("2026-03-10", 7).lastYear).toMatchObject({ from: "2024-07-01", to: "2025-06-30", compareLabel: "vs FY Jul 2023 – Jun 2024" });
+    // The months stay calendar months whatever the fiscal year.
+    expect(homePeriodRanges("2026-11-17", 7).last3).toMatchObject({ from: "2026-08-01", to: "2026-10-31" });
+  });
+
+  it("ends on February 29 in a leap year", () => {
+    const march = homePeriodRanges("2028-03-15", 1);
+    expect(march.last3).toMatchObject({ from: "2027-12-01", to: "2028-02-29", priorFrom: "2027-09-01", priorTo: "2027-11-30", compareLabel: "vs Sep – Nov 2027" });
+    expect(march.last12).toMatchObject({ from: "2027-03-01", to: "2028-02-29", priorFrom: "2026-03-01", priorTo: "2027-02-28" });
+    // A fiscal year from March: the one before last ends on the leap day, the one before it on the 28th.
+    const fiscal = homePeriodRanges("2029-04-02", 3).lastYear;
+    expect(fiscal).toMatchObject({ from: "2028-03-01", to: "2029-02-28", priorFrom: "2027-03-01", priorTo: "2028-02-29", compareLabel: "vs FY Mar 2027 – Feb 2028" });
+    expect(homePeriodRanges("2028-04-02", 3).lastYear).toMatchObject({ from: "2027-03-01", to: "2028-02-29" });
   });
 });
 
